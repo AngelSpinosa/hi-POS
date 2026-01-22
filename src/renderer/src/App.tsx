@@ -8,8 +8,8 @@ function App() {
   const [cart, setCart] = useState<CartItem[]>([])
   const [activeOrderId, setActiveOrderId] = useState<number | null>(null)
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false)
+  const [successData, setSuccessData] = useState<{ change: number, orderId: number } | null>(null)
 
-  // Función central: Sincronizar el Frontend con la Base de Datos
   const fetchActiveOrder = useCallback(async () => {
     try {
       // @ts-ignore
@@ -23,14 +23,12 @@ function App() {
     }
   }, [])
 
-  // 1. Inicialización de la App
   useEffect(() => {
     const init = async () => {
       try {
         // @ts-ignore
         const items = await window.electron.ipcRenderer.invoke('get-products')
         setProducts(items)
-        
         await fetchActiveOrder()
       } catch (error) {
         console.error('Error inicializando app:', error)
@@ -39,44 +37,44 @@ function App() {
     init()
   }, [fetchActiveOrder])
 
-  // 2. Agregar Producto
+  // --- ACCIONES OPTIMIZADAS (Actualización directa) ---
+
   const addToCart = async (product: Producto) => {
     if (!activeOrderId) return
-
     try {
       // @ts-ignore
       const result = await window.electron.ipcRenderer.invoke('add-to-cart', {
         orderId: activeOrderId,
         product
       })
-      
-      if (result.success) await fetchActiveOrder()
+      // Usamos directamente los items que devuelve el backend
+      if (result.success && result.items) {
+        setCart(result.items)
+      }
     } catch (error) {
       console.error('Error agregando producto:', error)
     }
   }
 
-  // 3. Eliminar Producto
   const removeFromCart = async (productId: number) => {
     if (!activeOrderId) return
-
     try {
       // @ts-ignore
       const result = await window.electron.ipcRenderer.invoke('remove-from-cart', {
         orderId: activeOrderId,
         productId
       })
-      
-      if (result.success) await fetchActiveOrder()
+      // Actualización inmediata
+      if (result.success && result.items) {
+        setCart(result.items)
+      }
     } catch (error) {
       console.error('Error eliminando producto:', error)
     }
   }
 
-  // 4. Actualizar Cantidad
   const updateQuantity = async (productId: number, newQuantity: number) => {
     if (!activeOrderId) return
-
     try {
       // @ts-ignore
       const result = await window.electron.ipcRenderer.invoke('update-quantity', {
@@ -84,8 +82,10 @@ function App() {
         productId,
         quantity: newQuantity
       })
-      
-      if (result.success) await fetchActiveOrder()
+      // Actualización inmediata
+      if (result.success && result.items) {
+        setCart(result.items)
+      }
     } catch (error) {
       console.error('Error actualizando cantidad:', error)
     }
@@ -93,10 +93,8 @@ function App() {
 
   const total = cart.reduce((sum, item) => sum + item.precio * item.quantity, 0)
 
-  // 5. Procesar Pago
   const handlePaymentConfirm = async (method: 'efectivo' | 'tarjeta', received: number) => {
     if (!activeOrderId) return
-
     try {
       // @ts-ignore
       const result = await window.electron.ipcRenderer.invoke('pay-order', {
@@ -106,11 +104,16 @@ function App() {
       })
 
       if (result.success) {
+        const change = received - total
+        setSuccessData({ change, orderId: activeOrderId })
+        
         console.log('Venta completada. Orden ID:', activeOrderId)
         setIsPaymentModalOpen(false)
         await fetchActiveOrder() 
+        setTimeout(() => setSuccessData(null), 3000)
+
       } else {
-        alert('Error al procesar el pago.')
+        alert(result.error || 'Error al procesar el pago.')
       }
     } catch (error) {
       console.error('Error de comunicación:', error)
@@ -140,7 +143,7 @@ function App() {
       <OrderCart 
         cart={cart} 
         total={total}
-        orderId={activeOrderId} // <--- Pasamos el ID real aquí
+        orderId={activeOrderId}
         onPay={() => setIsPaymentModalOpen(true)} 
         onRemove={removeFromCart}
         onUpdateQuantity={updateQuantity}
@@ -153,6 +156,45 @@ function App() {
         onClose={() => setIsPaymentModalOpen(false)}
         onConfirmPayment={handlePaymentConfirm}
       />
+
+      {/* FEEDBACK VISUAL DE ÉXITO */}
+      {successData && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.85)',
+          backdropFilter: 'blur(5px)',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          zIndex: 2000, color: 'white', animation: 'fadeIn 0.2s'
+        }} onClick={() => setSuccessData(null)}>
+          
+          <div style={{ fontSize: '5rem', marginBottom: '10px' }}>✅</div>
+          <h1 style={{ fontSize: '3rem', margin: 0, textShadow: '0 4px 10px rgba(0,0,0,0.5)' }}>
+            ¡Venta Exitosa!
+          </h1>
+          <p style={{ fontSize: '1.5rem', color: '#d1d5db', marginTop: '10px' }}>
+            Orden #{successData.orderId.toString().padStart(4, '0')} registrada
+          </p>
+          
+          <div style={{ 
+            marginTop: '30px', padding: '20px 40px', 
+            backgroundColor: '#2d2d2d', borderRadius: '15px', 
+            border: '2px solid #22c55e',
+            boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
+            textAlign: 'center' 
+          }}>
+            <div style={{ fontSize: '1.2rem', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '1px' }}>
+              Su Cambio
+            </div>
+            <div style={{ fontSize: '4rem', fontWeight: 'bold', color: '#22c55e', lineHeight: 1, marginTop: '5px' }}>
+              ${successData.change.toFixed(2)}
+            </div>
+          </div>
+          
+          <p style={{ marginTop: '50px', color: '#6b7280' }}>
+            Toque en cualquier lugar para continuar
+          </p>
+        </div>
+      )}
     </div>
   )
 }
