@@ -1,0 +1,30 @@
+/* src/renderer/src/assets/base.css */
+:root {
+  /* --- COLORES BASE --- */
+  --color-bg-main: #1a1a1a;      /* Fondo principal oscuro */
+  --color-bg-card: #2d2d2d;      /* Fondo de tarjetas/botones */
+  --color-bg-ticket: #262626;    /* Fondo del ticket lateral */
+  
+  /* --- TIPOGRAFÍA --- */
+  --color-text-main: #ffffff;
+  --color-text-muted: #a3a3a3;
+  
+  /* --- ACCIONES Y ESTADOS --- */
+  --color-primary: #e74c3c;      /* Rojo Pizza (Botones principales/Header) */
+  --color-accent: #fbbf24;       /* Amarillo/Dorado (Precios) */
+  --color-success: #22c55e;      /* Verde (Botón Cobrar) */
+  --color-border: #404040;       /* Bordes sutiles */
+  
+  /* --- ESPACIADO --- */
+  --radius-std: 8px;             /* Bordes redondeados estándar */
+}
+
+body {
+  background-color: var(--color-bg-main);
+  color: var(--color-text-main);
+  font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  margin: 0;
+  padding: 0;
+  overflow: hidden; /* App de escritorio no debe tener scroll en body */
+  user-select: none; /* UI de POS no se debe poder seleccionar texto */
+}

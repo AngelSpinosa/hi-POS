@@ -1,0 +1,129 @@
+/* src/renderer/src/assets/main.css */
+@import './base.css';
+
+/* Layout principal */
+.pos-container {
+  display: grid;
+  grid-template-columns: 2fr 1fr; /* 66% Menú, 33% Ticket */
+  height: 100vh;
+}
+
+/* --- SECCIÓN IZQUIERDA (CATÁLOGO) --- */
+.products-section {
+  padding: 20px;
+  overflow-y: auto;
+  border-right: 1px solid var(--color-border);
+}
+
+.products-section h2 {
+  margin-top: 0;
+  color: var(--color-primary);
+}
+
+.products-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 15px;
+}
+
+.product-card {
+  background-color: var(--color-bg-card);
+  padding: 15px;
+  border-radius: var(--radius-std);
+  cursor: pointer;
+  text-align: center;
+  border: 1px solid transparent;
+  transition: all 0.1s ease-in-out;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.product-card:active {
+  transform: scale(0.95); /* Efecto de click táctil */
+}
+
+.product-card:hover {
+  border-color: var(--color-primary);
+  background-color: #363636;
+}
+
+.product-price {
+  color: var(--color-accent);
+  font-weight: bold;
+  font-size: 1.2rem;
+  margin-top: 8px;
+}
+
+/* --- SECCIÓN DERECHA (TICKET) --- */
+.ticket-section {
+  display: flex;
+  flex-direction: column;
+  background-color: var(--color-bg-ticket);
+  border-left: 1px solid var(--color-border);
+}
+
+.ticket-header {
+  padding: 20px;
+  background-color: var(--color-bg-card);
+  border-bottom: 2px solid var(--color-primary);
+  font-weight: bold;
+  font-size: 1.1rem;
+  text-align: center;
+}
+
+.ticket-items {
+  flex: 1;
+  padding: 10px;
+  overflow-y: auto;
+}
+
+.ticket-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  border-bottom: 1px dashed var(--color-border);
+  animation: slideIn 0.2s ease;
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(10px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.ticket-footer {
+  padding: 20px;
+  background-color: var(--color-bg-card);
+  border-top: 1px solid var(--color-border);
+}
+
+.total-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 1.8rem;
+  font-weight: bold;
+  margin-bottom: 20px;
+  color: var(--color-accent);
+}
+
+.pay-btn {
+  width: 100%;
+  padding: 18px;
+  background-color: var(--color-success);
+  color: white;
+  border: none;
+  border-radius: var(--radius-std);
+  font-size: 1.4rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: filter 0.2s;
+}
+
+.pay-btn:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+.pay-btn:disabled {
+  background-color: var(--color-bg-main);
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+}
