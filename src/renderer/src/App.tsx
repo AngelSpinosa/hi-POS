@@ -7,6 +7,7 @@ import { TableGrid } from './components/TableGrid'
 import { DailyReport } from './components/DailyReport'
 import { Dashboard } from './components/Dashboard'
 import { PinPadModal } from './components/PinPadModal'
+import { UserManagement } from './components/UserManagement'
 
 // eslint-disable-next-line react/prop-types
 function KitchenCommand({ items, tableNum, onClose }) {
@@ -49,12 +50,9 @@ function App() {
   const [kitchenData, setKitchenData] = useState<{items: CartItem[], tableNum: number} | null>(null)
   
   const [isPinModalOpen, setIsPinModalOpen] = useState(false)
-  const [pinTitle, setPinTitle] = useState('Ingrese su PIN') // Título dinámico para el modal
-  
-  // Estados para acciones pendientes tras el PIN
+  const [pinTitle, setPinTitle] = useState('Ingrese su PIN') 
   const [pendingView, setPendingView] = useState<ViewState | null>(null)
   const [pendingTableId, setPendingTableId] = useState<number | null>(null)
-  
   const [currentUser, setCurrentUser] = useState<{ nombre: string, rol: string } | null>(null)
 
   const refreshTables = useCallback(async () => {
@@ -77,9 +75,6 @@ function App() {
     init()
   }, [refreshTables])
 
-  // --- LÓGICA DE SEGURIDAD Y NAVEGACIÓN ---
-
-  // 1. Navegación desde Dashboard
   const handleNavigate = (targetView: ViewState) => {
     if (targetView === 'REPORT' || targetView === 'USERS') {
       setPinTitle('Acceso Restringido 🔒')
@@ -92,47 +87,46 @@ function App() {
     }
   }
 
-  // 2. Selección de Mesa (Dispara el PIN)
   const handleSelectTableRequest = (tableId: number) => {
     setPinTitle('Mesero responsable 👤')
     setPendingTableId(tableId)
     setIsPinModalOpen(true)
   }
 
-  // 3. Verificación del PIN (Centralizada)
+  // --- NUEVA VALIDACIÓN REAL ---
   const handlePinVerify = async (pin: string) => {
-    let user: { nombre: string; rol: string } | null = null;
-    
-    // Simulación de validación (idealmente vendría de BD)
-    if (pin === '1234') user = { nombre: 'Angel Admin', rol: 'admin' }
-    if (pin === '0000') user = { nombre: 'Aldo Cajero', rol: 'cajero' }
-
-    if (user) {
-      setCurrentUser(user)
-      setIsPinModalOpen(false) // Cierra el modal si es correcto
+    try {
+      // @ts-ignore
+      const result = await window.electron.ipcRenderer.invoke('verify-pin', { pin })
       
-      // CASO A: Navegación protegida (Reportes/Usuarios)
-      if (pendingView) {
-        if ((pendingView === 'USERS' || pendingView === 'REPORT') && user.rol !== 'admin') {
-          alert('Acceso Denegado: Se requieren permisos de Administrador.')
-        } else {
-          setView(pendingView)
+      if (result.success && result.user) {
+        const user = result.user
+        setCurrentUser(user)
+        setIsPinModalOpen(false) 
+        
+        // Manejo de redirección tras login exitoso
+        if (pendingView) {
+          if ((pendingView === 'USERS' || pendingView === 'REPORT') && user.rol !== 'admin') {
+            alert('Acceso Denegado: Se requieren permisos de Administrador.')
+          } else {
+            setView(pendingView)
+          }
+          setPendingView(null)
         }
-        setPendingView(null)
+  
+        if (pendingTableId !== null) {
+          await executeOpenTable(pendingTableId)
+          setPendingTableId(null)
+        }
+      } else {
+        alert('PIN Incorrecto')
       }
-
-      // CASO B: Acceso a Mesa (Cualquier rol válido puede atender)
-      if (pendingTableId !== null) {
-        await executeOpenTable(pendingTableId)
-        setPendingTableId(null)
-      }
-
-    } else {
-      alert('PIN Incorrecto')
+    } catch (error) {
+      console.error(error)
+      alert('Error de comunicación con la base de datos')
     }
   }
 
-  // Función interna para abrir la mesa (solo se llama tras éxito del PIN)
   const executeOpenTable = async (tableId: number) => {
     try {
       // @ts-ignore
@@ -162,8 +156,6 @@ function App() {
     setCart([])
     await refreshTables()
   }
-
-  // --- LÓGICA DE ORDEN (Carrito y Acciones) ---
 
   const addToCart = async (product: Producto) => {
     if (!activeOrderId || orderStatus === 'cuenta_solicitada') return
@@ -237,10 +229,7 @@ function App() {
     else { alert('Error al cancelar: ' + result.error) }
   }
 
-  // --- RENDERIZADO DE VISTAS ---
-
   if (view === 'DASHBOARD') {
-    // El modal ahora vive fuera para poder sobreponerse al dashboard
     return (
       <>
         <PinPadModal 
@@ -256,12 +245,14 @@ function App() {
 
   if (view === 'USERS') {
     return (
-      <div style={{ padding: '20px', color: 'white', background: '#1a1a1a', height: '100vh' }}>
-        <button onClick={handleBackToDashboard} style={{ background: 'transparent', color: '#888', border: 'none', cursor: 'pointer', fontSize: '1.2rem', marginBottom: '20px' }}>← Menú Principal</button>
-        <h1>Gestión de Usuarios</h1>
-        <p>Bienvenido, {currentUser?.nombre}</p>
-        <div style={{ padding: '50px', textAlign: 'center', border: '2px dashed #444', borderRadius: '10px' }}>
-          🚧 Módulo en construcción 🚧
+      <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ padding: '10px 20px', background: '#1a1a1a', borderBottom: '1px solid #404040' }}>
+          <button onClick={handleBackToDashboard} style={{ background: 'transparent', color: '#9ca3af', border: 'none', cursor: 'pointer', fontSize: '1rem' }}>
+            ← Volver al Menú
+          </button>
+        </div>
+        <div style={{ flex: 1, overflow: 'hidden' }}>
+          <UserManagement />
         </div>
       </div>
     )
@@ -285,7 +276,6 @@ function App() {
   if (view === 'TABLES') {
     return (
       <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
-        {/* Modal de PIN aquí también por si el usuario está en esta vista y selecciona mesa */}
         <PinPadModal 
           title={pinTitle}
           isOpen={isPinModalOpen} 
@@ -300,7 +290,6 @@ function App() {
           <div style={{ fontWeight: 'bold', color: 'white' }}>MAPA DE MESAS</div>
         </div>
         <div style={{ flex: 1, overflow: 'hidden' }}>
-          {/* AQUÍ ESTABA EL CAMBIO CLAVE: Usamos handleSelectTableRequest en lugar de abrir directo */}
           <TableGrid tables={tables} onSelectTable={handleSelectTableRequest} />
         </div>
       </div>
@@ -310,7 +299,6 @@ function App() {
   // VISTA ORDER (POS)
   return (
     <div className="pos-container">
-      {/* Navegación Orden */}
       <div style={{ position: 'absolute', top: 10, left: 20, zIndex: 100 }}>
         <button onClick={handleBackToTables} style={{ padding: '10px 20px', background: '#404040', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' }}>← Volver a Mesas</button>
         <span style={{ marginLeft: '20px', color: 'white', fontWeight: 'bold' }}>Mesa #{tables.find(t => t.id === activeTableId)?.numero}</span>

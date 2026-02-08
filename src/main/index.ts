@@ -83,7 +83,6 @@ app.whenReady().then(() => {
   electronApp.setAppUserModelId('com.pospizza')
   initDatabase()
 
-  // --- HANDLERS EXISTENTES ---
   ipcMain.handle('get-products', () => {
     if (!db) return []
     try { return db.prepare('SELECT * FROM producto WHERE active = 1').all() } 
@@ -182,47 +181,74 @@ app.whenReady().then(() => {
     } catch (error: any) { return { success: false, error: error.message } }
   })
 
-  // --- NUEVOS HANDLERS (REPORTES Y CANCELACIÓN) ---
-
-  // Cancelar Orden (Libera la mesa)
   ipcMain.handle('cancel-order', (_, { orderId }) => {
     try {
-      // Simplemente marcamos como cancelada. Al no ser 'abierta'/'enviada_cocina', get-tables la verá libre.
       db.prepare("UPDATE orden SET estatus = 'cancelada' WHERE id = ?").run(orderId)
+      return { success: true }
+    } catch (error: any) { return { success: false, error: error.message } }
+  })
+
+  ipcMain.handle('get-daily-report', (_, { date }) => {
+    try {
+      const report = db.prepare('SELECT * FROM reporte_diario WHERE fecha = ?').get(date)
+      const orders = db.prepare(`SELECT o.id, o.total, o.creado_en, p.metodo, m.numero as mesa FROM orden o LEFT JOIN pago p ON p.orden_id = o.id LEFT JOIN mesa m ON o.mesa_id = m.id WHERE date(o.creado_en) LIKE ? AND o.estatus = 'pagada' ORDER BY o.creado_en DESC`).all(`${date}%`)
+      return { success: true, report, orders }
+    } catch (error: any) { return { success: false, error: error.message } }
+  })
+
+  ipcMain.handle('get-order-details', (_, { orderId }) => {
+    try {
+      const items = getOrderItems(orderId)
+      return { success: true, items }
+    } catch (error: any) { return { success: false, error: error.message } }
+  })
+
+  // --- GESTIÓN DE USUARIOS ---
+
+  ipcMain.handle('get-users', () => {
+    try {
+      return db.prepare('SELECT * FROM user ORDER BY id ASC').all()
+    } catch (error: any) { 
+      return { success: false, error: error.message } 
+    }
+  })
+
+  ipcMain.handle('create-user', (_, { nombre, pin }) => {
+    try {
+      if (!nombre || !pin) return { success: false, error: 'Faltan datos' }
+      if (pin.length < 4) return { success: false, error: 'PIN muy corto' }
+      
+      const insert = db.prepare("INSERT INTO user (nombre, rol, pin, active) VALUES (?, 'cajero', ?, 1)")
+      insert.run(nombre, pin)
+      
       return { success: true }
     } catch (error: any) {
       return { success: false, error: error.message }
     }
   })
 
-  // Obtener Datos del Reporte Diario
-  ipcMain.handle('get-daily-report', (_, { date }) => {
+  ipcMain.handle('toggle-user-status', (_, { userId, active }) => {
     try {
-      // 1. Obtener la fila del reporte
-      const report = db.prepare('SELECT * FROM reporte_diario WHERE fecha = ?').get(date)
+      if (userId === 1) return { success: false, error: 'No se puede desactivar al Admin principal' }
       
-      // 2. Obtener lista de órdenes PAGADAS de ese día para el detalle
-      const orders = db.prepare(`
-        SELECT o.id, o.total, o.creado_en, p.metodo, m.numero as mesa
-        FROM orden o
-        LEFT JOIN pago p ON p.orden_id = o.id
-        LEFT JOIN mesa m ON o.mesa_id = m.id
-        WHERE date(o.creado_en) LIKE ? AND o.estatus = 'pagada'
-        ORDER BY o.creado_en DESC
-      `).all(`${date}%`) // Usamos LIKE para asegurar match con datetime string
-
-      return { success: true, report, orders }
+      db.prepare('UPDATE user SET active = ? WHERE id = ?').run(active ? 1 : 0, userId)
+      return { success: true }
     } catch (error: any) {
-      console.error('Report Error:', error)
       return { success: false, error: error.message }
     }
   })
 
-  // Obtener detalle de una orden específica (Historial)
-  ipcMain.handle('get-order-details', (_, { orderId }) => {
+  // --- NUEVO: Validar PIN en BD ---
+  ipcMain.handle('verify-pin', (_, { pin }) => {
     try {
-      const items = getOrderItems(orderId)
-      return { success: true, items }
+      // Buscamos usuario activo con ese PIN
+      const user = db.prepare('SELECT nombre, rol FROM user WHERE pin = ? AND active = 1').get(pin)
+      
+      if (user) {
+        return { success: true, user }
+      } else {
+        return { success: false, error: 'PIN incorrecto o usuario inactivo' }
+      }
     } catch (error: any) {
       return { success: false, error: error.message }
     }
