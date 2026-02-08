@@ -8,8 +8,8 @@ let db: Database.Database
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
-    width: 900,
-    height: 670,
+    width: 1024,
+    height: 768,
     show: false,
     autoHideMenuBar: true,
     ...(process.platform === 'linux' ? { icon } : {}),
@@ -19,10 +19,8 @@ function createWindow(): void {
     }
   })
 
-  mainWindow.on('ready-to-show', () => {
-    mainWindow.show()
-  })
-
+  mainWindow.on('ready-to-show', () => { mainWindow.show() })
+  
   mainWindow.webContents.setWindowOpenHandler((details) => {
     shell.openExternal(details.url)
     return { action: 'deny' }
@@ -42,40 +40,35 @@ function initDatabase() {
       : join(app.getPath('userData'), 'pos.db')
 
     console.log(`Intentando conectar a la BD en: ${dbPath}`)
-    
-    db = new Database(dbPath, { verbose: console.log })
+    db = new Database(dbPath, { verbose: console.log, fileMustExist: false })
     db.pragma('journal_mode = WAL')
-    
+    db.pragma('foreign_keys = ON') 
     console.log('Conexión a SQLite exitosa')
   } catch (error) {
     console.error('Error al conectar con la base de datos:', error)
   }
 }
 
-// --- HELPER CRÍTICO: Obtener items de una orden ---
-// Esta función es la que estaba faltando usarse en los handlers
 function getOrderItems(orderId: number) {
   return db.prepare(`
     SELECT 
       producto_id as id, 
       nombre, 
       precio, 
-      cantidad as quantity 
+      cantidad, 
+      comanda_impresa
     FROM orden_item 
     WHERE orden_id = ?
   `).all(orderId)
 }
 
-function getDailyReportId(): number {
-  const today = new Date().toISOString().split('T')[0]
+function getDailyReportId(dateStr?: string): number {
+  const date = dateStr || new Date().toISOString().split('T')[0]
   const stmt = db.prepare('SELECT id FROM reporte_diario WHERE fecha = ?')
-  const report = stmt.get(today) as { id: number } | undefined
-
+  const report = stmt.get(date) as { id: number } | undefined
   if (report) return report.id
-
-  console.log('Creando nuevo Reporte Diario para:', today)
   const insert = db.prepare('INSERT INTO reporte_diario (fecha) VALUES (?)')
-  const info = insert.run(today)
+  const info = insert.run(date)
   return Number(info.lastInsertRowid)
 }
 
@@ -88,141 +81,155 @@ function recalculateOrderTotal(orderId: number) {
 
 app.whenReady().then(() => {
   electronApp.setAppUserModelId('com.pospizza')
-
   initDatabase()
 
+  // --- HANDLERS EXISTENTES ---
   ipcMain.handle('get-products', () => {
     if (!db) return []
-    try {
-      return db.prepare('SELECT * FROM producto WHERE active = 1').all()
-    } catch (error) {
-      console.error('Error obteniendo productos:', error)
-      return []
-    }
+    try { return db.prepare('SELECT * FROM producto WHERE active = 1').all() } 
+    catch (error) { return [] }
   })
 
-  ipcMain.handle('get-active-order', () => {
-    if (!db) return { success: false, error: 'Sin conexión BD' }
-    
+  ipcMain.handle('get-tables', () => {
+    if (!db) return []
     try {
-      let order = db.prepare("SELECT * FROM orden WHERE estatus = 'pendiente' LIMIT 1").get() as any
+      const mesas = db.prepare('SELECT * FROM mesa WHERE activa = 1').all() as any[]
+      const mesasConEstado = mesas.map(mesa => {
+        const ordenActiva = db.prepare(`SELECT estatus, total FROM orden WHERE mesa_id = ? AND estatus IN ('abierta', 'enviada_cocina', 'cuenta_solicitada') LIMIT 1`).get(mesa.id) as any
+        return { ...mesa, estado_orden: ordenActiva ? ordenActiva.estatus : 'libre', total_actual: ordenActiva ? ordenActiva.total : 0 }
+      })
+      return mesasConEstado
+    } catch (error) { return [] }
+  })
 
+  ipcMain.handle('open-table-order', (_, { tableId }) => {
+    if (!db) return { success: false, error: 'Sin conexión BD' }
+    try {
+      let order = db.prepare(`SELECT * FROM orden WHERE mesa_id = ? AND estatus IN ('abierta', 'enviada_cocina', 'cuenta_solicitada') LIMIT 1`).get(tableId) as any
       if (!order) {
         const reportId = getDailyReportId()
         const fechaActual = new Date().toISOString()
-        
-        const stmtInsert = db.prepare(`
-          INSERT INTO orden (user_id, id_reporte_diario, estatus, total, ticket_impreso, creado_en)
-          VALUES (1, ?, 'pendiente', 0, 0, ?)
-        `)
-        const info = stmtInsert.run(reportId, fechaActual)
-        
-        order = { id: info.lastInsertRowid, estatus: 'pendiente', total: 0 }
-        console.log(`Nueva orden creada ID: ${order.id}`)
+        const stmtInsert = db.prepare(`INSERT INTO orden (user_id, id_reporte_diario, mesa_id, estatus, total, ticket_impreso, creado_en) VALUES (1, ?, ?, 'abierta', 0, 0, ?)`)
+        const info = stmtInsert.run(reportId, tableId, fechaActual)
+        order = { id: info.lastInsertRowid, mesa_id: tableId, estatus: 'abierta', total: 0 }
       }
-
       const items = getOrderItems(order.id)
       return { success: true, order, items }
-
-    } catch (error: any) {
-      console.error('Error en get-active-order:', error)
-      return { success: false, error: error.message }
-    }
+    } catch (error: any) { return { success: false, error: error.message } }
   })
 
-  // --- AQUÍ ESTÁ LA CORRECCIÓN CLAVE ---
+  ipcMain.handle('update-order-status', (_, { orderId, status }) => {
+    try {
+      db.prepare('UPDATE orden SET estatus = ? WHERE id = ?').run(status, orderId)
+      return { success: true }
+    } catch (error: any) { return { success: false, error: error.message } }
+  })
+
+  ipcMain.handle('generate-command', (_, { orderId }) => {
+    try {
+      db.prepare(`UPDATE orden_item SET comanda_impresa = 1 WHERE orden_id = ? AND comanda_impresa = 0`).run(orderId)
+      db.prepare(`UPDATE orden SET estatus = 'enviada_cocina' WHERE id = ? AND estatus = 'abierta'`).run(orderId)
+      const items = getOrderItems(orderId)
+      return { success: true, items }
+    } catch (error: any) { return { success: false, error: error.message } }
+  })
   
   ipcMain.handle('add-to-cart', (_, { orderId, product }) => {
     try {
-      const existing = db.prepare('SELECT id FROM orden_item WHERE orden_id = ? AND producto_id = ?').get(orderId, product.id) as any
-
-      if (existing) {
-        db.prepare('UPDATE orden_item SET cantidad = cantidad + 1 WHERE id = ?').run(existing.id)
-      } else {
-        db.prepare(`
-          INSERT INTO orden_item (orden_id, producto_id, nombre, precio, cantidad)
-          VALUES (?, ?, ?, ?, 1)
-        `).run(orderId, product.id, product.nombre, product.precio)
-      }
-      
+      const existing = db.prepare('SELECT id FROM orden_item WHERE orden_id = ? AND producto_id = ? AND comanda_impresa = 0').get(orderId, product.id) as any
+      if (existing) { db.prepare('UPDATE orden_item SET cantidad = cantidad + 1 WHERE id = ?').run(existing.id) } 
+      else { db.prepare('INSERT INTO orden_item (orden_id, producto_id, nombre, precio, cantidad) VALUES (?, ?, ?, ?, 1)').run(orderId, product.id, product.nombre, product.precio) }
       const newTotal = recalculateOrderTotal(orderId)
-      const items = getOrderItems(orderId) // <-- ESTO FALTABA: Devolver la lista actualizada
+      const items = getOrderItems(orderId)
       return { success: true, newTotal, items }
-    } catch (error: any) {
-      return { success: false, error: error.message }
-    }
+    } catch (error: any) { return { success: false, error: error.message } }
   })
 
   ipcMain.handle('remove-from-cart', (_, { orderId, productId }) => {
     try {
-      db.prepare('DELETE FROM orden_item WHERE orden_id = ? AND producto_id = ?').run(orderId, productId)
-      
+      db.prepare('DELETE FROM orden_item WHERE orden_id = ? AND producto_id = ? AND comanda_impresa = 0').run(orderId, productId)
       const newTotal = recalculateOrderTotal(orderId)
-      const items = getOrderItems(orderId) // <-- Devolver lista actualizada
+      const items = getOrderItems(orderId)
       return { success: true, newTotal, items }
-    } catch (error: any) {
-      return { success: false, error: error.message }
-    }
+    } catch (error: any) { return { success: false, error: error.message } }
   })
 
   ipcMain.handle('update-quantity', (_, { orderId, productId, quantity }) => {
     try {
       if (quantity < 1) return { success: false, error: 'Cantidad inválida' }
-      db.prepare('UPDATE orden_item SET cantidad = ? WHERE orden_id = ? AND producto_id = ?').run(quantity, orderId, productId)
-      
+      db.prepare('UPDATE orden_item SET cantidad = ? WHERE orden_id = ? AND producto_id = ? AND comanda_impresa = 0').run(quantity, orderId, productId)
       const newTotal = recalculateOrderTotal(orderId)
-      const items = getOrderItems(orderId) // <-- Devolver lista actualizada
+      const items = getOrderItems(orderId)
       return { success: true, newTotal, items }
-    } catch (error: any) {
-      return { success: false, error: error.message }
-    }
+    } catch (error: any) { return { success: false, error: error.message } }
   })
 
   ipcMain.handle('pay-order', (_, { orderId, payment, total }) => {
     try {
-      const check = db.prepare('SELECT total FROM orden WHERE id = ?').get(orderId) as any
-      if (!check || check.total <= 0) {
-        return { success: false, error: 'Orden vacía' }
-      }
-
+      const orderCheck = db.prepare('SELECT total, id_reporte_diario FROM orden WHERE id = ?').get(orderId) as any
+      if (!orderCheck || orderCheck.total <= 0) return { success: false, error: 'Orden vacía' }
       const payTransaction = db.transaction(() => {
         const fechaActual = new Date().toISOString()
         const cambio = payment.received - total
-
-        db.prepare(`
-          INSERT INTO pago (orden_id, metodo, monto_recibido, cambio, creado_en)
-          VALUES (?, ?, ?, ?, ?)
-        `).run(orderId, payment.method, payment.received, cambio, fechaActual)
-
-        db.prepare(`
-          UPDATE orden 
-          SET estatus = 'pagada', ticket_impreso = 0 
-          WHERE id = ?
-        `).run(orderId)
+        db.prepare('INSERT INTO pago (orden_id, metodo, monto_recibido, cambio, creado_en) VALUES (?, ?, ?, ?, ?)').run(orderId, payment.method, payment.received, cambio, fechaActual)
+        db.prepare("UPDATE orden SET estatus = 'pagada', ticket_impreso = 0 WHERE id = ?").run(orderId)
+        const montoEfectivo = payment.method === 'efectivo' ? total : 0
+        const montoTarjeta = payment.method === 'tarjeta' ? total : 0
+        db.prepare(`UPDATE reporte_diario SET total_ventas = total_ventas + ?, total_pedidos = total_pedidos + 1, total_efectivo = total_efectivo + ?, total_tarjeta = total_tarjeta + ? WHERE id = ?`).run(total, montoEfectivo, montoTarjeta, orderCheck.id_reporte_diario)
       })
-
       payTransaction()
+      return { success: true }
+    } catch (error: any) { return { success: false, error: error.message } }
+  })
+
+  // --- NUEVOS HANDLERS (REPORTES Y CANCELACIÓN) ---
+
+  // Cancelar Orden (Libera la mesa)
+  ipcMain.handle('cancel-order', (_, { orderId }) => {
+    try {
+      // Simplemente marcamos como cancelada. Al no ser 'abierta'/'enviada_cocina', get-tables la verá libre.
+      db.prepare("UPDATE orden SET estatus = 'cancelada' WHERE id = ?").run(orderId)
       return { success: true }
     } catch (error: any) {
       return { success: false, error: error.message }
     }
   })
 
-  app.on('browser-window-created', (_, window) => {
-    optimizer.watchWindowShortcuts(window)
+  // Obtener Datos del Reporte Diario
+  ipcMain.handle('get-daily-report', (_, { date }) => {
+    try {
+      // 1. Obtener la fila del reporte
+      const report = db.prepare('SELECT * FROM reporte_diario WHERE fecha = ?').get(date)
+      
+      // 2. Obtener lista de órdenes PAGADAS de ese día para el detalle
+      const orders = db.prepare(`
+        SELECT o.id, o.total, o.creado_en, p.metodo, m.numero as mesa
+        FROM orden o
+        LEFT JOIN pago p ON p.orden_id = o.id
+        LEFT JOIN mesa m ON o.mesa_id = m.id
+        WHERE date(o.creado_en) LIKE ? AND o.estatus = 'pagada'
+        ORDER BY o.creado_en DESC
+      `).all(`${date}%`) // Usamos LIKE para asegurar match con datetime string
+
+      return { success: true, report, orders }
+    } catch (error: any) {
+      console.error('Report Error:', error)
+      return { success: false, error: error.message }
+    }
   })
 
-  ipcMain.on('ping', () => console.log('pong'))
+  // Obtener detalle de una orden específica (Historial)
+  ipcMain.handle('get-order-details', (_, { orderId }) => {
+    try {
+      const items = getOrderItems(orderId)
+      return { success: true, items }
+    } catch (error: any) {
+      return { success: false, error: error.message }
+    }
+  })
 
+  app.on('browser-window-created', (_, window) => { optimizer.watchWindowShortcuts(window) })
   createWindow()
-
-  app.on('activate', function () {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
-  })
+  app.on('activate', function () { if (BrowserWindow.getAllWindows().length === 0) createWindow() })
 })
-
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit()
-  }
-})
+app.on('window-all-closed', () => { if (process.platform !== 'darwin') { app.quit() } })
