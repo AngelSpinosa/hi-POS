@@ -227,6 +227,23 @@ app.whenReady().then(() => {
     }
   })
 
+  // NUEVO: Editar Usuario
+  ipcMain.handle('update-user', (_, { userId, nombre, rol, pin }) => {
+    try {
+      if (!nombre || !pin || !rol) return { success: false, error: 'Datos incompletos' }
+      
+      // Protección: No cambiar rol del Super Admin (ID 1)
+      if (userId === 1 && rol !== 'admin') {
+        return { success: false, error: 'No se puede quitar el rol de Admin al usuario principal' }
+      }
+
+      db.prepare('UPDATE user SET nombre = ?, rol = ?, pin = ? WHERE id = ?').run(nombre, rol, pin, userId)
+      return { success: true }
+    } catch (error: any) {
+      return { success: false, error: error.message }
+    }
+  })
+
   ipcMain.handle('toggle-user-status', (_, { userId, active }) => {
     try {
       if (userId === 1) return { success: false, error: 'No se puede desactivar al Admin principal' }
@@ -238,20 +255,12 @@ app.whenReady().then(() => {
     }
   })
 
-  // --- NUEVO: Validar PIN en BD ---
   ipcMain.handle('verify-pin', (_, { pin }) => {
     try {
-      // Buscamos usuario activo con ese PIN
       const user = db.prepare('SELECT nombre, rol FROM user WHERE pin = ? AND active = 1').get(pin)
-      
-      if (user) {
-        return { success: true, user }
-      } else {
-        return { success: false, error: 'PIN incorrecto o usuario inactivo' }
-      }
-    } catch (error: any) {
-      return { success: false, error: error.message }
-    }
+      if (user) { return { success: true, user } } 
+      else { return { success: false, error: 'PIN incorrecto o usuario inactivo' } }
+    } catch (error: any) { return { success: false, error: error.message } }
   })
 
   app.on('browser-window-created', (_, window) => { optimizer.watchWindowShortcuts(window) })
