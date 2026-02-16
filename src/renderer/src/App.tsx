@@ -1,39 +1,13 @@
 import { useEffect, useState, useCallback } from 'react'
-import type { Producto, CartItem, Mesa } from './types/db'
-import { OrderCart } from './components/OrderCart'
-import { PaymentModal } from './components/PaymentModal'
-import { TicketReceipt } from './components/TicketReceipt'
+import type { Mesa } from './types/db'
 import { TableGrid } from './components/TableGrid'
 import { DailyReport } from './components/DailyReport'
 import { Dashboard } from './components/Dashboard'
 import { PinPadModal } from './components/PinPadModal'
 import { UserManagement } from './components/UserManagement'
-
-// eslint-disable-next-line react/prop-types
-function KitchenCommand({ items, tableNum, onClose }) {
-  return (
-    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.8)', zIndex: 3000, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-      <div style={{ backgroundColor: '#fff', color: '#000', padding: '20px', width: '250px', fontFamily: 'monospace' }}>
-        <h3 style={{ textAlign: 'center', borderBottom: '2px dashed #000' }}>COCINA - MESA {tableNum}</h3>
-        {/* eslint-disable-next-line react/prop-types */}
-        {items.map((item, idx) => (
-          <div key={idx} style={{ fontSize: '1.2rem', margin: '10px 0' }}>[ ] {item.cantidad} x {item.nombre}</div>
-        ))}
-        <div style={{ borderTop: '2px dashed #000', marginTop: '20px', paddingTop: '10px', textAlign: 'center' }}>{new Date().toLocaleTimeString()}</div>
-        <button onClick={onClose} style={{ marginTop: '20px', width: '100%', padding: '10px', background: 'black', color: 'white', border: 'none', cursor: 'pointer' }}>CERRAR</button>
-      </div>
-    </div>
-  )
-}
+import { POSView } from './views/POSView' // <--- Importamos la nueva vista
 
 type ViewState = 'DASHBOARD' | 'TABLES' | 'ORDER' | 'REPORT' | 'USERS';
-
-interface TicketData {
-  orderId: number;
-  items: CartItem[];
-  total: number;
-  payment: { method: string; received: number; change: number };
-}
 
 interface CurrentUser {
   id: number;
@@ -43,25 +17,17 @@ interface CurrentUser {
 
 function App() {
   const [view, setView] = useState<ViewState>('DASHBOARD')
+  
+  // Estado Global necesario para navegación (Mesas y Usuario)
   const [tables, setTables] = useState<Mesa[]>([])
-  const [products, setProducts] = useState<Producto[]>([])
-  const [cart, setCart] = useState<CartItem[]>([])
-  
   const [activeTableId, setActiveTableId] = useState<number | null>(null)
-  const [activeOrderId, setActiveOrderId] = useState<number | null>(null)
-  const [orderStatus, setOrderStatus] = useState<string>('abierta')
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
   
-  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false)
-  const [ticketData, setTicketData] = useState<TicketData | null>(null)
-  const [kitchenData, setKitchenData] = useState<{items: CartItem[], tableNum: number} | null>(null)
-  
+  // Estados para el PIN Global (Navegación y Apertura de Mesa)
   const [isPinModalOpen, setIsPinModalOpen] = useState(false)
   const [pinTitle, setPinTitle] = useState('Ingrese su PIN') 
   const [pendingView, setPendingView] = useState<ViewState | null>(null)
   const [pendingTableId, setPendingTableId] = useState<number | null>(null)
-  // NUEVO: Estado para saber qué orden vamos a cancelar
-  const [pendingOrderIdToCancel, setPendingOrderIdToCancel] = useState<number | null>(null)
-  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
 
   const refreshTables = useCallback(async () => {
     try {
@@ -71,17 +37,9 @@ function App() {
     } catch (error) { console.error(error) }
   }, [])
 
-  useEffect(() => {
-    const init = async () => {
-      try {
-        // @ts-ignore
-        const prods = await window.electron.ipcRenderer.invoke('get-products')
-        setProducts(prods)
-        await refreshTables()
-      } catch (error) { console.error('Error cargando datos', error) }
-    }
-    init()
-  }, [refreshTables])
+  useEffect(() => { refreshTables() }, [refreshTables])
+
+  // --- NAVEGACIÓN Y SEGURIDAD ---
 
   const handleNavigate = (targetView: ViewState) => {
     if (targetView === 'REPORT' || targetView === 'USERS') {
@@ -90,6 +48,7 @@ function App() {
       setIsPinModalOpen(true)
     } else if (targetView === 'TABLES') {
       setView('TABLES')
+      refreshTables() // Refrescar estado de mesas al entrar
     } else {
       setView(targetView)
     }
@@ -101,36 +60,8 @@ function App() {
     setIsPinModalOpen(true)
   }
 
-  // --- NUEVA LÓGICA DE CANCELACIÓN (Trigger) ---
-  const handleCancelOrder = async () => {
-    if (!activeOrderId) return
-    setPinTitle('Autorizar Cancelación 🗑️')
-    setPendingOrderIdToCancel(activeOrderId)
-    setIsPinModalOpen(true)
-  }
-
   const handlePinVerify = async (pin: string) => {
     try {
-      // CASO ESPECIAL: Cancelación de Orden (Se valida en backend con el PIN directo)
-      if (pendingOrderIdToCancel !== null) {
-        // @ts-ignore
-        const result = await window.electron.ipcRenderer.invoke('cancel-order', { 
-          orderId: pendingOrderIdToCancel, 
-          pin 
-        })
-        
-        if (result.success) {
-          setIsPinModalOpen(false)
-          setPendingOrderIdToCancel(null)
-          handleBackToTables() // Éxito: volvemos al mapa
-        } else {
-          alert('Error: ' + result.error)
-          // No cerramos el modal para permitir reintentar o que venga el admin
-        }
-        return // Salimos para no ejecutar el login normal
-      }
-
-      // FLUJO NORMAL: Login / Cambio de Pantalla / Abrir Mesa
       // @ts-ignore
       const result = await window.electron.ipcRenderer.invoke('verify-pin', { pin })
       
@@ -139,6 +70,7 @@ function App() {
         setCurrentUser(user)
         setIsPinModalOpen(false) 
         
+        // A. Navegación a módulos protegidos
         if (pendingView) {
           if ((pendingView === 'USERS' || pendingView === 'REPORT') && user.rol !== 'admin') {
             alert('Acceso Denegado: Se requieren permisos de Administrador.')
@@ -148,8 +80,20 @@ function App() {
           setPendingView(null)
         }
   
+        // B. Apertura de Mesa (POS)
         if (pendingTableId !== null) {
-          await executeOpenTable(pendingTableId, user)
+          // Intentamos abrir la mesa
+          // @ts-ignore
+          const openResult = await window.electron.ipcRenderer.invoke('open-table-order', { 
+            tableId: pendingTableId, userId: user.id 
+          })
+          
+          if (openResult.success) {
+            setActiveTableId(pendingTableId)
+            setView('ORDER')
+          } else {
+            alert(openResult.error)
+          }
           setPendingTableId(null)
         }
       } else {
@@ -157,124 +101,27 @@ function App() {
       }
     } catch (error) {
       console.error(error)
-      alert('Error de comunicación con la base de datos')
+      alert('Error de comunicación')
     }
   }
 
-  const executeOpenTable = async (tableId: number, user: CurrentUser) => {
-    try {
-      // @ts-ignore
-      const result = await window.electron.ipcRenderer.invoke('open-table-order', { 
-        tableId, 
-        userId: user.id 
-      })
-      
-      if (result.success) {
-        setActiveTableId(tableId)
-        setActiveOrderId(result.order.id)
-        setCart(result.items)
-        setOrderStatus(result.order.estatus)
-        setView('ORDER')
-      } else {
-        alert(result.error)
-      }
-    } catch (error) { console.error(error) }
-  }
-
-  const handleBackToDashboard = async () => {
+  const handleBackToDashboard = () => {
     setView('DASHBOARD')
-    setActiveTableId(null)
-    setActiveOrderId(null)
-    setCart([])
     setCurrentUser(null) 
   }
 
   const handleBackToTables = async () => {
     setView('TABLES')
     setActiveTableId(null)
-    setActiveOrderId(null)
-    setCart([])
     await refreshTables()
   }
 
-  const addToCart = async (product: Producto) => {
-    if (!activeOrderId || orderStatus === 'cuenta_solicitada') return
-    // @ts-ignore
-    const result = await window.electron.ipcRenderer.invoke('add-to-cart', { orderId: activeOrderId, product })
-    if (result.success) setCart(result.items)
-  }
-
-  const removeFromCart = async (productId: number) => {
-    if (!activeOrderId) return
-    // @ts-ignore
-    const result = await window.electron.ipcRenderer.invoke('remove-from-cart', { orderId: activeOrderId, productId })
-    if (result.success) setCart(result.items)
-  }
-
-  const updateQuantity = async (productId: number, newQuantity: number) => {
-    if (!activeOrderId) return
-    // @ts-ignore
-    const result = await window.electron.ipcRenderer.invoke('update-quantity', { orderId: activeOrderId, productId, quantity: newQuantity })
-    if (result.success) setCart(result.items)
-  }
-
-  const handleGenerateCommand = async () => {
-    if (!activeOrderId) return
-    const newItems = cart.filter(i => i.comanda_impresa === 0)
-    const tableNum = tables.find(t => t.id === activeTableId)?.numero || 0
-    // @ts-ignore
-    const result = await window.electron.ipcRenderer.invoke('generate-command', { orderId: activeOrderId })
-    if (result.success) {
-      setCart(result.items) 
-      setKitchenData({ items: newItems, tableNum }) 
-    }
-  }
-
-  const total = cart.reduce((sum: number, item) => sum + item.precio * item.cantidad, 0)
-
-  const handleRequestBill = async () => {
-    if (!activeOrderId) return
-    // @ts-ignore
-    await window.electron.ipcRenderer.invoke('update-order-status', { orderId: activeOrderId, status: 'cuenta_solicitada' })
-    setOrderStatus('cuenta_solicitada')
-    
-    setTicketData({
-      orderId: activeOrderId, items: [...cart], total: total,
-      payment: { method: 'PENDIENTE', received: 0, change: 0 }
-    })
-  }
-
-  const handlePaymentConfirm = async (method: 'efectivo' | 'tarjeta', received: number) => {
-    if (!activeOrderId) return
-    try {
-      // @ts-ignore
-      const result = await window.electron.ipcRenderer.invoke('pay-order', {
-        orderId: activeOrderId, payment: { method, received }, total
-      })
-      if (result.success) {
-        setTicketData({
-          orderId: activeOrderId, items: [...cart], total: total,
-          payment: { method, received, change: received - total }
-        })
-        setIsPaymentModalOpen(false)
-      } else { alert(result.error) }
-    } catch (error) { console.error(error) }
-  }
+  // --- RENDERIZADO (Router Básico) ---
 
   if (view === 'DASHBOARD') {
     return (
       <>
-        <PinPadModal 
-          title={pinTitle}
-          isOpen={isPinModalOpen} 
-          onClose={() => { 
-            setIsPinModalOpen(false); 
-            setPendingView(null); 
-            setPendingTableId(null);
-            setPendingOrderIdToCancel(null); // Limpiar estado de cancelación
-          }}
-          onVerify={handlePinVerify}
-        />
+        <PinPadModal title={pinTitle} isOpen={isPinModalOpen} onClose={() => { setIsPinModalOpen(false); setPendingView(null); setPendingTableId(null); }} onVerify={handlePinVerify} />
         <Dashboard onNavigate={handleNavigate} />
       </>
     )
@@ -284,9 +131,7 @@ function App() {
     return (
       <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
         <div style={{ padding: '10px 20px', background: '#1a1a1a', borderBottom: '1px solid #404040' }}>
-          <button onClick={handleBackToDashboard} style={{ background: 'transparent', color: '#9ca3af', border: 'none', cursor: 'pointer', fontSize: '1rem' }}>
-            ← Volver al Menú
-          </button>
+          <button onClick={handleBackToDashboard} style={{ background: 'transparent', color: '#9ca3af', border: 'none', cursor: 'pointer', fontSize: '1rem' }}>← Volver al Menú</button>
         </div>
         <div style={{ flex: 1, overflow: 'hidden' }}>
           <UserManagement />
@@ -299,9 +144,7 @@ function App() {
     return (
       <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
         <div style={{ padding: '10px 20px', background: '#1a1a1a', borderBottom: '1px solid #404040' }}>
-          <button onClick={handleBackToDashboard} style={{ background: 'transparent', color: '#9ca3af', border: 'none', cursor: 'pointer', fontSize: '1rem' }}>
-            ← Volver al Menú
-          </button>
+          <button onClick={handleBackToDashboard} style={{ background: 'transparent', color: '#9ca3af', border: 'none', cursor: 'pointer', fontSize: '1rem' }}>← Volver al Menú</button>
         </div>
         <div style={{ flex: 1, overflow: 'hidden' }}>
           <DailyReport />
@@ -313,17 +156,9 @@ function App() {
   if (view === 'TABLES') {
     return (
       <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
-        <PinPadModal 
-          title={pinTitle}
-          isOpen={isPinModalOpen} 
-          onClose={() => { setIsPinModalOpen(false); setPendingTableId(null); }}
-          onVerify={handlePinVerify}
-        />
-        
+        <PinPadModal title={pinTitle} isOpen={isPinModalOpen} onClose={() => { setIsPinModalOpen(false); setPendingTableId(null); }} onVerify={handlePinVerify} />
         <div style={{ padding: '10px 20px', display: 'flex', justifyContent: 'space-between', background: '#1a1a1a', alignItems: 'center' }}>
-          <button onClick={handleBackToDashboard} style={{ background: 'transparent', color: '#9ca3af', border: 'none', cursor: 'pointer', fontSize: '1rem' }}>
-            ← Menú Principal
-          </button>
+          <button onClick={handleBackToDashboard} style={{ background: 'transparent', color: '#9ca3af', border: 'none', cursor: 'pointer', fontSize: '1rem' }}>← Menú Principal</button>
           <div style={{ fontWeight: 'bold', color: 'white' }}>MAPA DE MESAS</div>
         </div>
         <div style={{ flex: 1, overflow: 'hidden' }}>
@@ -333,68 +168,19 @@ function App() {
     )
   }
 
-  // VISTA ORDER (POS)
-  return (
-    <div className="pos-container">
-      
-      {/* Modal de PIN para la cancelación dentro de la orden */}
-      <PinPadModal 
-        title={pinTitle}
-        isOpen={isPinModalOpen} 
-        onClose={() => { 
-          setIsPinModalOpen(false); 
-          setPendingOrderIdToCancel(null); 
-        }}
-        onVerify={handlePinVerify}
+  // NUEVO: Usamos el componente POSView para la venta
+  if (view === 'ORDER' && activeTableId) {
+    const tableNum = tables.find(t => t.id === activeTableId)?.numero || 0
+    return (
+      <POSView 
+        tableId={activeTableId} 
+        tableNumber={tableNum} 
+        onBack={handleBackToTables} 
       />
+    )
+  }
 
-      <div style={{ position: 'absolute', top: 10, left: 20, zIndex: 100 }}>
-        <button onClick={handleBackToTables} style={{ padding: '10px 20px', background: '#404040', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' }}>← Volver a Mesas</button>
-        <span style={{ marginLeft: '20px', color: 'white', fontWeight: 'bold' }}>Mesa #{tables.find(t => t.id === activeTableId)?.numero}</span>
-      </div>
-
-      <div className="products-section" style={{ paddingTop: '60px' }}>
-        <h2>Menú</h2>
-        <div className="products-grid">
-          {products.map((product) => (
-            <div key={product.id} className="product-card" onClick={() => addToCart(product)}>
-              <h3>{product.nombre}</h3>
-              <div className="product-price">${product.precio.toFixed(2)}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="ticket-section" style={{ paddingTop: '60px' }}>
-        <OrderCart 
-          cart={cart} total={total} orderId={activeOrderId}
-          onPay={() => {}} 
-          onRemove={removeFromCart} onUpdateQuantity={updateQuantity}
-          onGenerateCommand={handleGenerateCommand} onRequestBill={handleRequestBill}
-          onFinalizePayment={() => setIsPaymentModalOpen(true)}
-          onCancelOrder={handleCancelOrder} 
-          orderStatus={orderStatus}
-        />
-      </div>
-
-      <PaymentModal 
-        isOpen={isPaymentModalOpen} total={total}
-        onClose={() => setIsPaymentModalOpen(false)} onConfirmPayment={handlePaymentConfirm}
-      />
-
-      {kitchenData && (
-        <KitchenCommand items={kitchenData.items} tableNum={kitchenData.tableNum} onClose={() => setKitchenData(null)} />
-      )}
-
-      {ticketData && (
-        <TicketReceipt 
-          {...ticketData}
-          onClose={() => { setTicketData(null); if (ticketData.payment.method !== 'PENDIENTE') handleBackToTables() }}
-          onPrint={() => { setTicketData(null); if (ticketData.payment.method !== 'PENDIENTE') handleBackToTables() }}
-        />
-      )}
-    </div>
-  )
+  return null
 }
 
 export default App
