@@ -101,20 +101,41 @@ app.whenReady().then(() => {
     } catch (error) { return [] }
   })
 
-  ipcMain.handle('open-table-order', (_, { tableId }) => {
+  ipcMain.handle('open-table-order', (_, { tableId, userId }) => {
     if (!db) return { success: false, error: 'Sin conexión BD' }
+    
     try {
-      let order = db.prepare(`SELECT * FROM orden WHERE mesa_id = ? AND estatus IN ('abierta', 'enviada_cocina', 'cuenta_solicitada') LIMIT 1`).get(tableId) as any
-      if (!order) {
+      let order = db.prepare(`
+        SELECT o.*, u.nombre as nombre_mesero 
+        FROM orden o
+        JOIN user u ON o.user_id = u.id
+        WHERE o.mesa_id = ? AND o.estatus IN ('abierta', 'enviada_cocina', 'cuenta_solicitada')
+        LIMIT 1
+      `).get(tableId) as any
+
+      if (order) {
+        if (order.user_id !== userId) {
+          return { success: false, error: `Mesa ocupada por ${order.nombre_mesero}. Acceso denegado.` }
+        }
+      } else {
         const reportId = getDailyReportId()
         const fechaActual = new Date().toISOString()
-        const stmtInsert = db.prepare(`INSERT INTO orden (user_id, id_reporte_diario, mesa_id, estatus, total, ticket_impreso, creado_en) VALUES (1, ?, ?, 'abierta', 0, 0, ?)`)
-        const info = stmtInsert.run(reportId, tableId, fechaActual)
+        
+        const stmtInsert = db.prepare(`
+          INSERT INTO orden (user_id, id_reporte_diario, mesa_id, estatus, total, ticket_impreso, creado_en)
+          VALUES (?, ?, ?, 'abierta', 0, 0, ?)
+        `)
+        const info = stmtInsert.run(userId, reportId, tableId, fechaActual)
+        
         order = { id: info.lastInsertRowid, mesa_id: tableId, estatus: 'abierta', total: 0 }
       }
+
       const items = getOrderItems(order.id)
       return { success: true, order, items }
-    } catch (error: any) { return { success: false, error: error.message } }
+
+    } catch (error: any) {
+      return { success: false, error: error.message }
+    }
   })
 
   ipcMain.handle('update-order-status', (_, { orderId, status }) => {
@@ -181,11 +202,28 @@ app.whenReady().then(() => {
     } catch (error: any) { return { success: false, error: error.message } }
   })
 
-  ipcMain.handle('cancel-order', (_, { orderId }) => {
+  // --- HANDLER DE CANCELACIÓN SEGURO ---
+  ipcMain.handle('cancel-order', (_, { orderId, pin }) => {
     try {
+      // 1. Obtener usuario por PIN
+      const user = db.prepare('SELECT id, rol FROM user WHERE pin = ? AND active = 1').get(pin) as any
+      if (!user) return { success: false, error: 'PIN incorrecto' }
+
+      // 2. Obtener orden
+      const order = db.prepare('SELECT user_id FROM orden WHERE id = ?').get(orderId) as any
+      if (!order) return { success: false, error: 'Orden no encontrada' }
+
+      // 3. VALIDACIÓN DE PERMISOS: Solo Admin o el Dueño de la orden
+      if (user.rol !== 'admin' && user.id !== order.user_id) {
+        return { success: false, error: 'Permisos insuficientes. Solo el Admin o el mesero que abrió la mesa pueden cancelarla.' }
+      }
+
+      // 4. Ejecutar cancelación
       db.prepare("UPDATE orden SET estatus = 'cancelada' WHERE id = ?").run(orderId)
       return { success: true }
-    } catch (error: any) { return { success: false, error: error.message } }
+    } catch (error: any) {
+      return { success: false, error: error.message }
+    }
   })
 
   ipcMain.handle('get-daily-report', (_, { date }) => {
@@ -218,6 +256,14 @@ app.whenReady().then(() => {
       if (!nombre || !pin) return { success: false, error: 'Faltan datos' }
       if (pin.length < 4) return { success: false, error: 'PIN muy corto' }
       
+      // Validación PIN Duplicado
+      const existingPin = db.prepare('SELECT id FROM user WHERE pin = ?').get(pin)
+      if (existingPin) return { success: false, error: 'Este PIN ya está en uso por otro empleado' }
+
+      // NUEVO: Validación Nombre Duplicado
+      const existingName = db.prepare('SELECT id FROM user WHERE nombre = ?').get(nombre)
+      if (existingName) return { success: false, error: 'Ya existe un usuario con este nombre' }
+
       const insert = db.prepare("INSERT INTO user (nombre, rol, pin, active) VALUES (?, 'cajero', ?, 1)")
       insert.run(nombre, pin)
       
@@ -227,15 +273,21 @@ app.whenReady().then(() => {
     }
   })
 
-  // NUEVO: Editar Usuario
   ipcMain.handle('update-user', (_, { userId, nombre, rol, pin }) => {
     try {
       if (!nombre || !pin || !rol) return { success: false, error: 'Datos incompletos' }
       
-      // Protección: No cambiar rol del Super Admin (ID 1)
       if (userId === 1 && rol !== 'admin') {
         return { success: false, error: 'No se puede quitar el rol de Admin al usuario principal' }
       }
+
+      // Validación PIN Duplicado
+      const existingPin = db.prepare('SELECT id FROM user WHERE pin = ? AND id != ?').get(pin, userId)
+      if (existingPin) return { success: false, error: 'Este PIN ya está en uso por otro empleado' }
+
+      // NUEVO: Validación Nombre Duplicado
+      const existingName = db.prepare('SELECT id FROM user WHERE nombre = ? AND id != ?').get(nombre, userId)
+      if (existingName) return { success: false, error: 'Ya existe un usuario con este nombre' }
 
       db.prepare('UPDATE user SET nombre = ?, rol = ?, pin = ? WHERE id = ?').run(nombre, rol, pin, userId)
       return { success: true }
@@ -247,7 +299,6 @@ app.whenReady().then(() => {
   ipcMain.handle('toggle-user-status', (_, { userId, active }) => {
     try {
       if (userId === 1) return { success: false, error: 'No se puede desactivar al Admin principal' }
-      
       db.prepare('UPDATE user SET active = ? WHERE id = ?').run(active ? 1 : 0, userId)
       return { success: true }
     } catch (error: any) {
@@ -257,7 +308,7 @@ app.whenReady().then(() => {
 
   ipcMain.handle('verify-pin', (_, { pin }) => {
     try {
-      const user = db.prepare('SELECT nombre, rol FROM user WHERE pin = ? AND active = 1').get(pin)
+      const user = db.prepare('SELECT id, nombre, rol FROM user WHERE pin = ? AND active = 1').get(pin)
       if (user) { return { success: true, user } } 
       else { return { success: false, error: 'PIN incorrecto o usuario inactivo' } }
     } catch (error: any) { return { success: false, error: error.message } }

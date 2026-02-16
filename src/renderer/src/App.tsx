@@ -35,6 +35,12 @@ interface TicketData {
   payment: { method: string; received: number; change: number };
 }
 
+interface CurrentUser {
+  id: number;
+  nombre: string;
+  rol: 'admin' | 'cajero';
+}
+
 function App() {
   const [view, setView] = useState<ViewState>('DASHBOARD')
   const [tables, setTables] = useState<Mesa[]>([])
@@ -53,7 +59,9 @@ function App() {
   const [pinTitle, setPinTitle] = useState('Ingrese su PIN') 
   const [pendingView, setPendingView] = useState<ViewState | null>(null)
   const [pendingTableId, setPendingTableId] = useState<number | null>(null)
-  const [currentUser, setCurrentUser] = useState<{ nombre: string, rol: string } | null>(null)
+  // NUEVO: Estado para saber qué orden vamos a cancelar
+  const [pendingOrderIdToCancel, setPendingOrderIdToCancel] = useState<number | null>(null)
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
 
   const refreshTables = useCallback(async () => {
     try {
@@ -93,18 +101,44 @@ function App() {
     setIsPinModalOpen(true)
   }
 
-  // --- NUEVA VALIDACIÓN REAL ---
+  // --- NUEVA LÓGICA DE CANCELACIÓN (Trigger) ---
+  const handleCancelOrder = async () => {
+    if (!activeOrderId) return
+    setPinTitle('Autorizar Cancelación 🗑️')
+    setPendingOrderIdToCancel(activeOrderId)
+    setIsPinModalOpen(true)
+  }
+
   const handlePinVerify = async (pin: string) => {
     try {
+      // CASO ESPECIAL: Cancelación de Orden (Se valida en backend con el PIN directo)
+      if (pendingOrderIdToCancel !== null) {
+        // @ts-ignore
+        const result = await window.electron.ipcRenderer.invoke('cancel-order', { 
+          orderId: pendingOrderIdToCancel, 
+          pin 
+        })
+        
+        if (result.success) {
+          setIsPinModalOpen(false)
+          setPendingOrderIdToCancel(null)
+          handleBackToTables() // Éxito: volvemos al mapa
+        } else {
+          alert('Error: ' + result.error)
+          // No cerramos el modal para permitir reintentar o que venga el admin
+        }
+        return // Salimos para no ejecutar el login normal
+      }
+
+      // FLUJO NORMAL: Login / Cambio de Pantalla / Abrir Mesa
       // @ts-ignore
       const result = await window.electron.ipcRenderer.invoke('verify-pin', { pin })
       
       if (result.success && result.user) {
-        const user = result.user
+        const user: CurrentUser = result.user
         setCurrentUser(user)
         setIsPinModalOpen(false) 
         
-        // Manejo de redirección tras login exitoso
         if (pendingView) {
           if ((pendingView === 'USERS' || pendingView === 'REPORT') && user.rol !== 'admin') {
             alert('Acceso Denegado: Se requieren permisos de Administrador.')
@@ -115,11 +149,11 @@ function App() {
         }
   
         if (pendingTableId !== null) {
-          await executeOpenTable(pendingTableId)
+          await executeOpenTable(pendingTableId, user)
           setPendingTableId(null)
         }
       } else {
-        alert('PIN Incorrecto')
+        alert(result.error || 'PIN Incorrecto')
       }
     } catch (error) {
       console.error(error)
@@ -127,16 +161,22 @@ function App() {
     }
   }
 
-  const executeOpenTable = async (tableId: number) => {
+  const executeOpenTable = async (tableId: number, user: CurrentUser) => {
     try {
       // @ts-ignore
-      const result = await window.electron.ipcRenderer.invoke('open-table-order', { tableId })
+      const result = await window.electron.ipcRenderer.invoke('open-table-order', { 
+        tableId, 
+        userId: user.id 
+      })
+      
       if (result.success) {
         setActiveTableId(tableId)
         setActiveOrderId(result.order.id)
         setCart(result.items)
         setOrderStatus(result.order.estatus)
         setView('ORDER')
+      } else {
+        alert(result.error)
       }
     } catch (error) { console.error(error) }
   }
@@ -221,21 +261,18 @@ function App() {
     } catch (error) { console.error(error) }
   }
 
-  const handleCancelOrder = async () => {
-    if (!activeOrderId) return
-    // @ts-ignore
-    const result = await window.electron.ipcRenderer.invoke('cancel-order', { orderId: activeOrderId })
-    if (result.success) { handleBackToTables() } 
-    else { alert('Error al cancelar: ' + result.error) }
-  }
-
   if (view === 'DASHBOARD') {
     return (
       <>
         <PinPadModal 
           title={pinTitle}
           isOpen={isPinModalOpen} 
-          onClose={() => { setIsPinModalOpen(false); setPendingView(null); setPendingTableId(null); }}
+          onClose={() => { 
+            setIsPinModalOpen(false); 
+            setPendingView(null); 
+            setPendingTableId(null);
+            setPendingOrderIdToCancel(null); // Limpiar estado de cancelación
+          }}
           onVerify={handlePinVerify}
         />
         <Dashboard onNavigate={handleNavigate} />
@@ -299,6 +336,18 @@ function App() {
   // VISTA ORDER (POS)
   return (
     <div className="pos-container">
+      
+      {/* Modal de PIN para la cancelación dentro de la orden */}
+      <PinPadModal 
+        title={pinTitle}
+        isOpen={isPinModalOpen} 
+        onClose={() => { 
+          setIsPinModalOpen(false); 
+          setPendingOrderIdToCancel(null); 
+        }}
+        onVerify={handlePinVerify}
+      />
+
       <div style={{ position: 'absolute', top: 10, left: 20, zIndex: 100 }}>
         <button onClick={handleBackToTables} style={{ padding: '10px 20px', background: '#404040', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' }}>← Volver a Mesas</button>
         <span style={{ marginLeft: '20px', color: 'white', fontWeight: 'bold' }}>Mesa #{tables.find(t => t.id === activeTableId)?.numero}</span>
