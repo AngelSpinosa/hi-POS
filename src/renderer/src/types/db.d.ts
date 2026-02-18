@@ -1,27 +1,35 @@
-// Mapeo exacto del esquema de la base de datos SQLite utilizada en la aplicación POS
-
 export interface User {
   id: number;
   nombre: string;
   rol: 'admin' | 'cajero';
-  active: number; // SQLite guarda booleanos como 0 o 1
+  pin: string; // <--- NUEVO: Clave de acceso
+  active: number;
 }
 
 export interface Producto {
   id: number;
   nombre: string;
-  precio: number; // INTEGER en tu DB
-  active: number; // 1 = activo, 0 = inactivo
+  precio: number;
+  active: number;
+}
+
+export interface Mesa {
+  id: number;
+  numero: number;
+  activa: number;
+  estado_orden?: 'libre' | 'abierta' | 'enviada_cocina' | 'cuenta_solicitada'; 
+  total_actual?: number;
 }
 
 export interface Orden {
   id: number;
   user_id: number;
-  id_reporte_diario?: number | null; // Puede ser null
-  estatus: 'pendiente' | 'pagada' | 'cancelada';
-  total: number; // FLOAT en tu DB
-  creado_en: string; // SQLite devuelve fechas como string
-  ticket_impreso: number; // 0 o 1
+  id_reporte_diario?: number | null;
+  mesa_id?: number | null;
+  estatus: 'abierta' | 'enviada_cocina' | 'cuenta_solicitada' | 'pagada' | 'cancelada';
+  total: number;
+  creado_en: string;
+  ticket_impreso: number;
 }
 
 export interface OrdenItem {
@@ -29,20 +37,26 @@ export interface OrdenItem {
   orden_id: number;
   producto_id: number;
   nombre: string;
-  precio: number; // FLOAT en tu DB (precio histórico)
+  precio: number;
   cantidad: number;
+  comanda_impresa: number;
 }
 
-export interface Pago {
+export interface CartItem extends OrdenItem { }
+
+export interface ReporteDiario {
   id: number;
-  orden_id: number;
-  metodo: 'efectivo' | 'tarjeta';
-  monto_recibido: number;
-  creado_en: string;
-  cambio: number;
+  fecha: string;
+  total_ventas: number;
+  total_pedidos: number;
+  total_efectivo: number;
+  total_tarjeta: number;
 }
 
-// Interfaces auxiliares para el Frontend (No existen en BD tal cual)
-export interface CartItem extends Producto {
-  quantity: number;
+export interface OrdenHistorial {
+  id: number;
+  total: number;
+  creado_en: string;
+  metodo: string;
+  mesa: number;
 }

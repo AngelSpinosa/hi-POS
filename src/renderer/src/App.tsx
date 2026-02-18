@@ -1,160 +1,186 @@
 import { useEffect, useState, useCallback } from 'react'
-import type { Producto, CartItem } from './types/db'
-import { OrderCart } from './components/OrderCart'
-import { PaymentModal } from './components/PaymentModal'
+import type { Mesa } from './types/db'
+import { TableGrid } from './components/TableGrid'
+import { DailyReport } from './components/DailyReport'
+import { Dashboard } from './components/Dashboard'
+import { PinPadModal } from './components/PinPadModal'
+import { UserManagement } from './components/UserManagement'
+import { POSView } from './views/POSView' // <--- Importamos la nueva vista
+
+type ViewState = 'DASHBOARD' | 'TABLES' | 'ORDER' | 'REPORT' | 'USERS';
+
+interface CurrentUser {
+  id: number;
+  nombre: string;
+  rol: 'admin' | 'cajero';
+}
 
 function App() {
-  const [products, setProducts] = useState<Producto[]>([])
-  const [cart, setCart] = useState<CartItem[]>([])
-  const [activeOrderId, setActiveOrderId] = useState<number | null>(null)
-  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false)
+  const [view, setView] = useState<ViewState>('DASHBOARD')
+  
+  // Estado Global necesario para navegación (Mesas y Usuario)
+  const [tables, setTables] = useState<Mesa[]>([])
+  const [activeTableId, setActiveTableId] = useState<number | null>(null)
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
+  
+  // Estados para el PIN Global (Navegación y Apertura de Mesa)
+  const [isPinModalOpen, setIsPinModalOpen] = useState(false)
+  const [pinTitle, setPinTitle] = useState('Ingrese su PIN') 
+  const [pendingView, setPendingView] = useState<ViewState | null>(null)
+  const [pendingTableId, setPendingTableId] = useState<number | null>(null)
 
-  // Función central: Sincronizar el Frontend con la Base de Datos
-  const fetchActiveOrder = useCallback(async () => {
+  const refreshTables = useCallback(async () => {
     try {
       // @ts-ignore
-      const result = await window.electron.ipcRenderer.invoke('get-active-order')
-      if (result.success) {
-        setActiveOrderId(result.order.id)
-        setCart(result.items)
-      }
-    } catch (error) {
-      console.error('Error recuperando orden:', error)
-    }
+      const result = await window.electron.ipcRenderer.invoke('get-tables')
+      setTables(result)
+    } catch (error) { console.error(error) }
   }, [])
 
-  // 1. Inicialización de la App
-  useEffect(() => {
-    const init = async () => {
-      try {
-        // @ts-ignore
-        const items = await window.electron.ipcRenderer.invoke('get-products')
-        setProducts(items)
+  useEffect(() => { refreshTables() }, [refreshTables])
+
+  // --- NAVEGACIÓN Y SEGURIDAD ---
+
+  const handleNavigate = (targetView: ViewState) => {
+    if (targetView === 'REPORT' || targetView === 'USERS') {
+      setPinTitle('Acceso Restringido 🔒')
+      setPendingView(targetView)
+      setIsPinModalOpen(true)
+    } else if (targetView === 'TABLES') {
+      setView('TABLES')
+      refreshTables() // Refrescar estado de mesas al entrar
+    } else {
+      setView(targetView)
+    }
+  }
+
+  const handleSelectTableRequest = (tableId: number) => {
+    setPinTitle('Mesero responsable 👤')
+    setPendingTableId(tableId)
+    setIsPinModalOpen(true)
+  }
+
+  const handlePinVerify = async (pin: string) => {
+    try {
+      // @ts-ignore
+      const result = await window.electron.ipcRenderer.invoke('verify-pin', { pin })
+      
+      if (result.success && result.user) {
+        const user: CurrentUser = result.user
+        setCurrentUser(user)
+        setIsPinModalOpen(false) 
         
-        await fetchActiveOrder()
-      } catch (error) {
-        console.error('Error inicializando app:', error)
-      }
-    }
-    init()
-  }, [fetchActiveOrder])
-
-  // 2. Agregar Producto
-  const addToCart = async (product: Producto) => {
-    if (!activeOrderId) return
-
-    try {
-      // @ts-ignore
-      const result = await window.electron.ipcRenderer.invoke('add-to-cart', {
-        orderId: activeOrderId,
-        product
-      })
-      
-      if (result.success) await fetchActiveOrder()
-    } catch (error) {
-      console.error('Error agregando producto:', error)
-    }
-  }
-
-  // 3. Eliminar Producto
-  const removeFromCart = async (productId: number) => {
-    if (!activeOrderId) return
-
-    try {
-      // @ts-ignore
-      const result = await window.electron.ipcRenderer.invoke('remove-from-cart', {
-        orderId: activeOrderId,
-        productId
-      })
-      
-      if (result.success) await fetchActiveOrder()
-    } catch (error) {
-      console.error('Error eliminando producto:', error)
-    }
-  }
-
-  // 4. Actualizar Cantidad
-  const updateQuantity = async (productId: number, newQuantity: number) => {
-    if (!activeOrderId) return
-
-    try {
-      // @ts-ignore
-      const result = await window.electron.ipcRenderer.invoke('update-quantity', {
-        orderId: activeOrderId,
-        productId,
-        quantity: newQuantity
-      })
-      
-      if (result.success) await fetchActiveOrder()
-    } catch (error) {
-      console.error('Error actualizando cantidad:', error)
-    }
-  }
-
-  const total = cart.reduce((sum, item) => sum + item.precio * item.quantity, 0)
-
-  // 5. Procesar Pago
-  const handlePaymentConfirm = async (method: 'efectivo' | 'tarjeta', received: number) => {
-    if (!activeOrderId) return
-
-    try {
-      // @ts-ignore
-      const result = await window.electron.ipcRenderer.invoke('pay-order', {
-        orderId: activeOrderId,
-        payment: { method, received },
-        total
-      })
-
-      if (result.success) {
-        console.log('Venta completada. Orden ID:', activeOrderId)
-        setIsPaymentModalOpen(false)
-        await fetchActiveOrder() 
+        // A. Navegación a módulos protegidos
+        if (pendingView) {
+          if ((pendingView === 'USERS' || pendingView === 'REPORT') && user.rol !== 'admin') {
+            alert('Acceso Denegado: Se requieren permisos de Administrador.')
+          } else {
+            setView(pendingView)
+          }
+          setPendingView(null)
+        }
+  
+        // B. Apertura de Mesa (POS)
+        if (pendingTableId !== null) {
+          // Intentamos abrir la mesa
+          // @ts-ignore
+          const openResult = await window.electron.ipcRenderer.invoke('open-table-order', { 
+            tableId: pendingTableId, userId: user.id 
+          })
+          
+          if (openResult.success) {
+            setActiveTableId(pendingTableId)
+            setView('ORDER')
+          } else {
+            alert(openResult.error)
+          }
+          setPendingTableId(null)
+        }
       } else {
-        alert('Error al procesar el pago.')
+        alert(result.error || 'PIN Incorrecto')
       }
     } catch (error) {
-      console.error('Error de comunicación:', error)
+      console.error(error)
+      alert('Error de comunicación')
     }
   }
 
-  return (
-    <div className="pos-container">
-      {/* SECCIÓN IZQUIERDA: MENÚ */}
-      <div className="products-section">
-        <h2>Menú</h2>
-        <div className="products-grid">
-          {products.map((product) => (
-            <div
-              key={product.id}
-              className="product-card"
-              onClick={() => addToCart(product)}
-            >
-              <h3>{product.nombre}</h3>
-              <div className="product-price">${product.precio.toFixed(2)}</div>
-            </div>
-          ))}
+  const handleBackToDashboard = () => {
+    setView('DASHBOARD')
+    setCurrentUser(null) 
+  }
+
+  const handleBackToTables = async () => {
+    setView('TABLES')
+    setActiveTableId(null)
+    await refreshTables()
+  }
+
+  // --- RENDERIZADO (Router Básico) ---
+
+  if (view === 'DASHBOARD') {
+    return (
+      <>
+        <PinPadModal title={pinTitle} isOpen={isPinModalOpen} onClose={() => { setIsPinModalOpen(false); setPendingView(null); setPendingTableId(null); }} onVerify={handlePinVerify} />
+        <Dashboard onNavigate={handleNavigate} />
+      </>
+    )
+  }
+
+  if (view === 'USERS') {
+    return (
+      <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ padding: '10px 20px', background: '#1a1a1a', borderBottom: '1px solid #404040' }}>
+          <button onClick={handleBackToDashboard} style={{ background: 'transparent', color: '#9ca3af', border: 'none', cursor: 'pointer', fontSize: '1rem' }}>← Volver al Menú</button>
+        </div>
+        <div style={{ flex: 1, overflow: 'hidden' }}>
+          <UserManagement />
         </div>
       </div>
+    )
+  }
 
-      {/* SECCIÓN DERECHA: CARRITO */}
-      <OrderCart 
-        cart={cart} 
-        total={total}
-        orderId={activeOrderId} // <--- Pasamos el ID real aquí
-        onPay={() => setIsPaymentModalOpen(true)} 
-        onRemove={removeFromCart}
-        onUpdateQuantity={updateQuantity}
-      />
+  if (view === 'REPORT') {
+    return (
+      <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ padding: '10px 20px', background: '#1a1a1a', borderBottom: '1px solid #404040' }}>
+          <button onClick={handleBackToDashboard} style={{ background: 'transparent', color: '#9ca3af', border: 'none', cursor: 'pointer', fontSize: '1rem' }}>← Volver al Menú</button>
+        </div>
+        <div style={{ flex: 1, overflow: 'hidden' }}>
+          <DailyReport />
+        </div>
+      </div>
+    )
+  }
 
-      {/* MODAL DE PAGO */}
-      <PaymentModal 
-        isOpen={isPaymentModalOpen}
-        total={total}
-        onClose={() => setIsPaymentModalOpen(false)}
-        onConfirmPayment={handlePaymentConfirm}
+  if (view === 'TABLES') {
+    return (
+      <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
+        <PinPadModal title={pinTitle} isOpen={isPinModalOpen} onClose={() => { setIsPinModalOpen(false); setPendingTableId(null); }} onVerify={handlePinVerify} />
+        <div style={{ padding: '10px 20px', display: 'flex', justifyContent: 'space-between', background: '#1a1a1a', alignItems: 'center' }}>
+          <button onClick={handleBackToDashboard} style={{ background: 'transparent', color: '#9ca3af', border: 'none', cursor: 'pointer', fontSize: '1rem' }}>← Menú Principal</button>
+          <div style={{ fontWeight: 'bold', color: 'white' }}>MAPA DE MESAS</div>
+        </div>
+        <div style={{ flex: 1, overflow: 'hidden' }}>
+          <TableGrid tables={tables} onSelectTable={handleSelectTableRequest} />
+        </div>
+      </div>
+    )
+  }
+
+  // NUEVO: Usamos el componente POSView para la venta
+  if (view === 'ORDER' && activeTableId) {
+    const tableNum = tables.find(t => t.id === activeTableId)?.numero || 0
+    return (
+      <POSView 
+        tableId={activeTableId} 
+        tableNumber={tableNum} 
+        onBack={handleBackToTables} 
       />
-    </div>
-  )
+    )
+  }
+
+  return null
 }
 
 export default App
