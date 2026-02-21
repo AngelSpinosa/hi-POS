@@ -1,13 +1,18 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState } from 'react'
 import type { Mesa } from './types/db'
 import { TableGrid } from './components/TableGrid'
 import { DailyReport } from './components/DailyReport'
 import { Dashboard } from './components/Dashboard'
 import { PinPadModal } from './components/PinPadModal'
 import { UserManagement } from './components/UserManagement'
-import { POSView } from './views/POSView' // <--- Importamos la nueva vista
+import { ProductManagement } from './components/ProductManagement'
+import { POSView } from './views/POSView'
 
-type ViewState = 'DASHBOARD' | 'TABLES' | 'ORDER' | 'REPORT' | 'USERS';
+// Definimos TODOS los estados posibles de la vista
+type ViewState = 'DASHBOARD' | 'TABLES' | 'ORDER' | 'REPORT' | 'USERS' | 'PRODUCTS';
+
+// Interfaz para la navegación que viene del Dashboard (limitada)
+type DashboardNav = 'TABLES' | 'REPORT' | 'USERS';
 
 interface CurrentUser {
   id: number;
@@ -18,139 +23,143 @@ interface CurrentUser {
 function App() {
   const [view, setView] = useState<ViewState>('DASHBOARD')
   
-  // Estado Global necesario para navegación (Mesas y Usuario)
   const [tables, setTables] = useState<Mesa[]>([])
   const [activeTableId, setActiveTableId] = useState<number | null>(null)
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
   
-  // Estados para el PIN Global (Navegación y Apertura de Mesa)
+  // Seguridad y Navegación
   const [isPinModalOpen, setIsPinModalOpen] = useState(false)
   const [pinTitle, setPinTitle] = useState('Ingrese su PIN') 
   const [pendingView, setPendingView] = useState<ViewState | null>(null)
   const [pendingTableId, setPendingTableId] = useState<number | null>(null)
 
-  const refreshTables = useCallback(async () => {
+  useEffect(() => { loadTables() }, [])
+
+  const loadTables = async () => {
     try {
       // @ts-ignore
-      const result = await window.electron.ipcRenderer.invoke('get-tables')
-      setTables(result)
-    } catch (error) { console.error(error) }
-  }, [])
-
-  useEffect(() => { refreshTables() }, [refreshTables])
-
-  // --- NAVEGACIÓN Y SEGURIDAD ---
-
-  const handleNavigate = (targetView: ViewState) => {
-    if (targetView === 'REPORT' || targetView === 'USERS') {
-      setPinTitle('Acceso Restringido 🔒')
-      setPendingView(targetView)
-      setIsPinModalOpen(true)
-    } else if (targetView === 'TABLES') {
-      setView('TABLES')
-      refreshTables() // Refrescar estado de mesas al entrar
-    } else {
-      setView(targetView)
-    }
+      const data = await window.electron.ipcRenderer.invoke('get-tables')
+      setTables(data)
+    } catch (err) { console.error(err) }
   }
 
-  const handleSelectTableRequest = (tableId: number) => {
-    setPinTitle('Mesero responsable 👤')
-    setPendingTableId(tableId)
+  // --- NAVEGACIÓN SEGURA ---
+
+  // Solicitud de cambio de vista
+  const requestViewChange = (targetView: ViewState, title: string) => {
+    setPendingView(targetView)
+    setPinTitle(title)
     setIsPinModalOpen(true)
   }
 
+  // Verificar PIN
   const handlePinVerify = async (pin: string) => {
     try {
       // @ts-ignore
       const result = await window.electron.ipcRenderer.invoke('verify-pin', { pin })
       
-      if (result.success && result.user) {
-        const user: CurrentUser = result.user
+      if (result.success) {
+        const user = result.user
         setCurrentUser(user)
-        setIsPinModalOpen(false) 
-        
-        // A. Navegación a módulos protegidos
-        if (pendingView) {
-          if ((pendingView === 'USERS' || pendingView === 'REPORT') && user.rol !== 'admin') {
-            alert('Acceso Denegado: Se requieren permisos de Administrador.')
+
+        // Lógica de Redirección según Permisos
+        if (pendingView === 'TABLES') {
+          if (pendingTableId) {
+             await openTableOrder(pendingTableId, user.id)
           } else {
+             setView('TABLES')
+          }
+        }
+        else if (pendingView === 'REPORT' || pendingView === 'USERS' || pendingView === 'PRODUCTS') {
+          if (user.rol === 'admin') {
             setView(pendingView)
-          }
-          setPendingView(null)
-        }
-  
-        // B. Apertura de Mesa (POS)
-        if (pendingTableId !== null) {
-          // Intentamos abrir la mesa
-          // @ts-ignore
-          const openResult = await window.electron.ipcRenderer.invoke('open-table-order', { 
-            tableId: pendingTableId, userId: user.id 
-          })
-          
-          if (openResult.success) {
-            setActiveTableId(pendingTableId)
-            setView('ORDER')
           } else {
-            alert(openResult.error)
+            alert('Acceso denegado: Se requieren permisos de Administrador.')
+            return
           }
-          setPendingTableId(null)
         }
+
+        setIsPinModalOpen(false)
+        setPendingView(null)
+        setPendingTableId(null)
       } else {
-        alert(result.error || 'PIN Incorrecto')
+        alert('PIN Incorrecto')
       }
     } catch (error) {
       console.error(error)
-      alert('Error de comunicación')
     }
+  }
+
+  const openTableOrder = async (tableId: number, userId: number) => {
+    setActiveTableId(tableId)
+    // Inicializar orden en backend si es necesario
+    // @ts-ignore
+    await window.electron.ipcRenderer.invoke('open-table-order', { mesaId: tableId, userId })
+    setView('ORDER')
+  }
+
+  const handleSelectTableRequest = (id: number) => {
+    setPendingTableId(id)
+    setPendingView('TABLES')
+    setPinTitle(`Mesa ${id}: Ingrese PIN`)
+    setIsPinModalOpen(true)
   }
 
   const handleBackToDashboard = () => {
     setView('DASHBOARD')
-    setCurrentUser(null) 
-  }
-
-  const handleBackToTables = async () => {
-    setView('TABLES')
     setActiveTableId(null)
-    await refreshTables()
+    setPendingTableId(null)
+    setCurrentUser(null)
   }
 
-  // --- RENDERIZADO (Router Básico) ---
+  // --- RENDERIZADO ---
 
   if (view === 'DASHBOARD') {
     return (
       <>
-        <PinPadModal title={pinTitle} isOpen={isPinModalOpen} onClose={() => { setIsPinModalOpen(false); setPendingView(null); setPendingTableId(null); }} onVerify={handlePinVerify} />
-        <Dashboard onNavigate={handleNavigate} />
+        <PinPadModal 
+          title={pinTitle} 
+          isOpen={isPinModalOpen} 
+          onClose={() => { setIsPinModalOpen(false); setPendingView(null); }} 
+          onVerify={handlePinVerify} 
+        />
+        
+        {/* Renderizamos el Dashboard existente */}
+        <Dashboard 
+          onNavigate={(v: DashboardNav) => {
+            const titles: Record<DashboardNav, string> = {
+              'TABLES': 'Acceso a Mesas',
+              'REPORT': 'Acceso a Reportes',
+              'USERS': 'Gestión de Usuarios'
+            }
+            requestViewChange(v, titles[v])
+          }}
+        />
       </>
-    )
-  }
-
-  if (view === 'USERS') {
-    return (
-      <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ padding: '10px 20px', background: '#1a1a1a', borderBottom: '1px solid #404040' }}>
-          <button onClick={handleBackToDashboard} style={{ background: 'transparent', color: '#9ca3af', border: 'none', cursor: 'pointer', fontSize: '1rem' }}>← Volver al Menú</button>
-        </div>
-        <div style={{ flex: 1, overflow: 'hidden' }}>
-          <UserManagement />
-        </div>
-      </div>
     )
   }
 
   if (view === 'REPORT') {
     return (
       <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ padding: '10px 20px', background: '#1a1a1a', borderBottom: '1px solid #404040' }}>
-          <button onClick={handleBackToDashboard} style={{ background: 'transparent', color: '#9ca3af', border: 'none', cursor: 'pointer', fontSize: '1rem' }}>← Volver al Menú</button>
+        <div style={{ padding: '10px 20px', display: 'flex', justifyContent: 'space-between', background: '#1a1a1a', alignItems: 'center' }}>
+          <button onClick={handleBackToDashboard} style={{ background: 'transparent', color: '#9ca3af', border: 'none', cursor: 'pointer', fontSize: '1rem' }}>← Menú Principal</button>
+          <div style={{ fontWeight: 'bold', color: 'white' }}>REPORTE DIARIO</div>
         </div>
         <div style={{ flex: 1, overflow: 'hidden' }}>
           <DailyReport />
         </div>
       </div>
     )
+  }
+
+  if (view === 'USERS') {
+    // @ts-ignore: Ignoramos error de TS si UserManagement no define props explícitamente en tu versión local
+    return <UserManagement onBack={handleBackToDashboard} />
+  }
+
+  if (view === 'PRODUCTS') {
+    return <ProductManagement onBack={handleBackToDashboard} />
   }
 
   if (view === 'TABLES') {
@@ -168,19 +177,17 @@ function App() {
     )
   }
 
-  // NUEVO: Usamos el componente POSView para la venta
   if (view === 'ORDER' && activeTableId) {
-    const tableNum = tables.find(t => t.id === activeTableId)?.numero || 0
     return (
       <POSView 
         tableId={activeTableId} 
-        tableNumber={tableNum} 
-        onBack={handleBackToTables} 
+        userId={currentUser?.id} 
+        onBack={() => setView('TABLES')} 
       />
     )
   }
 
-  return null
+  return <div style={{height: '100vh', background: '#1a1a1a', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>Cargando...</div>
 }
 
 export default App

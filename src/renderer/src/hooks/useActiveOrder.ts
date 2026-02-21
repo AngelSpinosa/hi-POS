@@ -1,143 +1,157 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import type { Producto, CartItem, TicketData } from '../types/db'
 
-export function useActiveOrder() {
+export function useActiveOrder(tableId: number | null, userId: number | undefined) {
   const [activeOrderId, setActiveOrderId] = useState<number | null>(null)
   const [cart, setCart] = useState<CartItem[]>([])
   const [orderStatus, setOrderStatus] = useState<string>('abierta')
   
-  // Modales locales de la orden
+  // Modales y Datos UI (Requeridos por POSView)
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false)
   const [ticketData, setTicketData] = useState<TicketData | null>(null)
   const [kitchenData, setKitchenData] = useState<{items: CartItem[], tableNum: number} | null>(null)
 
-  // Cargar una orden específica
-  const loadOrder = useCallback(async (tableId: number) => {
+  // Cargar Orden
+  const fetchOrder = useCallback(async () => {
+    if (!tableId) return
     try {
       // @ts-ignore
-      const result = await window.electron.ipcRenderer.invoke('open-table-order', { tableId })
-      if (result.success) {
-        setActiveOrderId(result.order.id)
-        setCart(result.items)
-        setOrderStatus(result.order.estatus)
-        return true
+      const res = await window.electron.ipcRenderer.invoke('open-table-order', { mesaId: tableId, userId })
+      if (res.success) {
+        setActiveOrderId(res.order.id)
+        setCart(res.items)
+        setOrderStatus(res.order.estatus)
+      } else {
+        // Si falla o no hay orden
+        setActiveOrderId(null)
+        setCart([])
       }
-      return false
-    } catch (error) {
-      console.error(error)
-      return false
-    }
-  }, [])
+    } catch (e) { console.error(e) }
+  }, [tableId, userId])
 
-  // Acciones del Carrito
+  // Cargar inicial
+  useEffect(() => {
+    if (tableId) fetchOrder()
+  }, [fetchOrder, tableId])
+
+  // --- ACCIONES DEL CARRITO ---
+
   const addToCart = async (product: Producto) => {
-    if (!activeOrderId || orderStatus === 'cuenta_solicitada') return
-    // @ts-ignore
-    const result = await window.electron.ipcRenderer.invoke('add-to-cart', { orderId: activeOrderId, product })
-    if (result.success) setCart(result.items)
+    if (!activeOrderId) return
+    try {
+      // @ts-ignore
+      await window.electron.ipcRenderer.invoke('add-order-item', { ordenId: activeOrderId, product })
+      await fetchOrder()
+    } catch (e) { console.error(e) }
   }
 
-  const removeFromCart = async (productId: number) => {
+  const removeFromCart = async (itemId: number) => {
     if (!activeOrderId) return
     // @ts-ignore
-    const result = await window.electron.ipcRenderer.invoke('remove-from-cart', { orderId: activeOrderId, productId })
-    if (result.success) setCart(result.items)
+    await window.electron.ipcRenderer.invoke('remove-order-item', { itemId, ordenId: activeOrderId })
+    await fetchOrder()
   }
 
-  const updateQuantity = async (productId: number, newQuantity: number) => {
+  const updateQuantity = async (itemId: number, change: number) => {
     if (!activeOrderId) return
     // @ts-ignore
-    const result = await window.electron.ipcRenderer.invoke('update-quantity', { orderId: activeOrderId, productId, quantity: newQuantity })
-    if (result.success) setCart(result.items)
+    await window.electron.ipcRenderer.invoke('update-order-item-qty', { itemId, ordenId: activeOrderId, change })
+    await fetchOrder()
   }
 
-  // Comandas y Cuenta
-  const generateCommand = async (tableNum: number) => {
+  // --- ACCIONES DE ORDEN (Cocina, Cuenta, Pago) ---
+
+  const generateCommand = async (tableNumber: number) => {
     if (!activeOrderId) return
-    const newItems = cart.filter(i => i.comanda_impresa === 0)
-    // @ts-ignore
-    const result = await window.electron.ipcRenderer.invoke('generate-command', { orderId: activeOrderId })
-    if (result.success) {
-      setCart(result.items)
-      setKitchenData({ items: newItems, tableNum })
-    }
+    try {
+      // @ts-ignore
+      const res = await window.electron.ipcRenderer.invoke('print-command', { ordenId: activeOrderId })
+      if (res.success && res.items.length > 0) {
+        setKitchenData({ items: res.items, tableNum: tableNumber })
+        await fetchOrder()
+      } else {
+        // Feedback opcional si no hay nada nuevo
+        console.log('Nada nuevo para imprimir')
+      }
+    } catch (e) { console.error(e) }
   }
 
   const requestBill = async () => {
     if (!activeOrderId) return
     // @ts-ignore
-    await window.electron.ipcRenderer.invoke('update-order-status', { orderId: activeOrderId, status: 'cuenta_solicitada' })
-    setOrderStatus('cuenta_solicitada')
-    
-    // Calculamos total para el pre-ticket
-    const total = cart.reduce((sum: number, item) => sum + item.precio * item.cantidad, 0)
-    setTicketData({
-      orderId: activeOrderId, items: [...cart], total,
-      payment: { method: 'PENDIENTE', received: 0, change: 0 }
-    })
+    await window.electron.ipcRenderer.invoke('request-bill', { ordenId: activeOrderId })
+    await fetchOrder()
   }
 
-  const payOrder = async (method: 'efectivo' | 'tarjeta', received: number) => {
-    if (!activeOrderId) return
-    const total = cart.reduce((sum: number, item) => sum + item.precio * item.cantidad, 0)
+  const processPayment = async (method: string, amount: number) => {
+    if (!activeOrderId) return { success: false }
     
+    // Calculamos total actual del carrito local para el registro
+    const total = cart.reduce((acc, item) => acc + (item.precio * item.cantidad), 0)
+
     try {
       // @ts-ignore
-      const result = await window.electron.ipcRenderer.invoke('pay-order', {
-        orderId: activeOrderId, payment: { method, received }, total
+      const res = await window.electron.ipcRenderer.invoke('pay-order', { 
+        orderId: activeOrderId, 
+        payment: { method, received: amount }, 
+        total 
       })
 
-      if (result.success) {
+      if (res.success) {
         setTicketData({
-          orderId: activeOrderId, items: [...cart], total,
-          payment: { method, received, change: received - total }
+          orderId: activeOrderId,
+          items: [...cart],
+          total,
+          date: new Date().toLocaleString(),
+          payment: { method, amount, change: amount - total }
         })
         setIsPaymentModalOpen(false)
-        return true // Éxito
-      } else {
-        alert(result.error)
-        return false
+        await fetchOrder()
+        return { success: true }
       }
-    } catch (error) { console.error(error); return false }
+      return { success: false }
+    } catch (e) { return { success: false } }
   }
 
-  const cancelOrder = async () => {
-    if (!activeOrderId) return
-    // @ts-ignore
-    const result = await window.electron.ipcRenderer.invoke('cancel-order', { orderId: activeOrderId })
-    if (result.success) {
-      return true
-    } else {
-      alert('Error: ' + result.error)
+  const cancelOrder = async (pin: string) => {
+    if (!activeOrderId) return false
+    try {
+      // @ts-ignore
+      const res = await window.electron.ipcRenderer.invoke('cancel-order', { orderId: activeOrderId, pin })
+      if (res.success) {
+        setActiveOrderId(null)
+        setCart([])
+        return true
+      }
       return false
-    }
+    } catch (e) { return false }
   }
 
-  // Limpiar estado (al salir de la mesa)
-  const clearOrder = () => {
-    setActiveOrderId(null)
-    setCart([])
-    setOrderStatus('abierta')
-    setTicketData(null)
-    setKitchenData(null)
-  }
+  // Refrescar manualmente
+  const refresh = fetchOrder
 
+  // Retorno estructurado para POSView
   return {
     activeOrderId,
     cart,
     orderStatus,
-    isPaymentModalOpen, setIsPaymentModalOpen,
-    ticketData, setTicketData,
-    kitchenData, setKitchenData,
-    // Acciones
-    loadOrder,
+    
+    // UI State & Setters
+    isPaymentModalOpen,
+    setIsPaymentModalOpen,
+    ticketData,
+    setTicketData,
+    kitchenData,
+    setKitchenData,
+
+    // Actions
     addToCart,
     removeFromCart,
     updateQuantity,
     generateCommand,
     requestBill,
-    payOrder,
+    processPayment, // POSView lo usa como handlePayment interno, pero lo exponemos
     cancelOrder,
-    clearOrder
+    refresh
   }
 }

@@ -1,8 +1,12 @@
+// ==========================================
+// 📦 ENTIDADES DE BASE DE DATOS (TABLAS SQL)
+// ==========================================
+
 export interface User {
   id: number;
   nombre: string;
   rol: 'admin' | 'cajero';
-  pin: string; // <--- NUEVO: Clave de acceso
+  pin: string;
   active: number;
 }
 
@@ -17,6 +21,7 @@ export interface Mesa {
   id: number;
   numero: number;
   activa: number;
+  // Campos calculados en la query (no columnas físicas, pero vienen de la BD)
   estado_orden?: 'libre' | 'abierta' | 'enviada_cocina' | 'cuenta_solicitada'; 
   total_actual?: number;
 }
@@ -42,8 +47,6 @@ export interface OrdenItem {
   comanda_impresa: number;
 }
 
-export interface CartItem extends OrdenItem { }
-
 export interface ReporteDiario {
   id: number;
   fecha: string;
@@ -53,6 +56,34 @@ export interface ReporteDiario {
   total_tarjeta: number;
 }
 
+export interface Licencia {
+  id: number;
+  tipo: string;
+  expira_en: string;
+}
+
+// ==========================================
+// 💻 TIPOS AUXILIARES DE LA UI (NO SON TABLAS)
+// ==========================================
+
+// Extensión de OrdenItem para uso en el Frontend
+export interface CartItem extends OrdenItem { }
+
+// DTO (Data Transfer Object) para el recibo.
+// Esto NO se guarda en BD, se construye en memoria al pagar para mostrar el modal.
+export interface TicketData {
+  orderId: number;
+  items: CartItem[];
+  total: number;
+  date: string;
+  payment: {
+    method: string;
+    amount: number;
+    change: number;
+  };
+}
+
+// Tipo para el historial visual (proyección de datos)
 export interface OrdenHistorial {
   id: number;
   total: number;
