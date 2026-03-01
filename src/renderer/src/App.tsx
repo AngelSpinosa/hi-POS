@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import type { Mesa } from './types/db'
 import { TableGrid } from './components/TableGrid'
 import { DailyReport } from './components/DailyReport'
@@ -8,11 +8,8 @@ import { UserManagement } from './components/UserManagement'
 import { ProductManagement } from './components/ProductManagement'
 import { POSView } from './views/POSView'
 
-// Definimos TODOS los estados posibles de la vista
+// ACTUALIZADO: Añadido 'PRODUCTS' a los ViewStates permitidos
 type ViewState = 'DASHBOARD' | 'TABLES' | 'ORDER' | 'REPORT' | 'USERS' | 'PRODUCTS';
-
-// Interfaz para la navegación que viene del Dashboard (limitada)
-type DashboardNav = 'TABLES' | 'REPORT' | 'USERS';
 
 interface CurrentUser {
   id: number;
@@ -27,7 +24,6 @@ function App() {
   const [activeTableId, setActiveTableId] = useState<number | null>(null)
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
   
-  // Seguridad y Navegación
   const [isPinModalOpen, setIsPinModalOpen] = useState(false)
   const [pinTitle, setPinTitle] = useState('Ingrese su PIN') 
   const [pendingView, setPendingView] = useState<ViewState | null>(null)
@@ -43,16 +39,12 @@ function App() {
     } catch (err) { console.error(err) }
   }
 
-  // --- NAVEGACIÓN SEGURA ---
-
-  // Solicitud de cambio de vista
   const requestViewChange = (targetView: ViewState, title: string) => {
     setPendingView(targetView)
     setPinTitle(title)
     setIsPinModalOpen(true)
   }
 
-  // Verificar PIN
   const handlePinVerify = async (pin: string) => {
     try {
       // @ts-ignore
@@ -62,7 +54,6 @@ function App() {
         const user = result.user
         setCurrentUser(user)
 
-        // Lógica de Redirección según Permisos
         if (pendingView === 'TABLES') {
           if (pendingTableId) {
              await openTableOrder(pendingTableId, user.id)
@@ -70,9 +61,9 @@ function App() {
              setView('TABLES')
           }
         }
-        else if (pendingView === 'REPORT' || pendingView === 'USERS' || pendingView === 'PRODUCTS') {
+        else if (['REPORT', 'USERS', 'PRODUCTS'].includes(pendingView || '')) {
           if (user.rol === 'admin') {
-            setView(pendingView)
+            if (pendingView) setView(pendingView)
           } else {
             alert('Acceso denegado: Se requieren permisos de Administrador.')
             return
@@ -92,9 +83,8 @@ function App() {
 
   const openTableOrder = async (tableId: number, userId: number) => {
     setActiveTableId(tableId)
-    // Inicializar orden en backend si es necesario
     // @ts-ignore
-    await window.electron.ipcRenderer.invoke('open-table-order', { mesaId: tableId, userId })
+    await window.electron.ipcRenderer.invoke('open-table-order', { tableId, userId })
     setView('ORDER')
   }
 
@@ -112,8 +102,6 @@ function App() {
     setCurrentUser(null)
   }
 
-  // --- RENDERIZADO ---
-
   if (view === 'DASHBOARD') {
     return (
       <>
@@ -124,15 +112,15 @@ function App() {
           onVerify={handlePinVerify} 
         />
         
-        {/* Renderizamos el Dashboard existente */}
         <Dashboard 
-          onNavigate={(v: DashboardNav) => {
-            const titles: Record<DashboardNav, string> = {
+          onNavigate={(v) => {
+            const titles: Record<string, string> = {
               'TABLES': 'Acceso a Mesas',
               'REPORT': 'Acceso a Reportes',
-              'USERS': 'Gestión de Usuarios'
+              'USERS': 'Gestión de Usuarios',
+              'PRODUCTS': 'Gestión de Productos'
             }
-            requestViewChange(v, titles[v])
+            requestViewChange(v as ViewState, titles[v])
           }}
         />
       </>
@@ -154,7 +142,7 @@ function App() {
   }
 
   if (view === 'USERS') {
-    // @ts-ignore: Ignoramos error de TS si UserManagement no define props explícitamente en tu versión local
+    // @ts-ignore
     return <UserManagement onBack={handleBackToDashboard} />
   }
 

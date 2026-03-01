@@ -1,12 +1,12 @@
 import { useState, useCallback, useEffect } from 'react'
 import type { Producto, CartItem, TicketData } from '../types/db'
 
-export function useActiveOrder(tableId: number | null, userId: number | undefined) {
+export function useActiveOrder(tableId: number, userId?: number) {
   const [activeOrderId, setActiveOrderId] = useState<number | null>(null)
   const [cart, setCart] = useState<CartItem[]>([])
   const [orderStatus, setOrderStatus] = useState<string>('abierta')
   
-  // Modales y Datos UI (Requeridos por POSView)
+  // Modales locales
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false)
   const [ticketData, setTicketData] = useState<TicketData | null>(null)
   const [kitchenData, setKitchenData] = useState<{items: CartItem[], tableNum: number} | null>(null)
@@ -15,34 +15,53 @@ export function useActiveOrder(tableId: number | null, userId: number | undefine
   const fetchOrder = useCallback(async () => {
     if (!tableId) return
     try {
+      // CORRECCIÓN: Mandamos la variable como tableId para que el backend la reconozca
       // @ts-ignore
-      const res = await window.electron.ipcRenderer.invoke('open-table-order', { mesaId: tableId, userId })
-      if (res.success) {
-        setActiveOrderId(res.order.id)
-        setCart(res.items)
-        setOrderStatus(res.order.estatus)
+      const result = await window.electron.ipcRenderer.invoke('open-table-order', { 
+        tableId: tableId, 
+        userId: userId 
+      })
+      
+      if (result && result.success) {
+        setActiveOrderId(result.order.id)
+        setCart(result.items || [])
+        setOrderStatus(result.order.estatus)
       } else {
-        // Si falla o no hay orden
         setActiveOrderId(null)
-        setCart([])
       }
-    } catch (e) { console.error(e) }
+    } catch (error) {
+      console.error('Error al cargar la orden:', error)
+      setActiveOrderId(null)
+    }
   }, [tableId, userId])
 
-  // Cargar inicial
   useEffect(() => {
-    if (tableId) fetchOrder()
-  }, [fetchOrder, tableId])
+    fetchOrder()
+  }, [fetchOrder])
 
   // --- ACCIONES DEL CARRITO ---
-
   const addToCart = async (product: Producto) => {
-    if (!activeOrderId) return
+    if (!activeOrderId) {
+      alert('⚠️ La orden no se generó correctamente. Sal al menú de mesas y vuelve a entrar.')
+      return
+    }
+    if (orderStatus === 'cuenta_solicitada') {
+      alert('⚠️ No se pueden añadir productos, la cuenta ya fue solicitada.')
+      return
+    }
+
     try {
       // @ts-ignore
-      await window.electron.ipcRenderer.invoke('add-order-item', { ordenId: activeOrderId, product })
-      await fetchOrder()
-    } catch (e) { console.error(e) }
+      const result = await window.electron.ipcRenderer.invoke('add-order-item', { 
+        ordenId: activeOrderId, 
+        product 
+      })
+      if (result && result.success) {
+        await fetchOrder()
+      } else {
+        alert('❌ Error al añadir el producto: ' + (result?.error || 'Desconocido'))
+      }
+    } catch (e) { console.error('Error:', e) }
   }
 
   const removeFromCart = async (itemId: number) => {
@@ -59,21 +78,17 @@ export function useActiveOrder(tableId: number | null, userId: number | undefine
     await fetchOrder()
   }
 
-  // --- ACCIONES DE ORDEN (Cocina, Cuenta, Pago) ---
-
+  // --- ACCIONES DE ORDEN ---
   const generateCommand = async (tableNumber: number) => {
     if (!activeOrderId) return
-    try {
-      // @ts-ignore
-      const res = await window.electron.ipcRenderer.invoke('print-command', { ordenId: activeOrderId })
-      if (res.success && res.items.length > 0) {
-        setKitchenData({ items: res.items, tableNum: tableNumber })
-        await fetchOrder()
-      } else {
-        // Feedback opcional si no hay nada nuevo
-        console.log('Nada nuevo para imprimir')
-      }
-    } catch (e) { console.error(e) }
+    // @ts-ignore
+    const res = await window.electron.ipcRenderer.invoke('print-command', { ordenId: activeOrderId })
+    if (res && res.success && res.items.length > 0) {
+      setKitchenData({ items: res.items, tableNum: tableNumber })
+      await fetchOrder()
+    } else {
+       alert('No hay productos nuevos para enviar a la cocina.')
+    }
   }
 
   const requestBill = async () => {
@@ -83,75 +98,50 @@ export function useActiveOrder(tableId: number | null, userId: number | undefine
     await fetchOrder()
   }
 
-  const processPayment = async (method: string, amount: number) => {
-    if (!activeOrderId) return { success: false }
-    
-    // Calculamos total actual del carrito local para el registro
-    const total = cart.reduce((acc, item) => acc + (item.precio * item.cantidad), 0)
-
+  const processPayment = async (method: string, received: number, total: number) => {
+    if (!activeOrderId) return false
     try {
       // @ts-ignore
-      const res = await window.electron.ipcRenderer.invoke('pay-order', { 
-        orderId: activeOrderId, 
-        payment: { method, received: amount }, 
-        total 
+      const result = await window.electron.ipcRenderer.invoke('pay-order', {
+        orderId: activeOrderId, payment: { method, received }, total
       })
 
-      if (res.success) {
+      if (result && result.success) {
         setTicketData({
-          orderId: activeOrderId,
-          items: [...cart],
-          total,
+          orderId: activeOrderId, items: [...cart], total,
           date: new Date().toLocaleString(),
-          payment: { method, amount, change: amount - total }
+          payment: { method, received, change: received - total }
         })
         setIsPaymentModalOpen(false)
-        await fetchOrder()
-        return { success: true }
+        return true
       }
-      return { success: false }
-    } catch (e) { return { success: false } }
+      alert(result?.error || 'Error al procesar pago')
+      return false
+    } catch (error) { return false }
   }
 
   const cancelOrder = async (pin: string) => {
     if (!activeOrderId) return false
     try {
       // @ts-ignore
-      const res = await window.electron.ipcRenderer.invoke('cancel-order', { orderId: activeOrderId, pin })
-      if (res.success) {
+      const result = await window.electron.ipcRenderer.invoke('cancel-order', { orderId: activeOrderId, pin })
+      if (result && result.success) {
         setActiveOrderId(null)
         setCart([])
+        setOrderStatus('abierta')
         return true
       }
+      alert('❌ No se pudo cancelar: ' + (result?.error || 'PIN incorrecto o sin permisos'))
       return false
-    } catch (e) { return false }
+    } catch (error) { return false }
   }
 
-  // Refrescar manualmente
-  const refresh = fetchOrder
-
-  // Retorno estructurado para POSView
   return {
-    activeOrderId,
-    cart,
-    orderStatus,
-    
-    // UI State & Setters
-    isPaymentModalOpen,
-    setIsPaymentModalOpen,
-    ticketData,
-    setTicketData,
-    kitchenData,
-    setKitchenData,
-
-    // Actions
-    addToCart,
-    removeFromCart,
-    updateQuantity,
-    generateCommand,
-    requestBill,
-    processPayment, // POSView lo usa como handlePayment interno, pero lo exponemos
-    cancelOrder,
-    refresh
+    activeOrderId, cart, orderStatus,
+    isPaymentModalOpen, setIsPaymentModalOpen,
+    ticketData, setTicketData,
+    kitchenData, setKitchenData,
+    addToCart, removeFromCart, updateQuantity,
+    generateCommand, requestBill, processPayment, cancelOrder
   }
 }

@@ -25,7 +25,7 @@ export function ProductManagement({ onBack }: ProductManagementProps) {
     try {
       // @ts-ignore
       const res = await window.electron.ipcRenderer.invoke('get-products')
-      // Validación segura para evitar crasheos (pantalla blanca)
+      // Prevenir el error de "pantalla blanca" asegurando que siempre sea un array
       if (Array.isArray(res)) {
         setProducts(res)
       } else {
@@ -62,6 +62,11 @@ export function ProductManagement({ onBack }: ProductManagementProps) {
       alert('⚠️ Por favor ingresa el nombre y el precio del producto.')
       return 
     }
+
+    if (Number(formPrice) < 0) {
+      alert('⚠️ El precio no puede ser un valor negativo.')
+      return
+    }
     
     // Guardamos la acción que se ejecutará si el PIN es correcto
     const actionToExecute = async () => {
@@ -76,9 +81,9 @@ export function ProductManagement({ onBack }: ProductManagementProps) {
       if (res.success) {
         setIsEditing(false)
         await fetchProducts()
-        alert('✅ Producto guardado correctamente en la base de datos.') // Feedback de éxito
+        alert('✅ Producto guardado correctamente.') // Notificación visual de éxito
       } else {
-        alert('❌ Ocurrió un error al guardar: ' + res.error)
+        alert('❌ Error al guardar: ' + res.error) // Notificación de error (ej. duplicados)
       }
     }
 
@@ -109,7 +114,7 @@ export function ProductManagement({ onBack }: ProductManagementProps) {
     if (res.success && res.user.rol === 'admin') {
       setIsPinModalOpen(false)
       if (pendingAction) {
-        await pendingAction() // Ejecutamos la inserción/actualización
+        await pendingAction() // Ejecutar guardar o desactivar
       }
       setPendingAction(null)
     } else {
@@ -122,10 +127,10 @@ export function ProductManagement({ onBack }: ProductManagementProps) {
       {/* HEADER */}
       <div style={{ padding: '15px 30px', display: 'flex', justifyContent: 'space-between', background: '#2d2d2d', alignItems: 'center', color: 'white', borderBottom: '1px solid #404040' }}>
         <button onClick={onBack} style={{ background: 'transparent', color: '#9ca3af', border: 'none', cursor: 'pointer', fontSize: '1rem', fontWeight: 'bold' }}>
-          ← Volver
+          ← Volver al Menú
         </button>
         <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#22c55e' }}>INVENTARIO DE PRODUCTOS</div>
-        <div style={{ width: '60px' }}></div>
+        <div style={{ width: '130px' }}></div>
       </div>
 
       <div style={{ flex: 1, padding: '30px', overflowY: 'auto' }}>
@@ -148,7 +153,9 @@ export function ProductManagement({ onBack }: ProductManagementProps) {
         {isLoading ? (
           <div style={{ textAlign: 'center', color: 'white', marginTop: '50px' }}>Cargando productos...</div>
         ) : products.length === 0 ? (
-          <div style={{ textAlign: 'center', color: '#9ca3af', marginTop: '50px' }}>No hay productos registrados aún.</div>
+          <div style={{ textAlign: 'center', color: '#9ca3af', marginTop: '50px', fontSize: '1.2rem' }}>
+            No hay productos registrados aún. ¡Añade el primero!
+          </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
             {products.map(prod => (
@@ -197,7 +204,7 @@ export function ProductManagement({ onBack }: ProductManagementProps) {
       {/* MODAL FORMULARIO */}
       {isEditing && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>
-          <div style={{ background: '#2d2d2d', padding: '30px', borderRadius: '15px', width: '400px', color: 'white', border: '1px solid #404040' }}>
+          <div style={{ background: '#2d2d2d', padding: '30px', borderRadius: '15px', width: '400px', color: 'white', border: '1px solid #404040', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5)' }}>
             <h2 style={{ margin: '0 0 20px 0', fontSize: '1.5rem', color: '#22c55e' }}>
               {editingId ? 'Editar Producto' : 'Nuevo Producto'}
             </h2>
@@ -207,15 +214,17 @@ export function ProductManagement({ onBack }: ProductManagementProps) {
               <input 
                 value={formName} onChange={e => setFormName(e.target.value)}
                 style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #404040', background: '#1a1a1a', color: 'white', fontSize: '1rem', outline: 'none', boxSizing: 'border-box' }}
-                placeholder="Ej. Pizza Peperoni"
+                placeholder="Ej. PIZZA HAWAIANA"
                 autoFocus
               />
+              <small style={{color: '#6b7280'}}>El nombre se guardará en MAYÚSCULAS.</small>
             </div>
             
             <div style={{ marginBottom: '25px' }}>
               <label style={{ display: 'block', marginBottom: '8px', color: '#9ca3af', fontWeight: 'bold', fontSize: '0.9rem' }}>Precio ($)</label>
               <input 
                 type="number"
+                min="0"
                 value={formPrice} onChange={e => setFormPrice(e.target.value)}
                 style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #404040', background: '#1a1a1a', color: 'white', fontSize: '1rem', fontFamily: 'monospace', outline: 'none', boxSizing: 'border-box' }}
                 placeholder="0.00"
