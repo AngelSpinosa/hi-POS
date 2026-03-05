@@ -5,10 +5,9 @@ import { DailyReport } from './components/DailyReport'
 import { Dashboard } from './components/Dashboard'
 import { PinPadModal } from './components/PinPadModal'
 import { UserManagement } from './components/UserManagement'
-import { ProductManagement } from './components/ProductManagement'
-import { POSView } from './views/POSView'
+import { POSView } from './views/POSView' 
+import { ProductManagement } from './components/ProductManagement' 
 
-// ACTUALIZADO: Añadido 'PRODUCTS' a los ViewStates permitidos
 type ViewState = 'DASHBOARD' | 'TABLES' | 'ORDER' | 'REPORT' | 'USERS' | 'PRODUCTS';
 
 interface CurrentUser {
@@ -58,6 +57,7 @@ function App() {
           if (pendingTableId) {
              await openTableOrder(pendingTableId, user.id)
           } else {
+             loadTables()
              setView('TABLES')
           }
         }
@@ -76,9 +76,7 @@ function App() {
       } else {
         alert('PIN Incorrecto')
       }
-    } catch (error) {
-      console.error(error)
-    }
+    } catch (error) { console.error(error) }
   }
 
   const openTableOrder = async (tableId: number, userId: number) => {
@@ -105,13 +103,7 @@ function App() {
   if (view === 'DASHBOARD') {
     return (
       <>
-        <PinPadModal 
-          title={pinTitle} 
-          isOpen={isPinModalOpen} 
-          onClose={() => { setIsPinModalOpen(false); setPendingView(null); }} 
-          onVerify={handlePinVerify} 
-        />
-        
+        <PinPadModal title={pinTitle} isOpen={isPinModalOpen} onClose={() => { setIsPinModalOpen(false); setPendingView(null); }} onVerify={handlePinVerify} />
         <Dashboard 
           onNavigate={(v) => {
             const titles: Record<string, string> = {
@@ -170,7 +162,11 @@ function App() {
       <POSView 
         tableId={activeTableId} 
         userId={currentUser?.id} 
-        onBack={() => setView('TABLES')} 
+        onBack={() => {
+          // AQUÍ ESTABA EL ERROR: Ahora forzamos a recargar las mesas desde la BD al volver
+          loadTables()
+          setView('TABLES')
+        }} 
       />
     )
   }
