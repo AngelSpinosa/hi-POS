@@ -10,6 +10,7 @@ export function LicenseScreen({ onLicenseActivated, reason }: LicenseScreenProps
   const [licenseCode, setLicenseCode] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
+  const [copied, setCopied] = useState(false) // Estado para el botón de copiar
 
   // 1. Obtener el Device ID al montar la pantalla
   useEffect(() => {
@@ -52,6 +53,18 @@ export function LicenseScreen({ onLicenseActivated, reason }: LicenseScreenProps
     }
   }
 
+  // 3. Manejar el copiado al portapapeles
+  const handleCopy = () => {
+    if (deviceId && deviceId !== 'Cargando...' && deviceId !== 'ERROR_CONEXION') {
+      navigator.clipboard.writeText(deviceId).then(() => {
+        setCopied(true)
+        setTimeout(() => setCopied(false), 2000) // Restaurar el botón después de 2 segundos
+      }).catch(err => {
+        console.error('Error al copiar al portapapeles:', err)
+      })
+    }
+  }
+
   // Traducción amigable del motivo de bloqueo
   const getReasonMessage = () => {
     if (reason === 'NO_LICENSE') return 'No se detectó una licencia activa en este sistema.'
@@ -64,7 +77,7 @@ export function LicenseScreen({ onLicenseActivated, reason }: LicenseScreenProps
   return (
     <div style={{ height: '100vh', display: 'flex', backgroundColor: '#111', color: 'white', alignItems: 'center', justifyContent: 'center', fontFamily: 'sans-serif' }}>
       
-      <div style={{ backgroundColor: '#1a1a1a', padding: '40px', borderRadius: '15px', width: '500px', border: '1px solid #333', boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}>
+      <div style={{ backgroundColor: '#1a1a1a', padding: '40px', borderRadius: '15px', width: '550px', border: '1px solid #333', boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}>
         
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: '30px' }}>
@@ -78,8 +91,33 @@ export function LicenseScreen({ onLicenseActivated, reason }: LicenseScreenProps
           <p style={{ margin: '0 0 10px 0', color: '#9ca3af', fontSize: '0.9rem', textAlign: 'center' }}>
             Para obtener tu código de activación, por favor envía el siguiente <strong>ID de Dispositivo</strong> a tu proveedor:
           </p>
-          <div style={{ backgroundColor: '#000', padding: '15px', borderRadius: '8px', textAlign: 'center', fontSize: '1.5rem', fontFamily: 'monospace', color: '#22c55e', letterSpacing: '2px', userSelect: 'all' }}>
-            {deviceId}
+          
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ flex: 1, backgroundColor: '#000', padding: '15px', borderRadius: '8px', textAlign: 'center', fontSize: '1.5rem', fontFamily: 'monospace', color: '#22c55e', letterSpacing: '2px', userSelect: 'all' }}>
+              {deviceId}
+            </div>
+            
+            {/* BOTÓN DE COPIAR */}
+            <button 
+              onClick={handleCopy}
+              style={{ 
+                padding: '15px', 
+                backgroundColor: copied ? '#3b82f6' : '#4b5563', 
+                color: 'white', 
+                border: 'none', 
+                borderRadius: '8px', 
+                cursor: 'pointer',
+                fontWeight: 'bold',
+                transition: 'background-color 0.2s',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                minWidth: '100px'
+              }}
+              title="Copiar ID"
+            >
+              {copied ? '¡Copiado! ✓' : 'Copiar 📋'}
+            </button>
           </div>
         </div>
 

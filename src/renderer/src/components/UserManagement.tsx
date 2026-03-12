@@ -2,7 +2,11 @@ import { useState, useEffect } from 'react'
 import type { User } from '../types/db'
 import { PinPadModal } from './PinPadModal'
 
-export function UserManagement() {
+interface UserManagementProps {
+  onBack: () => void; // <-- 1. Asegúrate de tener esto declarado
+}
+
+export function UserManagement({ onBack }: UserManagementProps) {
   const [users, setUsers] = useState<User[]>([])
   
   // Estado del formulario (Crear/Editar)
@@ -115,6 +119,14 @@ export function UserManagement() {
   return (
     <div style={{ padding: '20px', color: 'white', height: '100%', overflowY: 'auto' }}>
       
+      <div style={{ padding: '15px 30px', display: 'flex', justifyContent: 'space-between', background: '#2d2d2d', alignItems: 'center', color: 'white', borderBottom: '1px solid #404040' }}>
+        <button onClick={onBack} style={{ background: 'transparent', color: '#9ca3af', border: 'none', cursor: 'pointer', fontSize: '1rem', fontWeight: 'bold' }}>
+          ← Volver al Menú
+        </button>
+        <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#a855f7' }}>GESTIÓN DE PERSONAL 👥</div>
+        <div style={{ width: '130px' }}></div> {/* Espaciador para centrar el título */}
+      </div>
+
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
         <h1 style={{ margin: 0 }}>Gestión de Personal 👥</h1>
         {!isEditing && (

@@ -7,8 +7,11 @@ import { PinPadModal } from './components/PinPadModal'
 import { UserManagement } from './components/UserManagement'
 import { POSView } from './views/POSView' 
 import { ProductManagement } from './components/ProductManagement' 
+// NUEVO: IMPORTAMOS LA PANTALLA DE LICENCIA
+import { LicenseScreen } from './components/LicenseScreen'
 
-type ViewState = 'DASHBOARD' | 'TABLES' | 'ORDER' | 'REPORT' | 'USERS' | 'PRODUCTS';
+// NUEVO: Añadimos 'LICENSE_ERROR' a las vistas posibles
+type ViewState = 'DASHBOARD' | 'TABLES' | 'ORDER' | 'REPORT' | 'USERS' | 'PRODUCTS' | 'LICENSE_ERROR';
 
 interface CurrentUser {
   id: number;
@@ -17,7 +20,10 @@ interface CurrentUser {
 }
 
 function App() {
+  // Empezamos asumiendo que estamos cargando la validación
   const [view, setView] = useState<ViewState>('DASHBOARD')
+  const [isCheckingLicense, setIsCheckingLicense] = useState(true)
+  const [licenseErrorReason, setLicenseErrorReason] = useState<string>('')
   
   const [tables, setTables] = useState<Mesa[]>([])
   const [activeTableId, setActiveTableId] = useState<number | null>(null)
@@ -28,7 +34,42 @@ function App() {
   const [pendingView, setPendingView] = useState<ViewState | null>(null)
   const [pendingTableId, setPendingTableId] = useState<number | null>(null)
 
-  useEffect(() => { loadTables() }, [])
+  // ==========================================
+  // NUEVO: FLUJO DE VALIDACIÓN DE LICENCIA
+  // ==========================================
+  useEffect(() => {
+    checkLicenseStatus()
+  }, [])
+
+  const checkLicenseStatus = async () => {
+    setIsCheckingLicense(true)
+    try {
+      // @ts-ignore
+      const result = await window.electron.ipcRenderer.invoke('license:check')
+      
+      if (result.valid) {
+        // Licencia OK, cargamos los datos normales y vamos al Dashboard
+        loadTables()
+        setView('DASHBOARD')
+      } else {
+        // Licencia fallida, bloqueamos en la pantalla de error
+        setLicenseErrorReason(result.reason || 'NO_LICENSE')
+        setView('LICENSE_ERROR')
+      }
+    } catch (error) {
+      console.error('Error validando licencia:', error)
+      setLicenseErrorReason('ERROR_CONEXION')
+      setView('LICENSE_ERROR')
+    } finally {
+      setIsCheckingLicense(false)
+    }
+  }
+
+  // Función que se llama cuando el usuario logra activar la licencia correctamente
+  const handleLicenseActivated = () => {
+    checkLicenseStatus()
+  }
+  // ==========================================
 
   const loadTables = async () => {
     try {
@@ -100,6 +141,23 @@ function App() {
     setCurrentUser(null)
   }
 
+  // --- RENDERIZADO CONDICIONAL ---
+
+  // NUEVO: Mostrar pantalla de carga mientras valida la licencia
+  if (isCheckingLicense) {
+    return (
+      <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: '#111', color: 'white', alignItems: 'center', justifyContent: 'center' }}>
+        <h1 style={{ color: '#f97316', marginBottom: '20px' }}>POS PIZZA 🍕</h1>
+        <div style={{ color: '#9ca3af', fontSize: '1.2rem' }}>Verificando licencia...</div>
+      </div>
+    )
+  }
+
+  // NUEVO: Bloqueo de Licencia
+  if (view === 'LICENSE_ERROR') {
+    return <LicenseScreen onLicenseActivated={handleLicenseActivated} reason={licenseErrorReason} />
+  }
+
   if (view === 'DASHBOARD') {
     return (
       <>
@@ -160,10 +218,9 @@ function App() {
   if (view === 'ORDER' && activeTableId) {
     return (
       <POSView 
-        tableId={activeTableId} 
+        tableId={activeTableId}
         userId={currentUser?.id} 
         onBack={() => {
-          // AQUÍ ESTABA EL ERROR: Ahora forzamos a recargar las mesas desde la BD al volver
           loadTables()
           setView('TABLES')
         }} 
