@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react'
 
-// Agregamos 'PRODUCTS' a los tipos permitidos
+// ACTUALIZADO: Añadido 'PRODUCTS' a las opciones de navegación permitidas
 interface DashboardProps {
   onNavigate: (view: 'TABLES' | 'REPORT' | 'USERS' | 'PRODUCTS') => void;
+  licenseInfo?: { type: string; remainingDays?: number } | null; // NUEVO: Recibimos la info
 }
 
-export function Dashboard({ onNavigate }: DashboardProps) {
+export function Dashboard({ onNavigate, licenseInfo }: DashboardProps) { // ACTUALIZADO
   const [time, setTime] = useState(new Date())
 
+  // Reloj en tiempo real
   useEffect(() => {
     const timer = setInterval(() => setTime(new Date()), 1000)
     return () => clearInterval(timer)
@@ -17,18 +19,25 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     background: '#2d2d2d', border: '1px solid #404040', borderRadius: '15px',
     display: 'flex', flexDirection: 'column' as const, alignItems: 'center', justifyContent: 'center',
     cursor: 'pointer', transition: 'transform 0.1s, border-color 0.2s',
-    color: 'white', padding: '20px', boxShadow: '0 4px 6px rgba(0,0,0,0.2)',
-    minHeight: '200px'
+    color: 'white', padding: '30px', boxShadow: '0 4px 6px rgba(0,0,0,0.2)',
+    minHeight: '220px'
   }
 
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#1a1a1a', color: 'white' }}>
       
-      {/* Header */}
+      {/* Header con Logo y Reloj */}
       <div style={{ padding: '30px 50px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #333' }}>
         <div>
           <h1 style={{ margin: 0, fontSize: '2.5rem', color: '#f97316' }}>POS PIZZERÍA 🍕</h1>
           <p style={{ margin: '5px 0 0 0', color: '#9ca3af' }}>Sistema de Punto de Venta v1.0</p>
+          
+          {/* NUEVO: Etiqueta visible SOLO cuando la licencia es DEMO */}
+          {licenseInfo?.type === 'DEMO' && (
+            <div style={{ marginTop: '12px', display: 'inline-block', padding: '6px 14px', background: '#450a0a', border: '1px solid #ef4444', borderRadius: '20px', color: '#fca5a5', fontSize: '0.85rem', fontWeight: 'bold' }}>
+              ⚠️ Modo Demo, le quedan {licenseInfo.remainingDays} días de prueba
+            </div>
+          )}
         </div>
         <div style={{ textAlign: 'right' }}>
           <div style={{ fontSize: '2rem', fontWeight: 'bold', fontFamily: 'monospace' }}>
@@ -47,7 +56,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         gap: '30px', alignContent: 'center' 
       }}>
         
-        {/* 1. MESAS */}
+        {/* Opción 1: MESAS */}
         <div 
           onClick={() => onNavigate('TABLES')}
           style={btnStyle}
@@ -59,7 +68,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           <div style={{ color: '#9ca3af', marginTop: '5px' }}>Ver Mapa y Órdenes</div>
         </div>
 
-        {/* 2. REPORTES */}
+        {/* Opción 2: REPORTES */}
         <div 
           onClick={() => onNavigate('REPORT')}
           style={btnStyle}
@@ -71,7 +80,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           <div style={{ color: '#9ca3af', marginTop: '5px' }}>Cortes y Estadísticas</div>
         </div>
 
-        {/* 3. PRODUCTOS */}
+        {/* Opción 3: PRODUCTOS (NUEVO) */}
         <div 
           onClick={() => onNavigate('PRODUCTS')}
           style={btnStyle}
@@ -83,7 +92,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           <div style={{ color: '#9ca3af', marginTop: '5px' }}>Inventario y Precios</div>
         </div>
 
-        {/* 4. USUARIOS */}
+        {/* Opción 4: USUARIOS */}
         <div 
           onClick={() => onNavigate('USERS')}
           style={btnStyle}
@@ -95,7 +104,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           <div style={{ color: '#9ca3af', marginTop: '5px' }}>Personal y Accesos</div>
         </div>
 
-        {/* 5. SALIR */}
+        {/* Opción 5: SALIR */}
         <div 
           onClick={() => window.close()}
           style={{ ...btnStyle, background: '#450a0a' }}

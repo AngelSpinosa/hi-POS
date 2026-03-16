@@ -3,8 +3,17 @@ import { db } from '../database'
 import * as crypto from 'crypto'
 import * as os from 'os'
 
-// ⚠️ MISMA CLAVE SECRETA QUE EN TU SCRIPT DE PYTHON
-const SECRET_KEY = "PL72367SSK"
+// ✅ SEGURIDAD NIVEL 2: CRIPTOGRAFÍA ASIMÉTRICA (RSA)
+const PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAsl3gFJNZs+9p7B4krtfH
+OXjVA3Acptl5gAdmAV2XLipOufrWJK1l+48p2uaYjZeplI+aHukxhP0PMPwQdxE2
+ulfWhwd4J7UEQL2IQybfPLCWtU/UAymgnI708Az5FOEOXxRuzEJAllNwn6wVEF7q
+M6H79CgAIxJ1NxOkS1TmT2hOC5SMZGUDpE9t3Ih6ydyx6sbC+8GLo576KfNGZloD
+IxIMaKm5kLKj6lqPFdcpv0PKzVQsGgKftayPlJ9tVpCgySpJaN6FQeRKy8H8w0Uy
+FTr6m6qL12Tn1SV6UUIimGVmu2Ns/4M3O8eKQwa2fUYwjbYyeLIjj6Uk3EO/QjsD
+XQIDAQAB
+-----END PUBLIC KEY-----
+`
 
 // Función auxiliar para obtener la Dirección MAC (Device ID)
 function getDeviceId(): string {
@@ -14,38 +23,42 @@ function getDeviceId(): string {
     if (!ifaces) continue
 
     for (const iface of ifaces) {
-      // Descartar interfaces internas (localhost) y MACs vacías
       if (!iface.internal && iface.mac !== '00:00:00:00:00:00') {
-        // Retornamos la primera MAC real encontrada
         return iface.mac
       }
     }
   }
-  return 'UNKNOWN_DEVICE' // Fallback por si no hay tarjeta de red
+  return 'UNKNOWN_DEVICE' 
 }
 
-// Función auxiliar para replicar la firma del Python
-function generateSignature(type: string, deviceId: string, expiration: string): string {
-  const rawString = `${type}|${deviceId}|${expiration}|${SECRET_KEY}`
-  // Hash SHA256, tomar los primeros 12 caracteres en mayúsculas
-  return crypto.createHash('sha256').update(rawString).digest('hex').substring(0, 12).toUpperCase()
+// Función auxiliar para verificar la firma RSA
+function verifySignature(type: string, deviceId: string, expiration: string, signatureBase64: string): boolean {
+  try {
+    const rawString = `${type}|${deviceId}|${expiration}`
+    const verify = crypto.createVerify('SHA256')
+    verify.update(rawString)
+    verify.end()
+    return verify.verify(PUBLIC_KEY, signatureBase64, 'base64')
+  } catch (error) {
+    console.error("Error criptográfico verificando firma:", error)
+    return false
+  }
 }
 
 export function registerLicenseHandlers() {
 
-  // 1. Obtener el Device ID para mostrarlo en pantalla
   ipcMain.handle('license:get-device-id', () => {
     return getDeviceId()
   })
 
-  // 2. Comprobar el estado actual de la licencia
   ipcMain.handle('license:check', () => {
     if (!db) return { valid: false, error: 'DB_ERROR' }
 
     try {
-      // Buscar la licencia activa más reciente
-      const lic = db.prepare('SELECT * FROM licencia WHERE activa = 1 ORDER BY id DESC LIMIT 1').get() as any
+      // 🛡️ ANTI-FRAUDE PASO 1: Crear tabla oculta si no existe
+      db.prepare('CREATE TABLE IF NOT EXISTS security_config (id TEXT PRIMARY KEY, value TEXT)').run()
 
+      const lic = db.prepare('SELECT * FROM licencia WHERE activa = 1 ORDER BY id DESC LIMIT 1').get() as any
       const currentDeviceId = getDeviceId()
 
       if (!lic) {
@@ -57,30 +70,58 @@ export function registerLicenseHandlers() {
         return { valid: false, reason: 'DEVICE_MISMATCH', deviceId: currentDeviceId }
       }
 
-      // b) Validar la firma matemática (evita alteraciones manuales en SQLite)
-      const expectedSignature = generateSignature(lic.tipo, lic.device_id, lic.expira_en)
-      if (expectedSignature !== lic.firma) {
+      // b) Validar la firma matemática asimétrica
+      const isSignatureValid = verifySignature(lic.tipo, lic.device_id, lic.expira_en, lic.firma)
+      if (!isSignatureValid) {
         return { valid: false, reason: 'INVALID_SIGNATURE', deviceId: currentDeviceId }
       }
 
+      // 🛡️ ANTI-FRAUDE PASO 2: Verificar alteración del reloj (Time Tampering)
+      const now = new Date()
+      const currentTimeMs = now.getTime()
+
+      // CORRECCIÓN: Usar parámetro ? para evitar error de comillas en SQL
+      const lastTimeRow = db.prepare('SELECT value FROM security_config WHERE id = ?').get('last_valid_time') as any
+      if (lastTimeRow) {
+        const lastTimeMs = parseInt(lastTimeRow.value, 10)
+        // Si el tiempo actual es menor al último registrado (damos 5 segundos de tolerancia por sincronizaciones de Windows)
+        if (currentTimeMs < (lastTimeMs - 5000)) {
+          return { valid: false, reason: 'TIME_TAMPERING', deviceId: currentDeviceId }
+        }
+      }
+
       // c) Validar la fecha de expiración si no es perpetua
+      let remainingDays: number | undefined = undefined;
+
       if (lic.expira_en !== 'PERPETUAL') {
         const expDate = new Date(lic.expira_en)
-        const now = new Date()
         
-        // Comparamos solo las fechas (ignorando las horas)
+        // Comparamos ignorando las horas
         expDate.setHours(23, 59, 59, 999)
         
         if (now > expDate) {
           return { valid: false, reason: 'EXPIRED', deviceId: currentDeviceId }
         }
+
+        // Calcular Días Restantes exactos
+        const todayMidnight = new Date();
+        todayMidnight.setHours(0, 0, 0, 0);
+        const expMidnight = new Date(lic.expira_en);
+        expMidnight.setHours(0, 0, 0, 0);
+        
+        const diffTime = expMidnight.getTime() - todayMidnight.getTime();
+        remainingDays = Math.max(0, Math.floor(diffTime / (1000 * 60 * 60 * 24)));
       }
 
-      // Si pasa todo, la licencia es legítima
+      // 🛡️ ANTI-FRAUDE PASO 3: El tiempo es legal, guardar este nuevo momento en la historia
+      // CORRECCIÓN: Usar parámetros ? para ambos valores
+      db.prepare('INSERT OR REPLACE INTO security_config (id, value) VALUES (?, ?)').run('last_valid_time', currentTimeMs.toString())
+
       return { 
         valid: true, 
         type: lic.tipo, 
-        expires: lic.expira_en 
+        expires: lic.expira_en,
+        remainingDays: remainingDays
       }
 
     } catch (e: any) {
@@ -89,31 +130,20 @@ export function registerLicenseHandlers() {
     }
   })
 
-  // 3. Activar una nueva licencia (Guardar el código del cliente)
   ipcMain.handle('license:activate', (_, { code }) => {
     if (!code) return { success: false, error: 'Por favor ingresa un código válido.' }
 
-    // El formato esperado es TIPO|DEVICE_ID|FECHA|FIRMA
     const parts = code.trim().split('|')
-    if (parts.length !== 4) {
-      return { success: false, error: 'El formato del código no es válido.' }
-    }
+    if (parts.length !== 4) return { success: false, error: 'El formato del código no es válido.' }
 
     const [tipo, deviceId, expiraEn, firma] = parts
     const currentDeviceId = getDeviceId()
 
-    // Comprobar que el código sea para esta máquina
-    if (deviceId !== currentDeviceId) {
-      return { success: false, error: 'Este código pertenece a otro equipo.' }
-    }
+    if (deviceId !== currentDeviceId) return { success: false, error: 'Este código pertenece a otro equipo.' }
 
-    // Comprobar la criptografía
-    const expectedSignature = generateSignature(tipo, deviceId, expiraEn)
-    if (expectedSignature !== firma) {
-      return { success: false, error: 'La firma del código es incorrecta.' }
-    }
+    const isSignatureValid = verifySignature(tipo, deviceId, expiraEn, firma)
+    if (!isSignatureValid) return { success: false, error: 'La firma de la licencia es incorrecta o ha sido alterada.' }
 
-    // Si es demo, verificar que no estemos intentando activar un demo que ya caducó en el tiempo
     if (expiraEn !== 'PERPETUAL') {
       const expDate = new Date(expiraEn)
       expDate.setHours(23, 59, 59, 999)
@@ -122,28 +152,23 @@ export function registerLicenseHandlers() {
       }
     }
 
-    // Guardar en la base de datos
     try {
       const tx = db.transaction(() => {
-        // Desactivar licencias anteriores
         db.prepare('UPDATE licencia SET activa = 0').run()
-
-        // Insertar la nueva
         db.prepare(`
           INSERT INTO licencia (codigo, tipo, device_id, expira_en, firma, activa)
           VALUES (?, ?, ?, ?, ?, 1)
         `).run(code, tipo, deviceId, expiraEn, firma)
+        
+        // 🛡️ NUEVO: "Perdonar" la alteración de tiempo al activar una licencia exitosamente.
+        // CORRECCIÓN: Usar parámetro ? para evitar error de comillas
+        db.prepare('DELETE FROM security_config WHERE id = ?').run('last_valid_time')
       })
-      
       tx()
       return { success: true }
     } catch (e: any) {
-      // Si tira error de UNIQUE, el código ya fue usado
-      if (e.message.includes('UNIQUE')) {
-         return { success: false, error: 'Este código de licencia ya está registrado en la base de datos.' }
-      }
+      if (e.message.includes('UNIQUE')) return { success: false, error: 'Este código ya está registrado.' }
       return { success: false, error: e.message }
     }
   })
-
 }

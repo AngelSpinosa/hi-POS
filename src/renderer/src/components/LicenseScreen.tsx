@@ -3,16 +3,19 @@ import { useState, useEffect } from 'react'
 interface LicenseScreenProps {
   onLicenseActivated: () => void;
   reason?: string;
+  onViewReports?: () => void;
 }
 
-export function LicenseScreen({ onLicenseActivated, reason }: LicenseScreenProps) {
+export function LicenseScreen({ onLicenseActivated, reason, onViewReports }: LicenseScreenProps) {
   const [deviceId, setDeviceId] = useState<string>('Cargando...')
   const [licenseCode, setLicenseCode] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
-  const [copied, setCopied] = useState(false) // Estado para el botón de copiar
+  const [copied, setCopied] = useState(false)
 
-  // 1. Obtener el Device ID al montar la pantalla
+  // Detectamos si el usuario intentó hacer trampa con el reloj
+  const isTimeTampering = reason === 'TIME_TAMPERING'
+
   useEffect(() => {
     const fetchDeviceId = async () => {
       try {
@@ -26,7 +29,6 @@ export function LicenseScreen({ onLicenseActivated, reason }: LicenseScreenProps
     fetchDeviceId()
   }, [])
 
-  // 2. Manejar el botón de activar
   const handleActivate = async () => {
     if (!licenseCode.trim()) {
       setErrorMsg('Por favor ingresa un código de licencia.')
@@ -42,7 +44,7 @@ export function LicenseScreen({ onLicenseActivated, reason }: LicenseScreenProps
       
       if (result.success) {
         alert('✅ ¡Licencia activada con éxito!')
-        onLicenseActivated() // Le avisa a App.tsx que ya puede entrar
+        onLicenseActivated() 
       } else {
         setErrorMsg(result.error || 'Código de licencia inválido.')
       }
@@ -53,43 +55,64 @@ export function LicenseScreen({ onLicenseActivated, reason }: LicenseScreenProps
     }
   }
 
-  // 3. Manejar el copiado al portapapeles
   const handleCopy = () => {
     if (deviceId && deviceId !== 'Cargando...' && deviceId !== 'ERROR_CONEXION') {
       navigator.clipboard.writeText(deviceId).then(() => {
         setCopied(true)
-        setTimeout(() => setCopied(false), 2000) // Restaurar el botón después de 2 segundos
+        setTimeout(() => setCopied(false), 2000) 
       }).catch(err => {
-        console.error('Error al copiar al portapapeles:', err)
+        console.error('Error al copiar:', err)
       })
     }
   }
 
-  // Traducción amigable del motivo de bloqueo
   const getReasonMessage = () => {
     if (reason === 'NO_LICENSE') return 'No se detectó una licencia activa en este sistema.'
     if (reason === 'EXPIRED') return 'Tu licencia o periodo de prueba ha expirado.'
     if (reason === 'DEVICE_MISMATCH') return 'Esta licencia pertenece a otro equipo.'
     if (reason === 'INVALID_SIGNATURE') return 'La firma de la licencia es inválida o ha sido alterada.'
+    
+    // NUEVO: Mensaje de castigo para los que modifican la fecha
+    if (isTimeTampering) return '⏳ ALTERACIÓN DE RELOJ DETECTADA ⏳'
+    
     return 'Activación de Software Requerida'
   }
 
   return (
     <div style={{ height: '100vh', display: 'flex', backgroundColor: '#111', color: 'white', alignItems: 'center', justifyContent: 'center', fontFamily: 'sans-serif' }}>
       
-      <div style={{ backgroundColor: '#1a1a1a', padding: '40px', borderRadius: '15px', width: '550px', border: '1px solid #333', boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}>
+      <div style={{ 
+        backgroundColor: '#1a1a1a', 
+        padding: '40px', 
+        borderRadius: '15px', 
+        width: '550px', 
+        // EFECTO VISUAL DE CASTIGO: Borde y sombra roja si hizo trampa
+        border: isTimeTampering ? '2px solid #ef4444' : '1px solid #333', 
+        boxShadow: isTimeTampering ? '0 0 30px rgba(239, 68, 68, 0.4)' : '0 10px 25px rgba(0,0,0,0.5)',
+        transition: 'all 0.3s ease'
+      }}>
         
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: '30px' }}>
           <h1 style={{ margin: '0 0 10px 0', color: '#f97316', fontSize: '2rem' }}>POS PIZZA 🍕</h1>
           <h2 style={{ margin: 0, color: '#fff', fontSize: '1.2rem' }}>Activación de Licencia</h2>
-          <p style={{ color: '#ef4444', marginTop: '10px', fontWeight: 'bold' }}>{getReasonMessage()}</p>
+          
+          <p style={{ color: '#ef4444', marginTop: '10px', fontWeight: 'bold', fontSize: isTimeTampering ? '1.1rem' : '1rem' }}>
+            {getReasonMessage()}
+          </p>
+          
+          {/* Subtítulo explicativo del castigo */}
+          {isTimeTampering && (
+            <p style={{ color: '#fca5a5', fontSize: '0.9rem', marginTop: '5px', backgroundColor: '#450a0a', padding: '10px', borderRadius: '5px' }}>
+              El sistema se ha bloqueado por seguridad. Para recuperar el acceso, <strong>restaure la fecha y hora real</strong> de su computadora.
+            </p>
+          )}
         </div>
 
         {/* Instrucciones y Device ID */}
         <div style={{ backgroundColor: '#262626', padding: '20px', borderRadius: '10px', marginBottom: '25px', border: '1px solid #404040' }}>
           <p style={{ margin: '0 0 10px 0', color: '#9ca3af', fontSize: '0.9rem', textAlign: 'center' }}>
-            Para obtener tu código de activación, por favor envía el siguiente <strong>ID de Dispositivo</strong> a tu proveedor:
+            Para obtener tu código de activación, envía el siguiente <strong>ID de Dispositivo</strong> a tu proveedor:
           </p>
           
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center', justifyContent: 'center' }}>
@@ -97,24 +120,9 @@ export function LicenseScreen({ onLicenseActivated, reason }: LicenseScreenProps
               {deviceId}
             </div>
             
-            {/* BOTÓN DE COPIAR */}
             <button 
               onClick={handleCopy}
-              style={{ 
-                padding: '15px', 
-                backgroundColor: copied ? '#3b82f6' : '#4b5563', 
-                color: 'white', 
-                border: 'none', 
-                borderRadius: '8px', 
-                cursor: 'pointer',
-                fontWeight: 'bold',
-                transition: 'background-color 0.2s',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                minWidth: '100px'
-              }}
-              title="Copiar ID"
+              style={{ padding: '15px', backgroundColor: copied ? '#3b82f6' : '#4b5563', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', transition: 'background-color 0.2s', minWidth: '100px' }}
             >
               {copied ? '¡Copiado! ✓' : 'Copiar 📋'}
             </button>
@@ -133,14 +141,12 @@ export function LicenseScreen({ onLicenseActivated, reason }: LicenseScreenProps
           />
         </div>
 
-        {/* Mensaje de Error */}
         {errorMsg && (
           <div style={{ color: '#ef4444', backgroundColor: '#450a0a', padding: '10px', borderRadius: '5px', marginBottom: '20px', textAlign: 'center', fontSize: '0.9rem', border: '1px solid #991b1b' }}>
             {errorMsg}
           </div>
         )}
 
-        {/* Botón de Activación */}
         <button 
           onClick={handleActivate}
           disabled={isLoading || !licenseCode}
@@ -149,8 +155,17 @@ export function LicenseScreen({ onLicenseActivated, reason }: LicenseScreenProps
           {isLoading ? 'Validando...' : 'ACTIVAR SOFTWARE'}
         </button>
 
-      </div>
+        {/* Botón para ver reportes en solo lectura */}
+        {onViewReports && (
+          <button 
+            onClick={onViewReports}
+            style={{ width: '100%', padding: '12px', marginTop: '15px', backgroundColor: 'transparent', color: '#9ca3af', border: '1px solid #404040', borderRadius: '8px', fontSize: '0.9rem', fontWeight: 'bold', cursor: 'pointer' }}
+          >
+            Ver Historial de Ventas (Solo Lectura) 📊
+          </button>
+        )}
 
+      </div>
     </div>
   )
 }

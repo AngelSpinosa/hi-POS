@@ -7,10 +7,8 @@ import { PinPadModal } from './components/PinPadModal'
 import { UserManagement } from './components/UserManagement'
 import { POSView } from './views/POSView' 
 import { ProductManagement } from './components/ProductManagement' 
-// NUEVO: IMPORTAMOS LA PANTALLA DE LICENCIA
 import { LicenseScreen } from './components/LicenseScreen'
 
-// NUEVO: Añadimos 'LICENSE_ERROR' a las vistas posibles
 type ViewState = 'DASHBOARD' | 'TABLES' | 'ORDER' | 'REPORT' | 'USERS' | 'PRODUCTS' | 'LICENSE_ERROR';
 
 interface CurrentUser {
@@ -20,10 +18,13 @@ interface CurrentUser {
 }
 
 function App() {
-  // Empezamos asumiendo que estamos cargando la validación
   const [view, setView] = useState<ViewState>('DASHBOARD')
+  
+  // Estados de la Licencia
   const [isCheckingLicense, setIsCheckingLicense] = useState(true)
   const [licenseErrorReason, setLicenseErrorReason] = useState<string>('')
+  const [hasValidLicense, setHasValidLicense] = useState<boolean>(false) // NUEVO: Memoria de seguridad
+  const [licenseInfo, setLicenseInfo] = useState<{type: string, remainingDays?: number} | null>(null) // NUEVO: Memoria de datos de la licencia
   
   const [tables, setTables] = useState<Mesa[]>([])
   const [activeTableId, setActiveTableId] = useState<number | null>(null)
@@ -34,9 +35,6 @@ function App() {
   const [pendingView, setPendingView] = useState<ViewState | null>(null)
   const [pendingTableId, setPendingTableId] = useState<number | null>(null)
 
-  // ==========================================
-  // NUEVO: FLUJO DE VALIDACIÓN DE LICENCIA
-  // ==========================================
   useEffect(() => {
     checkLicenseStatus()
   }, [])
@@ -48,16 +46,18 @@ function App() {
       const result = await window.electron.ipcRenderer.invoke('license:check')
       
       if (result.valid) {
-        // Licencia OK, cargamos los datos normales y vamos al Dashboard
+        setHasValidLicense(true)
+        setLicenseInfo({ type: result.type, remainingDays: result.remainingDays }) // Guardamos la info enviada por el backend
         loadTables()
         setView('DASHBOARD')
       } else {
-        // Licencia fallida, bloqueamos en la pantalla de error
+        setHasValidLicense(false)
         setLicenseErrorReason(result.reason || 'NO_LICENSE')
         setView('LICENSE_ERROR')
       }
     } catch (error) {
       console.error('Error validando licencia:', error)
+      setHasValidLicense(false)
       setLicenseErrorReason('ERROR_CONEXION')
       setView('LICENSE_ERROR')
     } finally {
@@ -65,11 +65,9 @@ function App() {
     }
   }
 
-  // Función que se llama cuando el usuario logra activar la licencia correctamente
   const handleLicenseActivated = () => {
     checkLicenseStatus()
   }
-  // ==========================================
 
   const loadTables = async () => {
     try {
@@ -134,16 +132,21 @@ function App() {
     setIsPinModalOpen(true)
   }
 
+  // NUEVO: La función de regresar ahora respeta si tienes licencia o no
   const handleBackToDashboard = () => {
-    setView('DASHBOARD')
     setActiveTableId(null)
     setPendingTableId(null)
     setCurrentUser(null)
+    
+    if (hasValidLicense) {
+      setView('DASHBOARD')
+    } else {
+      setView('LICENSE_ERROR') // Te regresa a la pantalla de bloqueo
+    }
   }
 
   // --- RENDERIZADO CONDICIONAL ---
 
-  // NUEVO: Mostrar pantalla de carga mientras valida la licencia
   if (isCheckingLicense) {
     return (
       <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: '#111', color: 'white', alignItems: 'center', justifyContent: 'center' }}>
@@ -153,9 +156,18 @@ function App() {
     )
   }
 
-  // NUEVO: Bloqueo de Licencia
   if (view === 'LICENSE_ERROR') {
-    return <LicenseScreen onLicenseActivated={handleLicenseActivated} reason={licenseErrorReason} />
+    return (
+      <>
+        {/* Incluimos el Modal del PIN aquí también para proteger los reportes */}
+        <PinPadModal title={pinTitle} isOpen={isPinModalOpen} onClose={() => { setIsPinModalOpen(false); setPendingView(null); }} onVerify={handlePinVerify} />
+        <LicenseScreen 
+          onLicenseActivated={handleLicenseActivated} 
+          reason={licenseErrorReason} 
+          onViewReports={() => requestViewChange('REPORT', 'Acceso a Reportes (Admin)')}
+        />
+      </>
+    )
   }
 
   if (view === 'DASHBOARD') {
@@ -163,6 +175,7 @@ function App() {
       <>
         <PinPadModal title={pinTitle} isOpen={isPinModalOpen} onClose={() => { setIsPinModalOpen(false); setPendingView(null); }} onVerify={handlePinVerify} />
         <Dashboard 
+          licenseInfo={licenseInfo} // NUEVO: Pasamos la info al Dashboard
           onNavigate={(v) => {
             const titles: Record<string, string> = {
               'TABLES': 'Acceso a Mesas',
@@ -181,8 +194,12 @@ function App() {
     return (
       <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
         <div style={{ padding: '10px 20px', display: 'flex', justifyContent: 'space-between', background: '#1a1a1a', alignItems: 'center' }}>
-          <button onClick={handleBackToDashboard} style={{ background: 'transparent', color: '#9ca3af', border: 'none', cursor: 'pointer', fontSize: '1rem' }}>← Menú Principal</button>
-          <div style={{ fontWeight: 'bold', color: 'white' }}>REPORTE DIARIO</div>
+          <button onClick={handleBackToDashboard} style={{ background: 'transparent', color: '#9ca3af', border: 'none', cursor: 'pointer', fontSize: '1rem' }}>
+            {hasValidLicense ? '← Menú Principal' : '← Volver a Activación'}
+          </button>
+          <div style={{ fontWeight: 'bold', color: 'white' }}>
+            REPORTE DIARIO {hasValidLicense ? '' : '(SOLO LECTURA)'}
+          </div>
         </div>
         <div style={{ flex: 1, overflow: 'hidden' }}>
           <DailyReport />
