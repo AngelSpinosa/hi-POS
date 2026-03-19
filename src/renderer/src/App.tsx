@@ -8,8 +8,10 @@ import { UserManagement } from './components/UserManagement'
 import { POSView } from './views/POSView' 
 import { ProductManagement } from './components/ProductManagement' 
 import { LicenseScreen } from './components/LicenseScreen'
+import { Settings } from './components/Settings' // NUEVO COMPONENTE
 
-type ViewState = 'DASHBOARD' | 'TABLES' | 'ORDER' | 'REPORT' | 'USERS' | 'PRODUCTS' | 'LICENSE_ERROR';
+// NUEVO: Añadimos 'SETTINGS'
+type ViewState = 'DASHBOARD' | 'TABLES' | 'ORDER' | 'REPORT' | 'USERS' | 'PRODUCTS' | 'LICENSE_ERROR' | 'SETTINGS';
 
 interface CurrentUser {
   id: number;
@@ -20,11 +22,10 @@ interface CurrentUser {
 function App() {
   const [view, setView] = useState<ViewState>('DASHBOARD')
   
-  // Estados de la Licencia
   const [isCheckingLicense, setIsCheckingLicense] = useState(true)
   const [licenseErrorReason, setLicenseErrorReason] = useState<string>('')
-  const [hasValidLicense, setHasValidLicense] = useState<boolean>(false) // NUEVO: Memoria de seguridad
-  const [licenseInfo, setLicenseInfo] = useState<{type: string, remainingDays?: number} | null>(null) // NUEVO: Memoria de datos de la licencia
+  const [hasValidLicense, setHasValidLicense] = useState<boolean>(false) 
+  const [licenseInfo, setLicenseInfo] = useState<{type: string, remainingDays?: number} | null>(null)
   
   const [tables, setTables] = useState<Mesa[]>([])
   const [activeTableId, setActiveTableId] = useState<number | null>(null)
@@ -47,7 +48,7 @@ function App() {
       
       if (result.valid) {
         setHasValidLicense(true)
-        setLicenseInfo({ type: result.type, remainingDays: result.remainingDays }) // Guardamos la info enviada por el backend
+        setLicenseInfo({ type: result.type, remainingDays: result.remainingDays })
         loadTables()
         setView('DASHBOARD')
       } else {
@@ -100,7 +101,8 @@ function App() {
              setView('TABLES')
           }
         }
-        else if (['REPORT', 'USERS', 'PRODUCTS'].includes(pendingView || '')) {
+        // NUEVO: Agregamos 'SETTINGS' a la lista de vistas protegidas solo para administradores
+        else if (['REPORT', 'USERS', 'PRODUCTS', 'SETTINGS'].includes(pendingView || '')) {
           if (user.rol === 'admin') {
             if (pendingView) setView(pendingView)
           } else {
@@ -132,7 +134,6 @@ function App() {
     setIsPinModalOpen(true)
   }
 
-  // NUEVO: La función de regresar ahora respeta si tienes licencia o no
   const handleBackToDashboard = () => {
     setActiveTableId(null)
     setPendingTableId(null)
@@ -141,11 +142,9 @@ function App() {
     if (hasValidLicense) {
       setView('DASHBOARD')
     } else {
-      setView('LICENSE_ERROR') // Te regresa a la pantalla de bloqueo
+      setView('LICENSE_ERROR') 
     }
   }
-
-  // --- RENDERIZADO CONDICIONAL ---
 
   if (isCheckingLicense) {
     return (
@@ -159,7 +158,6 @@ function App() {
   if (view === 'LICENSE_ERROR') {
     return (
       <>
-        {/* Incluimos el Modal del PIN aquí también para proteger los reportes */}
         <PinPadModal title={pinTitle} isOpen={isPinModalOpen} onClose={() => { setIsPinModalOpen(false); setPendingView(null); }} onVerify={handlePinVerify} />
         <LicenseScreen 
           onLicenseActivated={handleLicenseActivated} 
@@ -175,13 +173,14 @@ function App() {
       <>
         <PinPadModal title={pinTitle} isOpen={isPinModalOpen} onClose={() => { setIsPinModalOpen(false); setPendingView(null); }} onVerify={handlePinVerify} />
         <Dashboard 
-          licenseInfo={licenseInfo} // NUEVO: Pasamos la info al Dashboard
+          licenseInfo={licenseInfo}
           onNavigate={(v) => {
             const titles: Record<string, string> = {
               'TABLES': 'Acceso a Mesas',
               'REPORT': 'Acceso a Reportes',
               'USERS': 'Gestión de Usuarios',
-              'PRODUCTS': 'Gestión de Productos'
+              'PRODUCTS': 'Gestión de Productos',
+              'SETTINGS': 'Configuración del Sistema' // NUEVO TITULO PARA EL PIN PAD
             }
             requestViewChange(v as ViewState, titles[v])
           }}
@@ -215,6 +214,11 @@ function App() {
 
   if (view === 'PRODUCTS') {
     return <ProductManagement onBack={handleBackToDashboard} />
+  }
+
+  // NUEVA VISTA RENDERIZADA
+  if (view === 'SETTINGS') {
+    return <Settings onBack={handleBackToDashboard} />
   }
 
   if (view === 'TABLES') {
