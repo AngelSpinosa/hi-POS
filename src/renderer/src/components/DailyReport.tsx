@@ -4,24 +4,34 @@ import { OrderDetailModal } from './OrderDetailModal'
 
 export function DailyReport() {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0])
-  const [report, setReport] = useState<ReporteDiario | null>(null)
+  const [report, setReport] = useState<ReporteDiario | any>(null)
   const [orders, setOrders] = useState<OrdenHistorial[]>([])
   
   // Estado para el corte de caja
   const [cashInDrawer, setCashInDrawer] = useState('')
+  const [isSaving, setIsSaving] = useState(false) // NUEVO: Estado de carga
   
   // Estado para modal de detalle
   const [selectedOrder, setSelectedOrder] = useState<{id: number, items: CartItem[]} | null>(null)
 
-  useEffect(() => {
-    const fetchReport = async () => {
-      // @ts-ignore
-      const res = await window.electron.ipcRenderer.invoke('get-daily-report', { date })
-      if (res.success) {
-        setReport(res.report || { total_ventas: 0, total_pedidos: 0, total_efectivo: 0, total_tarjeta: 0 })
-        setOrders(res.orders || [])
+  const fetchReport = async () => {
+    // @ts-ignore
+    const res = await window.electron.ipcRenderer.invoke('get-daily-report', { date })
+    if (res.success) {
+      const fetchedReport = res.report || { total_ventas: 0, total_pedidos: 0, total_efectivo: 0, total_tarjeta: 0 };
+      setReport(fetchedReport)
+      setOrders(res.orders || [])
+
+      // NUEVO: Si este día ya tiene un corte guardado, cargamos el dinero real
+      if (fetchedReport.dinero_real !== undefined && fetchedReport.dinero_real !== null) {
+        setCashInDrawer(fetchedReport.dinero_real.toString())
+      } else {
+        setCashInDrawer('') // Limpiamos si es un día sin corte
       }
     }
+  }
+
+  useEffect(() => {
     fetchReport()
   }, [date])
 
@@ -36,19 +46,15 @@ export function DailyReport() {
   // VALIDACIÓN DE ENTRADA (Solo positivos)
   const handleCashChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value
-    // Si está vacío, lo permitimos para poder borrar
     if (value === '') {
       setCashInDrawer('')
       return
     }
-    // Si es negativo, lo ignoramos
     if (parseFloat(value) < 0) return
-    
     setCashInDrawer(value)
   }
 
   const preventInvalidChars = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    // Bloqueamos el signo menos y la 'e' exponencial
     if (['-', '+', 'e', 'E'].includes(e.key)) {
       e.preventDefault()
     }
@@ -58,6 +64,44 @@ export function DailyReport() {
   const expectedCash = report?.total_efectivo || 0
   const realCash = parseFloat(cashInDrawer) || 0
   const difference = realCash - expectedCash
+
+  // NUEVO: Función para Guardar el Corte
+  const handleSaveCut = async () => {
+    if (cashInDrawer === '') {
+      alert('Por favor ingresa el dinero real en caja.')
+      return
+    }
+
+    const confirm = window.confirm(
+      `¿Confirmas guardar el corte de caja para el ${date}?\n\n` +
+      `Efectivo Esperado: $${expectedCash.toFixed(2)}\n` +
+      `Efectivo Declarado: $${realCash.toFixed(2)}\n` +
+      `Diferencia: $${difference.toFixed(2)}`
+    )
+
+    if (!confirm) return
+
+    setIsSaving(true)
+    try {
+      // @ts-ignore
+      const res = await window.electron.ipcRenderer.invoke('save-daily-cut', {
+        date,
+        realCash,
+        difference
+      })
+
+      if (res.success) {
+        alert('✅ Corte de caja guardado con éxito.')
+        fetchReport() // Recargamos para ver los datos frescos
+      } else {
+        alert('❌ Error: ' + res.error)
+      }
+    } catch (error) {
+      alert('Error de conexión al guardar el corte.')
+    } finally {
+      setIsSaving(false)
+    }
+  }
 
   return (
     <div style={{ padding: '20px', color: 'white', height: '100%', overflowY: 'auto' }}>
@@ -151,7 +195,12 @@ export function DailyReport() {
 
         {/* CORTE DE CAJA RÁPIDO */}
         <div style={{ background: '#2d2d2d', borderRadius: '10px', padding: '20px' }}>
-          <h3 style={{ marginTop: 0 }}>Corte de Caja (MVP)</h3>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+             <h3 style={{ marginTop: 0 }}>Corte de Caja (MVP)</h3>
+             {report?.dinero_real !== null && report?.dinero_real !== undefined && (
+               <span style={{ fontSize: '0.8rem', background: '#065f46', color: '#34d399', padding: '2px 8px', borderRadius: '10px' }}>✓ Guardado</span>
+             )}
+          </div>
           
           <div style={{ marginBottom: '20px' }}>
             <label style={{ display: 'block', color: '#9ca3af', marginBottom: '5px' }}>Total Esperado (Efectivo)</label>
@@ -162,10 +211,10 @@ export function DailyReport() {
             <label style={{ display: 'block', color: '#9ca3af', marginBottom: '5px' }}>Dinero Real en Caja</label>
             <input 
               type="number" 
-              min="0" // Validación HTML básica
+              min="0"
               value={cashInDrawer}
-              onChange={handleCashChange} // Validación lógica estricta
-              onKeyDown={preventInvalidChars} // Bloqueo de teclas invalidas
+              onChange={handleCashChange}
+              onKeyDown={preventInvalidChars}
               placeholder="0.00"
               style={{ width: '100%', padding: '10px', background: '#1a1a1a', border: '1px solid #404040', color: 'white', fontSize: '1.2rem', borderRadius: '5px' }}
             />
@@ -180,6 +229,26 @@ export function DailyReport() {
               {difference === 0 ? '¡Caja cuadrada!' : difference > 0 ? 'Sobra dinero' : 'Falta dinero'}
             </small>
           </div>
+
+          {/* NUEVO: Botón de Guardar */}
+          <button 
+            onClick={handleSaveCut}
+            disabled={isSaving || !report || report.total_pedidos === 0}
+            style={{ 
+              width: '100%', 
+              padding: '12px', 
+              marginTop: '20px', 
+              background: (isSaving || !report || report.total_pedidos === 0) ? '#404040' : '#3b82f6', 
+              color: 'white', 
+              border: 'none', 
+              borderRadius: '5px', 
+              fontWeight: 'bold', 
+              cursor: (isSaving || !report || report.total_pedidos === 0) ? 'not-allowed' : 'pointer' 
+            }}
+          >
+            {isSaving ? 'Guardando...' : '💾 Guardar Corte'}
+          </button>
+
         </div>
 
       </div>
