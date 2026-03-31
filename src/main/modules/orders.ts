@@ -136,7 +136,10 @@ export function registerOrderHandlers() {
       const tx = db.transaction(() => {
         db.prepare("UPDATE orden SET estatus = 'pagada', ticket_impreso = 0 WHERE id = ?").run(orderId)
         
-        const today = new Date().toISOString().split('T')[0]
+        // CORRECCIÓN ZONA HORARIA: Ajustar al día local en lugar del día UTC
+        const tzOffset = new Date().getTimezoneOffset() * 60000;
+        const today = new Date(Date.now() - tzOffset).toISOString().split('T')[0];
+
         let reporte = db.prepare('SELECT id FROM reporte_diario WHERE date(fecha) = ?').get(today) as any
         if (!reporte) {
           const info = db.prepare('INSERT INTO reporte_diario (fecha) VALUES (?)').run(today)

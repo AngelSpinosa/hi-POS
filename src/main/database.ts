@@ -9,16 +9,15 @@ export let db: Database.Database
 export function initDatabase() {
   try {
     const dbPath = is.dev
-      ? resolve(process.cwd(), '../POS DB/data/pos.db') 
-      : join(app.getPath('userData'), 'pos.db')
+      ? resolve(process.cwd(), 'data/pos.db')          // desarrollo: carpeta /data en raíz del proyecto
+      : join(app.getPath('userData'), 'pos.db')         // producción: AppData del usuario
 
     console.log(`Intentando conectar a la BD en: ${dbPath}`)
-    
-    // fileMustExist: false permite que si no existe, falle o la cree según configuración (aquí solo conectamos)
+
     db = new Database(dbPath, { verbose: console.log })
     db.pragma('journal_mode = WAL')
-    db.pragma('foreign_keys = ON') 
-    
+    db.pragma('foreign_keys = ON')
+
     console.log('Conexión a SQLite exitosa')
   } catch (error) {
     console.error('Error al conectar con la base de datos:', error)

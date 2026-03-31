@@ -2,14 +2,20 @@ import { useState, useEffect } from 'react'
 import type { ReporteDiario, OrdenHistorial, CartItem } from '../types/db'
 import { OrderDetailModal } from './OrderDetailModal'
 
+// 🛠️ HELPER: Obtener fecha estrictamente en la ZONA HORARIA LOCAL (Evita el bug de medianoche)
+const getLocalDate = (d = new Date()) => {
+  const tzOffset = d.getTimezoneOffset() * 60000;
+  return new Date(d.getTime() - tzOffset).toISOString().split('T')[0];
+}
+
 export function DailyReport() {
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0])
+  const [date, setDate] = useState(getLocalDate())
   const [report, setReport] = useState<ReporteDiario | any>(null)
   const [orders, setOrders] = useState<OrdenHistorial[]>([])
   
   // Estado para el corte de caja
   const [cashInDrawer, setCashInDrawer] = useState('')
-  const [isSaving, setIsSaving] = useState(false) // NUEVO: Estado de carga
+  const [isSaving, setIsSaving] = useState(false)
   
   // Estado para modal de detalle
   const [selectedOrder, setSelectedOrder] = useState<{id: number, items: CartItem[]} | null>(null)
@@ -18,15 +24,15 @@ export function DailyReport() {
     // @ts-ignore
     const res = await window.electron.ipcRenderer.invoke('get-daily-report', { date })
     if (res.success) {
-      const fetchedReport = res.report || { total_ventas: 0, total_pedidos: 0, total_efectivo: 0, total_tarjeta: 0 };
+      const fetchedReport = res.report || null;
       setReport(fetchedReport)
       setOrders(res.orders || [])
 
-      // NUEVO: Si este día ya tiene un corte guardado, cargamos el dinero real
-      if (fetchedReport.dinero_real !== undefined && fetchedReport.dinero_real !== null) {
+      // Si este día ya tiene un corte guardado, cargamos el dinero real automáticamente
+      if (fetchedReport?.dinero_real !== undefined && fetchedReport?.dinero_real !== null) {
         setCashInDrawer(fetchedReport.dinero_real.toString())
       } else {
-        setCashInDrawer('') // Limpiamos si es un día sin corte
+        setCashInDrawer('') // Limpiamos si es un día nuevo sin corte
       }
     }
   }
@@ -43,7 +49,6 @@ export function DailyReport() {
     }
   }
 
-  // VALIDACIÓN DE ENTRADA (Solo positivos)
   const handleCashChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value
     if (value === '') {
@@ -60,12 +65,19 @@ export function DailyReport() {
     }
   }
 
-  // Cálculos para corte de caja
-  const expectedCash = report?.total_efectivo || 0
+  // 🧠 CÁLCULOS DINÁMICOS BASADOS EN LA LISTA REAL DE ÓRDENES
+  // Esto garantiza que las tarjetas siempre coincidan con la tabla, sin importar la hora del sistema
+  const totalVentas = orders.reduce((sum, order) => sum + order.total, 0);
+  const totalPedidos = orders.length;
+  const expectedCash = orders.filter(o => o.metodo === 'efectivo').reduce((sum, o) => sum + o.total, 0);
+  const totalTarjeta = orders.filter(o => o.metodo === 'tarjeta').reduce((sum, o) => sum + o.total, 0);
+
   const realCash = parseFloat(cashInDrawer) || 0
   const difference = realCash - expectedCash
 
-  // NUEVO: Función para Guardar el Corte
+  // Constante visual: ¿Ya habíamos guardado esto antes?
+  const isAlreadySaved = report?.dinero_real !== null && report?.dinero_real !== undefined
+
   const handleSaveCut = async () => {
     if (cashInDrawer === '') {
       alert('Por favor ingresa el dinero real en caja.')
@@ -73,7 +85,7 @@ export function DailyReport() {
     }
 
     const confirm = window.confirm(
-      `¿Confirmas guardar el corte de caja para el ${date}?\n\n` +
+      `¿Confirmas ${isAlreadySaved ? 'actualizar' : 'guardar'} el corte de caja para el ${date}?\n\n` +
       `Efectivo Esperado: $${expectedCash.toFixed(2)}\n` +
       `Efectivo Declarado: $${realCash.toFixed(2)}\n` +
       `Diferencia: $${difference.toFixed(2)}`
@@ -92,7 +104,7 @@ export function DailyReport() {
 
       if (res.success) {
         alert('✅ Corte de caja guardado con éxito.')
-        fetchReport() // Recargamos para ver los datos frescos
+        fetchReport() 
       } else {
         alert('❌ Error: ' + res.error)
       }
@@ -103,6 +115,12 @@ export function DailyReport() {
     }
   }
 
+  // 💡 LÓGICA DE BOTONES: Generamos las fechas locales exactas para saber cuál iluminar
+  const todayStr = getLocalDate();
+  const yesterdayDate = new Date();
+  yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+  const yesterdayStr = getLocalDate(yesterdayDate);
+
   return (
     <div style={{ padding: '20px', color: 'white', height: '100%', overflowY: 'auto' }}>
       
@@ -111,17 +129,24 @@ export function DailyReport() {
         <h1 style={{ margin: 0 }}>Reporte Diario 📊</h1>
         <div style={{ display: 'flex', gap: '10px' }}>
           <button 
-            onClick={() => {
-               const d = new Date(); d.setDate(d.getDate() - 1); 
-               setDate(d.toISOString().split('T')[0])
+            onClick={() => setDate(yesterdayStr)}
+            style={{ 
+              padding: '8px 12px', 
+              background: date === yesterdayStr ? '#3b82f6' : '#404040', 
+              border: 'none', color: 'white', borderRadius: '5px', cursor: 'pointer',
+              transition: 'background 0.2s'
             }}
-            style={{ padding: '8px 12px', background: '#404040', border: 'none', color: 'white', borderRadius: '5px', cursor: 'pointer' }}
           >
             Ayer
           </button>
           <button 
-            onClick={() => setDate(new Date().toISOString().split('T')[0])}
-            style={{ padding: '8px 12px', background: '#3b82f6', border: 'none', color: 'white', borderRadius: '5px', cursor: 'pointer' }}
+            onClick={() => setDate(todayStr)}
+            style={{ 
+              padding: '8px 12px', 
+              background: date === todayStr ? '#3b82f6' : '#404040', 
+              border: 'none', color: 'white', borderRadius: '5px', cursor: 'pointer',
+              transition: 'background 0.2s'
+            }}
           >
             Hoy
           </button>
@@ -134,23 +159,23 @@ export function DailyReport() {
         </div>
       </div>
 
-      {/* TARJETAS DE KPIs */}
+      {/* TARJETAS DE KPIs (Ahora usan los cálculos dinámicos locales) */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '15px', marginBottom: '30px' }}>
         <div style={{ background: '#2d2d2d', padding: '20px', borderRadius: '10px', borderLeft: '4px solid #22c55e' }}>
           <div style={{ color: '#9ca3af', fontSize: '0.9rem' }}>Ventas Totales</div>
-          <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>${report?.total_ventas.toFixed(2)}</div>
+          <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>${totalVentas.toFixed(2)}</div>
         </div>
         <div style={{ background: '#2d2d2d', padding: '20px', borderRadius: '10px', borderLeft: '4px solid #3b82f6' }}>
           <div style={{ color: '#9ca3af', fontSize: '0.9rem' }}>Pedidos Pagados</div>
-          <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>{report?.total_pedidos}</div>
+          <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>{totalPedidos}</div>
         </div>
         <div style={{ background: '#2d2d2d', padding: '20px', borderRadius: '10px', borderLeft: '4px solid #eab308' }}>
           <div style={{ color: '#9ca3af', fontSize: '0.9rem' }}>Efectivo</div>
-          <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>${report?.total_efectivo.toFixed(2)}</div>
+          <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>${expectedCash.toFixed(2)}</div>
         </div>
         <div style={{ background: '#2d2d2d', padding: '20px', borderRadius: '10px', borderLeft: '4px solid #a855f7' }}>
           <div style={{ color: '#9ca3af', fontSize: '0.9rem' }}>Tarjeta</div>
-          <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>${report?.total_tarjeta.toFixed(2)}</div>
+          <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>${totalTarjeta.toFixed(2)}</div>
         </div>
       </div>
 
@@ -186,7 +211,7 @@ export function DailyReport() {
                   </tr>
                 ))}
                 {orders.length === 0 && (
-                  <tr><td colSpan={5} style={{ textAlign: 'center', padding: '20px', color: '#666' }}>Sin ventas este día</td></tr>
+                  <tr><td colSpan={5} style={{ textAlign: 'center', padding: '20px', color: '#666' }}>Sin ventas registradas este día</td></tr>
                 )}
               </tbody>
             </table>
@@ -197,7 +222,7 @@ export function DailyReport() {
         <div style={{ background: '#2d2d2d', borderRadius: '10px', padding: '20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
              <h3 style={{ marginTop: 0 }}>Corte de Caja (MVP)</h3>
-             {report?.dinero_real !== null && report?.dinero_real !== undefined && (
+             {isAlreadySaved && (
                <span style={{ fontSize: '0.8rem', background: '#065f46', color: '#34d399', padding: '2px 8px', borderRadius: '10px' }}>✓ Guardado</span>
              )}
           </div>
@@ -230,23 +255,22 @@ export function DailyReport() {
             </small>
           </div>
 
-          {/* NUEVO: Botón de Guardar */}
           <button 
             onClick={handleSaveCut}
-            disabled={isSaving || !report || report.total_pedidos === 0}
+            disabled={isSaving || orders.length === 0}
             style={{ 
               width: '100%', 
               padding: '12px', 
               marginTop: '20px', 
-              background: (isSaving || !report || report.total_pedidos === 0) ? '#404040' : '#3b82f6', 
+              background: (isSaving || orders.length === 0) ? '#404040' : (isAlreadySaved ? '#059669' : '#3b82f6'), 
               color: 'white', 
               border: 'none', 
               borderRadius: '5px', 
               fontWeight: 'bold', 
-              cursor: (isSaving || !report || report.total_pedidos === 0) ? 'not-allowed' : 'pointer' 
+              cursor: (isSaving || orders.length === 0) ? 'not-allowed' : 'pointer' 
             }}
           >
-            {isSaving ? 'Guardando...' : '💾 Guardar Corte'}
+            {isSaving ? 'Guardando...' : (isAlreadySaved ? '🔄 Actualizar Corte' : '💾 Guardar Corte')}
           </button>
 
         </div>
