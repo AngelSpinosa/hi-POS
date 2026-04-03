@@ -62,6 +62,31 @@ export interface Licencia {
   expira_en: string;
 }
 
+export interface Insumo {
+  id: number;
+  codigo: string;
+  nombre: string;
+  unidad_medida: string;
+  stock_actual: number;
+  stock_minimo: number;
+}
+
+export interface RecetaProducto {
+  id: number;
+  producto_id: number;
+  insumo_id: number;
+  cantidad_requerida: number;
+}
+
+export interface MovimientoInventario {
+  id: number;
+  insumo_id: number;
+  tipo: 'ENTRADA' | 'SALIDA' | 'MERMA' | string;
+  cantidad: number;
+  motivo: string;
+  fecha: string;
+}
+
 // ==========================================
 // 💻 TIPOS AUXILIARES DE LA UI (NO SON TABLAS)
 // ==========================================

@@ -3,12 +3,50 @@ import { db } from '../database'
 
 export function registerOrderHandlers() {
 
+  // ==========================================
+  // NUEVOS HANDLERS PARA INVENTARIO Y POS
+  // ==========================================
+  
+  ipcMain.handle('get-insumos', () => {
+    if (!db) return []
+    try {
+      return db.prepare('SELECT * FROM Insumo ORDER BY nombre ASC').all()
+    } catch (error) { return [] }
+  })
+
+  // Esta query verifica el stock cruzando Producto -> Receta -> Insumo
+  ipcMain.handle('get-productos-pos', () => {
+    if (!db) return []
+    try {
+      const stmt = db.prepare(`
+        SELECT p.*,
+          CASE
+            WHEN EXISTS (
+              SELECT 1 FROM Receta_producto rp
+              JOIN Insumo i ON rp.insumo_id = i.id
+              WHERE rp.producto_id = p.id AND i.stock_actual < rp.cantidad_requerida
+            ) THEN 0
+            ELSE 1
+          END as disponible
+        FROM Producto p
+      `)
+      const productos = stmt.all() as any[]
+      return productos.map(p => ({
+        ...p,
+        disponible: p.disponible === 1
+      }))
+    } catch (error) { return [] }
+  })
+
+  // ==========================================
+  // HANDLERS ORIGINALES DE ÓRDENES
+  // ==========================================
+
   ipcMain.handle('get-tables', () => {
     if (!db) return []
     try {
       const mesas = db.prepare('SELECT * FROM mesa WHERE activa = 1').all() as any[]
       return mesas.map(mesa => {
-        // CORRECCIÓN: ORDER BY id DESC LIMIT 1 asegura que ignoremos bugs viejos
         const ordenActiva = db.prepare(`
           SELECT estatus, total 
           FROM orden 
@@ -33,7 +71,6 @@ export function registerOrderHandlers() {
 
       if (!targetTableId) return { success: false, error: 'ID de mesa no proporcionado' }
 
-      // CORRECCIÓN: ORDER BY o.id DESC LIMIT 1
       let order = db.prepare(`
         SELECT o.*, u.nombre as nombre_mesero 
         FROM orden o
@@ -136,7 +173,6 @@ export function registerOrderHandlers() {
       const tx = db.transaction(() => {
         db.prepare("UPDATE orden SET estatus = 'pagada', ticket_impreso = 0 WHERE id = ?").run(orderId)
         
-        // CORRECCIÓN ZONA HORARIA: Ajustar al día local en lugar del día UTC
         const tzOffset = new Date().getTimezoneOffset() * 60000;
         const today = new Date(Date.now() - tzOffset).toISOString().split('T')[0];
 
@@ -150,8 +186,31 @@ export function registerOrderHandlers() {
         const montoTarjeta = payment.method === 'tarjeta' ? total : 0
         db.prepare(`UPDATE reporte_diario SET total_ventas = total_ventas + ?, total_pedidos = total_pedidos + 1, total_efectivo = total_efectivo + ?, total_tarjeta = total_tarjeta + ? WHERE id = ?`).run(total, montoEfectivo, montoTarjeta, reporte.id)
 
-        // Se mantiene el insert que ya te funcionaba bien
         db.prepare(`INSERT INTO pago (orden_id, metodo, monto_recibido) VALUES (?, ?, ?)`).run(orderId, payment.method, payment.received)
+        
+        // --- NUEVA LÓGICA DE INVENTARIO: DESCONTAR INSUMOS EN CASCADA ---
+        const items = db.prepare('SELECT producto_id, cantidad FROM orden_item WHERE orden_id = ?').all(orderId) as any[]
+        
+        for (const item of items) {
+          // Buscamos la receta del producto
+          const receta = db.prepare('SELECT insumo_id, cantidad_requerida FROM Receta_producto WHERE producto_id = ?').all(item.producto_id) as any[]
+          
+          for (const ing of receta) {
+            // Multiplicamos la cantidad de la receta por los platillos vendidos
+            const qtyToDeduct = ing.cantidad_requerida * item.cantidad
+            
+            // 1. Descontamos el stock
+            db.prepare('UPDATE Insumo SET stock_actual = stock_actual - ? WHERE id = ?').run(qtyToDeduct, ing.insumo_id)
+            
+            // 2. Registramos el movimiento para trazabilidad
+            db.prepare(`INSERT INTO Movimiento_inventario (insumo_id, tipo, cantidad, motivo, fecha) VALUES (?, 'SALIDA', ?, ?, datetime('now', 'localtime'))`).run(
+              ing.insumo_id, 
+              qtyToDeduct, 
+              `Venta Orden #${orderId} (Prod ID: ${item.producto_id})`
+            )
+          }
+        }
+        // ----------------------------------------------------------------
         
         return { success: true }
       })

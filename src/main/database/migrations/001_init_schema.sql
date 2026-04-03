@@ -18,15 +18,15 @@ CREATE TABLE IF NOT EXISTS user (
   creado_en DATETIME DEFAULT CURRENT_TIMESTAMP -- Auditoría de creación
 );
 
--- 3. Tabla Licencia (ACTUALIZADA)
+-- 3. Tabla Licencia
 CREATE TABLE IF NOT EXISTS licencia (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  codigo TEXT NOT NULL UNIQUE,      -- El string completo generado por Python
-  tipo VARCHAR(50) NOT NULL,        -- 'DEMO' o 'FULL'
-  device_id VARCHAR(100) NOT NULL,  -- Dirección MAC de la tarjeta de red
-  expira_en VARCHAR(50) NOT NULL,   -- Fecha ISO o 'PERPETUAL'
-  firma VARCHAR(100) NOT NULL,      -- Hash de seguridad SHA256
-  activa BOOLEAN DEFAULT 1,         -- Para poder revocarla desde BD si fuera necesario
+  codigo TEXT NOT NULL UNIQUE,      
+  tipo VARCHAR(50) NOT NULL,        
+  device_id VARCHAR(100) NOT NULL,  
+  expira_en VARCHAR(50) NOT NULL,   
+  firma VARCHAR(100) NOT NULL,      
+  activa BOOLEAN DEFAULT 1,         
   creado_en DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -38,6 +38,8 @@ CREATE TABLE IF NOT EXISTS reporte_diario (
   total_pedidos INTEGER DEFAULT 0,
   total_efectivo INTEGER DEFAULT 0,
   total_tarjeta INTEGER DEFAULT 0,
+  dinero_real FLOAT DEFAULT NULL,
+  diferencia FLOAT DEFAULT NULL,
   creado_en DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -56,7 +58,7 @@ CREATE TABLE IF NOT EXISTS orden (
   mesa_id INTEGER,
   estatus VARCHAR(50) DEFAULT 'abierta',
   total FLOAT DEFAULT 0,
-  creado_en DATE DEFAULT CURRENT_TIMESTAMP,
+  creado_en DATETIME DEFAULT CURRENT_TIMESTAMP,
   ticket_impreso BOOLEAN DEFAULT 0,
   FOREIGN KEY (user_id) REFERENCES user(id),
   FOREIGN KEY (id_reporte_diario) REFERENCES reporte_diario(id),
@@ -90,7 +92,42 @@ CREATE TABLE IF NOT EXISTS pago (
   orden_id INTEGER NOT NULL UNIQUE, 
   metodo VARCHAR(50) NOT NULL,
   monto_recibido FLOAT NOT NULL,
-  creado_en DATE DEFAULT CURRENT_TIMESTAMP,
+  creado_en DATETIME DEFAULT CURRENT_TIMESTAMP,
   cambio FLOAT DEFAULT 0,
   FOREIGN KEY (orden_id) REFERENCES orden(id)
+);
+
+-- =========================================
+-- NUEVAS TABLAS: SISTEMA DE INVENTARIO
+-- =========================================
+
+-- 10. Tabla Insumo (Materia Prima o Productos Cerrados)
+CREATE TABLE IF NOT EXISTS insumo (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  codigo VARCHAR(50) NOT NULL UNIQUE,
+  nombre VARCHAR(150) NOT NULL,
+  unidad_medida VARCHAR(20) NOT NULL, -- Ej: 'KG', 'GR', 'L', 'ML', 'PZ'
+  stock_actual FLOAT NOT NULL DEFAULT 0,
+  stock_minimo FLOAT NOT NULL DEFAULT 0
+);
+
+-- 11. Tabla Receta_Producto (La receta / Explosión de materiales)
+CREATE TABLE IF NOT EXISTS receta_producto (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  producto_id INTEGER NOT NULL,
+  insumo_id INTEGER NOT NULL,
+  cantidad_requerida FLOAT NOT NULL,
+  FOREIGN KEY (producto_id) REFERENCES producto(id) ON DELETE CASCADE,
+  FOREIGN KEY (insumo_id) REFERENCES insumo(id) ON DELETE CASCADE
+);
+
+-- 12. Tabla Movimiento_Inventario (Auditoría de Entradas/Salidas)
+CREATE TABLE IF NOT EXISTS movimiento_inventario (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  insumo_id INTEGER NOT NULL,
+  tipo VARCHAR(20) NOT NULL, -- 'ENTRADA', 'SALIDA', 'MERMA'
+  cantidad FLOAT NOT NULL,
+  motivo VARCHAR(150) NOT NULL, -- Ej: 'Venta Orden #5', 'Compra a Proveedor'
+  fecha DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (insumo_id) REFERENCES insumo(id) ON DELETE CASCADE
 );
