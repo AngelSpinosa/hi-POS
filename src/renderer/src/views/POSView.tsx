@@ -1,16 +1,11 @@
 import { useEffect, useState } from 'react'
-// Importamos el tipo base Producto
+// Importamos ProductoPOS que ahora contiene la propiedad 'disponible'
 import type { Producto } from '../types/db'
 import { OrderCart } from '../components/OrderCart'
 import { PaymentModal } from '../components/PaymentModal'
 import { TicketReceipt } from '../components/TicketReceipt'
 import { PinPadModal } from '../components/PinPadModal'
 import { useActiveOrder } from '../hooks/useActiveOrder'
-
-// Definimos un tipo local que extiende Producto para incluir la propiedad dinámica del backend
-export interface ProductoPOS extends Producto {
-  disponible?: boolean;
-}
 
 // Componente KitchenCommand local
 // eslint-disable-next-line react/prop-types
@@ -37,26 +32,20 @@ interface POSViewProps {
 
 export function POSView({ tableId, userId, onBack }: POSViewProps) {
   const order = useActiveOrder(tableId, userId)
-  // Usamos ProductoPOS en lugar de Producto para permitir la propiedad 'disponible'
-  const [products, setProducts] = useState<ProductoPOS[]>([])
+  const [products, setProducts] = useState<Producto[]>([])
   
   // Estado para cancelar
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false)
 
-  // NUEVO: Estado para el reloj
-  const [currentTime, setCurrentTime] = useState(new Date())
-
-  // NUEVO: Efecto del reloj en tiempo real
   useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 1000)
-    return () => clearInterval(timer)
-  }, [])
-
-  useEffect(() => {
-    // LLamamos al nuevo endpoint que cruza productos con recetas e insumos
+    // LLamamos al endpoint que cruza productos con recetas e insumos
     // @ts-ignore
     window.electron.ipcRenderer.invoke('get-productos-pos').then((res) => {
-      if (Array.isArray(res)) setProducts(res.filter(p => p.active === 1))
+      if (Array.isArray(res)) {
+        // Utilizamos == en lugar de === para atrapar tanto el booleano true como el numero 1
+        // @ts-ignore
+        setProducts(res.filter(p => p.active == 1 || p.active === true))
+      }
     })
   }, [])
 
@@ -84,11 +73,6 @@ export function POSView({ tableId, userId, onBack }: POSViewProps) {
     onBack() 
   }
 
-  // NUEVO: Formateo de fecha y hora idéntico al Dashboard
-  const timeString = currentTime.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: true }).toLowerCase()
-  const dateString = currentTime.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })
-  const formattedDate = dateString.replace(/\b\w/g, l => l.toUpperCase())
-
   return (
     <div style={{ display: 'flex', height: '100vh', backgroundColor: '#111', color: 'white' }}>
       
@@ -99,19 +83,14 @@ export function POSView({ tableId, userId, onBack }: POSViewProps) {
             ← Volver al Mapa
           </button>
           <h2 style={{ margin: 0, color: '#f97316' }}>Mesa {tableId}</h2>
-          
-          {/* NUEVO: Contenedor de la Hora, reemplaza al div vacío anterior */}
-          <div style={{ textAlign: 'right', color: '#9ca3af', minWidth: '100px' }}>
-            <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: 'white' }}>{timeString}</div>
-            <div style={{ fontSize: '0.8rem' }}>{formattedDate}</div>
-          </div>
+          <div style={{ width: '100px' }}></div>
         </div>
 
         <div style={{ flex: 1, padding: '30px', overflowY: 'auto' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '20px' }}>
             {products.map((product) => {
               // Verificamos si hay stock (el backend lo precalculó en product.disponible)
-              // Asumimos true si por alguna razón no viene el valor para no romper productos sin receta
+              // @ts-ignore
               const isAvailable = product.disponible !== false;
 
               return (

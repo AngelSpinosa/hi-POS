@@ -108,7 +108,8 @@ CREATE TABLE IF NOT EXISTS insumo (
   nombre VARCHAR(150) NOT NULL,
   unidad_medida VARCHAR(20) NOT NULL, -- Ej: 'KG', 'GR', 'L', 'ML', 'PZ'
   stock_actual FLOAT NOT NULL DEFAULT 0,
-  stock_minimo FLOAT NOT NULL DEFAULT 0
+  stock_minimo FLOAT NOT NULL DEFAULT 0,
+  active BOOLEAN DEFAULT 1
 );
 
 -- 11. Tabla Receta_Producto (La receta / Explosión de materiales)

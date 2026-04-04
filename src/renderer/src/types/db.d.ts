@@ -69,16 +69,17 @@ export interface Insumo {
   unidad_medida: string;
   stock_actual: number;
   stock_minimo: number;
+  active: number;
 }
 
-export interface RecetaProducto {
+export interface receta_producto {
   id: number;
   producto_id: number;
   insumo_id: number;
   cantidad_requerida: number;
 }
 
-export interface MovimientoInventario {
+export interface movimiento_inventario {
   id: number;
   insumo_id: number;
   tipo: 'ENTRADA' | 'SALIDA' | 'MERMA' | string;
