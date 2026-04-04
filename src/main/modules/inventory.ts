@@ -81,14 +81,30 @@ export function registrarMovimiento(movimiento: Omit<movimiento_inventario, 'id'
 }
 
 // ==========================================
-// 🍕 NUEVO: GESTIÓN DE RECETAS (CU-44)
+// 📊 NUEVO: HISTORIAL DE MOVIMIENTOS
+// ==========================================
+
+export function getMovimientosInventario(): any[] {
+  const stmt = db.prepare(`
+    SELECT m.id, m.insumo_id, m.tipo, m.cantidad, m.motivo, m.fecha,
+           i.nombre as insumo_nombre, i.codigo, i.unidad_medida
+    FROM movimiento_inventario m
+    JOIN Insumo i ON m.insumo_id = i.id
+    ORDER BY m.fecha DESC
+  `);
+  return stmt.all() as any[];
+}
+
+
+// ==========================================
+// 🍕 GESTIÓN DE RECETAS (CU-44)
 // ==========================================
 
 export function getRecetaByProducto(productoId: number): any[] {
   const stmt = db.prepare(`
     SELECT r.id, r.producto_id, r.insumo_id, r.cantidad_requerida, 
            i.nombre as insumo_nombre, i.unidad_medida, i.codigo
-    FROM receta_producto r
+    FROM RecetaProducto r
     JOIN Insumo i ON r.insumo_id = i.id
     WHERE r.producto_id = ?
   `);
@@ -98,11 +114,11 @@ export function getRecetaByProducto(productoId: number): any[] {
 export function saveRecetaProducto(productoId: number, ingredientes: Omit<receta_producto, 'id' | 'producto_id'>[]): void {
   const transaction = db.transaction((id: number, ings: any[]) => {
     // 1. Limpiamos la receta anterior
-    db.prepare('DELETE FROM receta_producto WHERE producto_id = ?').run(id);
+    db.prepare('DELETE FROM RecetaProducto WHERE producto_id = ?').run(id);
     
     // 2. Insertamos los nuevos ingredientes
     const insertStmt = db.prepare(`
-      INSERT INTO receta_producto (producto_id, insumo_id, cantidad_requerida) 
+      INSERT INTO RecetaProducto (producto_id, insumo_id, cantidad_requerida) 
       VALUES (?, ?, ?)
     `);
     
@@ -120,7 +136,7 @@ export function saveRecetaProducto(productoId: number, ingredientes: Omit<receta
  */
 export function descontarInventarioPorVenta(itemsVendidos: { producto_id: number; cantidad: number }[]): void {
   const transaction = db.transaction((items: any[]) => {
-    const getRecetaStmt = db.prepare('SELECT insumo_id, cantidad_requerida FROM receta_producto WHERE producto_id = ?');
+    const getRecetaStmt = db.prepare('SELECT insumo_id, cantidad_requerida FROM RecetaProducto WHERE producto_id = ?');
     const insertMovStmt = db.prepare(`
       INSERT INTO movimiento_inventario (insumo_id, tipo, cantidad, motivo, fecha)
       VALUES (@insumo_id, 'SALIDA', @cantidad, 'Venta automática POS', datetime('now', 'localtime'))
@@ -193,11 +209,20 @@ export function registerInventoryHandlers() {
     catch (error: any) { return { success: false, error: error.message }; }
   });
 
-  // NUEVO: CANAL PARA REGISTRAR MOVIMIENTOS (REABASTO/MERMA - CU-45 y CU-46)
+  // CANAL PARA REGISTRAR MOVIMIENTOS (REABASTO/MERMA)
   ipcMain.handle('register-movement', (_, payload: Omit<movimiento_inventario, 'id' | 'fecha'>) => {
     try {
       registrarMovimiento(payload);
       return { success: true };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  // NUEVO: CANAL PARA OBTENER EL HISTORIAL
+  ipcMain.handle('get-movimientos', () => {
+    try {
+      return { success: true, data: getMovimientosInventario() };
     } catch (error: any) {
       return { success: false, error: error.message };
     }

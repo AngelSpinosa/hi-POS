@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import type { Producto, Insumo } from '../types/db'
+import type { Producto, Insumo, movimiento_inventario } from '../types/db'
 import { PinPadModal } from './PinPadModal'
 
 interface ProductManagementProps {
@@ -14,10 +14,20 @@ interface RecipeItem {
   cantidad_requerida: number;
 }
 
+// Tipo local para visualizar movimientos unidos con insumos
+interface MovimientoView extends movimiento_inventario {
+  insumo_nombre: string;
+  codigo: string;
+  unidad_medida: string;
+}
+
 export function ProductManagement({ onBack }: ProductManagementProps) {
-  const [activeTab, setActiveTab] = useState<'productos' | 'insumos'>('productos')
+  // NUEVO: Añadida la pestaña 'historial'
+  const [activeTab, setActiveTab] = useState<'productos' | 'insumos' | 'historial'>('productos')
+  
   const [products, setProducts] = useState<Producto[]>([])
   const [insumos, setInsumos] = useState<Insumo[]>([])
+  const [movimientos, setMovimientos] = useState<MovimientoView[]>([]) // NUEVO ESTADO
   const [isLoading, setIsLoading] = useState(true)
   
   // Reloj y Búsqueda
@@ -47,7 +57,7 @@ export function ProductManagement({ onBack }: ProductManagementProps) {
   const [selectedInsumoId, setSelectedInsumoId] = useState<number | ''>('')
   const [recipeCantidad, setRecipeCantidad] = useState('')
 
-  // NUEVO: Formulario de Movimientos de Inventario (CU-45 y CU-46)
+  // Formulario de Movimientos de Inventario (CU-45 y CU-46)
   const [isMovementModalOpen, setIsMovementModalOpen] = useState(false)
   const [movementType, setMovementType] = useState<'ENTRADA' | 'MERMA'>('ENTRADA')
   const [movementInsumo, setMovementInsumo] = useState<Insumo | null>(null)
@@ -68,11 +78,13 @@ export function ProductManagement({ onBack }: ProductManagementProps) {
     setIsLoading(true)
     try {
       // @ts-ignore
-      const [resProducts, resInsumos] = await Promise.all([
+      const [resProducts, resInsumos, resMovimientos] = await Promise.all([
         // @ts-ignore
         window.electron.ipcRenderer.invoke('get-products'),
         // @ts-ignore
-        window.electron.ipcRenderer.invoke('get-insumos')
+        window.electron.ipcRenderer.invoke('get-insumos'),
+        // @ts-ignore
+        window.electron.ipcRenderer.invoke('get-movimientos') // NUEVA LLAMADA
       ])
 
       if (Array.isArray(resProducts)) setProducts(resProducts)
@@ -80,6 +92,9 @@ export function ProductManagement({ onBack }: ProductManagementProps) {
 
       if (Array.isArray(resInsumos)) setInsumos(resInsumos)
       else setInsumos([])
+
+      if (resMovimientos && resMovimientos.success) setMovimientos(resMovimientos.data)
+      else setMovimientos([])
 
     } catch (e) { 
       console.error(e) 
@@ -90,6 +105,7 @@ export function ProductManagement({ onBack }: ProductManagementProps) {
 
   useEffect(() => { fetchData() }, [])
 
+  // Filtrados dinámicos
   const filteredProducts = products.filter(product =>
     product.nombre.toLowerCase().includes(searchTerm.toLowerCase())
   )
@@ -99,9 +115,22 @@ export function ProductManagement({ onBack }: ProductManagementProps) {
     insumo.codigo.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
+  // Búsqueda en el historial
+  const filteredMovimientos = movimientos.filter(mov =>
+    mov.insumo_nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    mov.codigo.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    mov.motivo.toLowerCase().includes(searchTerm.toLowerCase())
+  )
+
   const timeString = currentTime.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: true }).toLowerCase()
   const dateString = currentTime.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })
   const formattedDate = dateString.replace(/\b\w/g, l => l.toUpperCase())
+
+  // Placeholder dinámico para la barra de búsqueda
+  let searchPlaceholder = 'Buscar...';
+  if (activeTab === 'productos') searchPlaceholder = 'Buscar platillo o producto...';
+  if (activeTab === 'insumos') searchPlaceholder = 'Buscar insumo por nombre o código...';
+  if (activeTab === 'historial') searchPlaceholder = 'Buscar en historial por insumo o motivo...';
 
   // --- MÉTODOS DEL FORMULARIO (Productos) ---
 
@@ -200,7 +229,7 @@ export function ProductManagement({ onBack }: ProductManagementProps) {
     setPendingAction(() => actionToExecute); setIsPinModalOpen(true);
   }
 
-  // --- NUEVO: MÉTODOS DE MOVIMIENTOS (CU-45 y CU-46) ---
+  // --- MÉTODOS DE MOVIMIENTOS (CU-45 y CU-46) ---
   
   const handleOpenMovement = (insumo: Insumo, type: 'ENTRADA' | 'MERMA') => {
     setMovementInsumo(insumo);
@@ -216,7 +245,6 @@ export function ProductManagement({ onBack }: ProductManagementProps) {
       return;
     }
     
-    // Validar que la merma no sea mayor al stock
     if (movementType === 'MERMA' && movementInsumo && Number(movementCantidad) > movementInsumo.stock_actual) {
       alert('⚠️ No puedes mermar más del stock actual.');
       return;
@@ -235,7 +263,7 @@ export function ProductManagement({ onBack }: ProductManagementProps) {
       
       if (res.success) {
         setIsMovementModalOpen(false);
-        await fetchData();
+        await fetchData(); // Al recargar la data, se refrescará el historial también
         alert(`✅ ${movementType === 'ENTRADA' ? 'Reabasto' : 'Merma'} registrado correctamente.`);
       } else {
         alert('❌ Error al registrar movimiento: ' + res.error);
@@ -243,7 +271,7 @@ export function ProductManagement({ onBack }: ProductManagementProps) {
     }
     
     setPendingAction(() => actionToExecute);
-    setIsPinModalOpen(true); // Protegemos el movimiento con PIN de administrador
+    setIsPinModalOpen(true); 
   }
 
   // --- CONFIRMACIÓN PIN ---
@@ -262,7 +290,7 @@ export function ProductManagement({ onBack }: ProductManagementProps) {
       {/* HEADER */}
       <div style={{ padding: '20px 30px', display: 'flex', justifyContent: 'space-between', background: '#1a1a1a', alignItems: 'center', borderBottom: '1px solid #333' }}>
         <button onClick={onBack} style={{ background: 'transparent', color: '#9ca3af', border: 'none', cursor: 'pointer', fontSize: '1.1rem', fontWeight: 'bold' }}>← Menú principal</button>
-        <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#10b981' }}>Platillos e Insumos</div>
+        <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#10b981' }}>Almacén y Menú</div>
         <div style={{ textAlign: 'right', color: '#9ca3af' }}>
           <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: 'white' }}>{timeString}</div>
           <div style={{ fontSize: '0.8rem' }}>{formattedDate}</div>
@@ -270,24 +298,33 @@ export function ProductManagement({ onBack }: ProductManagementProps) {
       </div>
 
       <div style={{ flex: 1, padding: '30px', overflowY: 'auto' }}>
-        {/* TABS */}
-        <div style={{ display: 'flex', maxWidth: '600px', marginBottom: '30px', background: '#1a1a1a', borderRadius: '12px', padding: '5px', border: '1px solid #333' }}>
+        {/* TABS (Ahora con 3 opciones) */}
+        <div style={{ display: 'flex', maxWidth: '850px', marginBottom: '30px', background: '#1a1a1a', borderRadius: '12px', padding: '5px', border: '1px solid #333' }}>
           <button onClick={() => { setActiveTab('productos'); setSearchTerm(''); }} style={{ flex: 1, padding: '12px', background: activeTab === 'productos' ? '#262626' : 'transparent', color: activeTab === 'productos' ? '#10b981' : '#6b7280', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '1.1rem', fontWeight: 'bold', transition: 'all 0.2s', boxShadow: activeTab === 'productos' ? '0 2px 4px rgba(0,0,0,0.2)' : 'none' }}>Platillos / Productos</button>
           <button onClick={() => { setActiveTab('insumos'); setSearchTerm(''); }} style={{ flex: 1, padding: '12px', background: activeTab === 'insumos' ? '#262626' : 'transparent', color: activeTab === 'insumos' ? '#10b981' : '#6b7280', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '1.1rem', fontWeight: 'bold', transition: 'all 0.2s', boxShadow: activeTab === 'insumos' ? '0 2px 4px rgba(0,0,0,0.2)' : 'none' }}>Inventario / Insumos</button>
+          <button onClick={() => { setActiveTab('historial'); setSearchTerm(''); }} style={{ flex: 1, padding: '12px', background: activeTab === 'historial' ? '#262626' : 'transparent', color: activeTab === 'historial' ? '#10b981' : '#6b7280', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '1.1rem', fontWeight: 'bold', transition: 'all 0.2s', boxShadow: activeTab === 'historial' ? '0 2px 4px rgba(0,0,0,0.2)' : 'none' }}>Historial de Movimientos</button>
         </div>
 
+        {/* BÚSQUEDA COMÚN Y ACCIONES PRINCIPALES */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
+          <div style={{ position: 'relative', width: '100%', maxWidth: '400px' }}>
+            <span style={{ position: 'absolute', left: '15px', top: '12px', fontSize: '1.1rem' }}>🔍</span>
+            <input type="text" placeholder={searchPlaceholder} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ width: '100%', padding: '12px 20px 12px 45px', borderRadius: '25px', background: '#1a1a1a', border: '1px solid #333', color: 'white', fontSize: '1rem', outline: 'none', boxSizing: 'border-box', transition: 'border-color 0.2s' }} onFocus={(e) => e.target.style.border = '1px solid #10b981'} onBlur={(e) => e.target.style.border = '1px solid #333'} />
+          </div>
+          
+          {activeTab === 'productos' && (
+            <button onClick={handleOpenCreate} style={{ padding: '12px 25px', background: '#10b981', color: 'white', border: 'none', borderRadius: '25px', fontWeight: 'bold', fontSize: '1rem', cursor: 'pointer', boxShadow: '0 4px 6px -1px rgba(16, 185, 129, 0.2)', transition: 'background-color 0.2s' }} onMouseEnter={e => e.currentTarget.style.backgroundColor = '#059669'} onMouseLeave={e => e.currentTarget.style.backgroundColor = '#10b981'}>+ Nuevo producto</button>
+          )}
+          {activeTab === 'insumos' && (
+            <button onClick={handleOpenCreateInsumo} style={{ padding: '12px 25px', background: '#10b981', color: 'white', border: 'none', borderRadius: '25px', fontWeight: 'bold', fontSize: '1rem', cursor: 'pointer', boxShadow: '0 4px 6px -1px rgba(16, 185, 129, 0.2)', transition: 'background-color 0.2s' }} onMouseEnter={e => e.currentTarget.style.backgroundColor = '#059669'} onMouseLeave={e => e.currentTarget.style.backgroundColor = '#10b981'}>+ Nuevo insumo</button>
+          )}
+        </div>
+
+        {/* CONTENIDO DE LAS PESTAÑAS */}
         {isLoading ? (
           <div style={{ textAlign: 'center', color: '#9ca3af', marginTop: '50px', fontSize: '1.2rem' }}>Cargando datos...</div>
         ) : activeTab === 'productos' ? (
           <>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
-              <div style={{ position: 'relative', width: '100%', maxWidth: '400px' }}>
-                <span style={{ position: 'absolute', left: '15px', top: '12px', fontSize: '1.1rem' }}>🔍</span>
-                <input type="text" placeholder="Buscar platillo o producto..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ width: '100%', padding: '12px 20px 12px 45px', borderRadius: '25px', background: '#1a1a1a', border: '1px solid #333', color: 'white', fontSize: '1rem', outline: 'none', boxSizing: 'border-box', transition: 'border-color 0.2s' }} onFocus={(e) => e.target.style.border = '1px solid #10b981'} onBlur={(e) => e.target.style.border = '1px solid #333'} />
-              </div>
-              <button onClick={handleOpenCreate} style={{ padding: '12px 25px', background: '#10b981', color: 'white', border: 'none', borderRadius: '25px', fontWeight: 'bold', fontSize: '1rem', cursor: 'pointer', boxShadow: '0 4px 6px -1px rgba(16, 185, 129, 0.2)', transition: 'background-color 0.2s' }} onMouseEnter={e => e.currentTarget.style.backgroundColor = '#059669'} onMouseLeave={e => e.currentTarget.style.backgroundColor = '#10b981'}>+ Nuevo producto</button>
-            </div>
-
             {filteredProducts.length === 0 ? (
               <div style={{ textAlign: 'center', color: '#6b7280', marginTop: '50px', fontSize: '1.2rem' }}>{searchTerm ? `No se encontraron productos con "${searchTerm}"` : 'No hay productos registrados.'}</div>
             ) : (
@@ -309,16 +346,8 @@ export function ProductManagement({ onBack }: ProductManagementProps) {
               </div>
             )}
           </>
-        ) : (
+        ) : activeTab === 'insumos' ? (
           <>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
-              <div style={{ position: 'relative', width: '100%', maxWidth: '400px' }}>
-                <span style={{ position: 'absolute', left: '15px', top: '12px', fontSize: '1.1rem' }}>🔍</span>
-                <input type="text" placeholder="Buscar insumo por nombre o código..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ width: '100%', padding: '12px 20px 12px 45px', borderRadius: '25px', background: '#1a1a1a', border: '1px solid #333', color: 'white', fontSize: '1rem', outline: 'none', boxSizing: 'border-box', transition: 'border-color 0.2s' }} onFocus={(e) => e.target.style.border = '1px solid #10b981'} onBlur={(e) => e.target.style.border = '1px solid #333'} />
-              </div>
-              <button onClick={handleOpenCreateInsumo} style={{ padding: '12px 25px', background: '#10b981', color: 'white', border: 'none', borderRadius: '25px', fontWeight: 'bold', fontSize: '1rem', cursor: 'pointer', boxShadow: '0 4px 6px -1px rgba(16, 185, 129, 0.2)', transition: 'background-color 0.2s' }} onMouseEnter={e => e.currentTarget.style.backgroundColor = '#059669'} onMouseLeave={e => e.currentTarget.style.backgroundColor = '#10b981'}>+ Nuevo insumo</button>
-            </div>
-
             <div style={{ background: '#1a1a1a', borderRadius: '15px', border: '1px solid #333', overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', color: 'white', textAlign: 'left' }}>
                 <thead>
@@ -342,21 +371,72 @@ export function ProductManagement({ onBack }: ProductManagementProps) {
                         <td style={{ padding: '15px 20px', textAlign: 'right', fontWeight: 'bold', color: isLowStock ? '#ef4444' : '#10b981', fontSize: '1.1rem' }}>{insumo.stock_actual}</td>
                         <td style={{ padding: '15px 20px', textAlign: 'right', color: '#6b7280' }}>{insumo.stock_minimo}</td>
                         <td style={{ padding: '15px 20px', textAlign: 'right' }}>
-                          {/* NUEVO BOTON REABASTO */}
                           <button onClick={() => handleOpenMovement(insumo, 'ENTRADA')} style={{ background: 'transparent', color: '#10b981', border: 'none', cursor: 'pointer', marginRight: '15px', fontWeight: 'bold' }} title="Agregar Stock">+ Stock</button>
-                          {/* NUEVO BOTON MERMA */}
                           <button onClick={() => handleOpenMovement(insumo, 'MERMA')} style={{ background: 'transparent', color: '#f59e0b', border: 'none', cursor: 'pointer', marginRight: '20px', fontWeight: 'bold' }} title="Registrar Pérdida/Merma">- Merma</button>
-                          
                           <button onClick={() => handleOpenEditInsumo(insumo)} style={{ background: 'transparent', color: '#3b82f6', border: 'none', cursor: 'pointer', marginRight: '15px', fontWeight: 'bold' }}>Editar</button>
                           <button onClick={() => handleDeleteInsumoRequest(insumo.id)} style={{ background: 'transparent', color: '#ef4444', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}>Eliminar</button>
                         </td>
                       </tr>
                     )
                   })}
+                  {filteredInsumos.length === 0 && (
+                    <tr><td colSpan={6} style={{ padding: '40px', textAlign: 'center', color: '#6b7280' }}>{searchTerm ? 'No se encontraron insumos' : 'No hay insumos registrados.'}</td></tr>
+                  )}
                 </tbody>
               </table>
             </div>
           </>
+        ) : (
+          // NUEVA PESTAÑA: HISTORIAL DE MOVIMIENTOS
+          <div style={{ background: '#1a1a1a', borderRadius: '15px', border: '1px solid #333', overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', color: 'white', textAlign: 'left' }}>
+              <thead>
+                <tr style={{ background: '#262626', borderBottom: '1px solid #333', color: '#9ca3af', fontSize: '0.9rem', textTransform: 'uppercase' }}>
+                  <th style={{ padding: '18px 20px', fontWeight: '600' }}>Fecha y Hora</th>
+                  <th style={{ padding: '18px 20px', fontWeight: '600' }}>Insumo</th>
+                  <th style={{ padding: '18px 20px', fontWeight: '600' }}>Tipo</th>
+                  <th style={{ padding: '18px 20px', fontWeight: '600', textAlign: 'right' }}>Cantidad</th>
+                  <th style={{ padding: '18px 20px', fontWeight: '600' }}>Motivo / Justificación</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredMovimientos.map(mov => {
+                  // Colores dinámicos según el tipo de movimiento
+                  let colorTipo = '#10b981'; // Verde para Entrada
+                  if (mov.tipo === 'SALIDA') colorTipo = '#3b82f6'; // Azul para Salida POS
+                  if (mov.tipo === 'MERMA') colorTipo = '#ef4444'; // Rojo para Merma
+                  
+                  // Formateo simple de fecha
+                  const fechaMov = new Date(mov.fecha).toLocaleString('es-MX', {
+                    year: 'numeric', month: 'short', day: 'numeric',
+                    hour: '2-digit', minute: '2-digit', hour12: true
+                  });
+
+                  return (
+                    <tr key={mov.id} style={{ borderBottom: '1px solid #262626', transition: 'background-color 0.2s' }} onMouseEnter={e => e.currentTarget.style.backgroundColor = '#2a2a2a'} onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}>
+                      <td style={{ padding: '15px 20px', color: '#9ca3af', fontSize: '0.9rem' }}>{fechaMov}</td>
+                      <td style={{ padding: '15px 20px', fontWeight: '500' }}>
+                        <div style={{ fontSize: '0.8rem', color: '#6b7280', fontFamily: 'monospace', marginBottom: '2px' }}>{mov.codigo}</div>
+                        {mov.insumo_nombre}
+                      </td>
+                      <td style={{ padding: '15px 20px' }}>
+                        <span style={{ border: `1px solid ${colorTipo}`, color: colorTipo, padding: '4px 10px', borderRadius: '15px', fontSize: '0.8rem', fontWeight: 'bold' }}>
+                          {mov.tipo}
+                        </span>
+                      </td>
+                      <td style={{ padding: '15px 20px', textAlign: 'right', fontWeight: 'bold', fontSize: '1.1rem', color: colorTipo }}>
+                        {mov.tipo === 'ENTRADA' ? '+' : '-'}{mov.cantidad} <span style={{ fontSize: '0.8rem', color: '#6b7280', fontWeight: 'normal' }}>{mov.unidad_medida}</span>
+                      </td>
+                      <td style={{ padding: '15px 20px', color: '#d1d5db' }}>{mov.motivo}</td>
+                    </tr>
+                  )
+                })}
+                {filteredMovimientos.length === 0 && (
+                  <tr><td colSpan={5} style={{ padding: '40px', textAlign: 'center', color: '#6b7280' }}>{searchTerm ? 'No se encontraron movimientos' : 'No hay historial de movimientos.'}</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
