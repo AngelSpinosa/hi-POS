@@ -31,7 +31,6 @@ export function registerOrderHandlers() {
         disponible: p.disponible === 1
       }))
     } catch (error) { 
-      // Agregamos el console.error para que NUNCA vuelva a fallar en silencio
       console.error("❌ Error en get-productos-pos:", error);
       return [] 
     }
@@ -173,8 +172,8 @@ export function registerOrderHandlers() {
     if (!db) return { success: false }
     try {
       const tx = db.transaction(() => {
-        db.prepare("UPDATE orden SET estatus = 'pagada', ticket_impreso = 0 WHERE id = ?").run(orderId)
         
+        // 1. Obtener o crear el reporte diario actual
         const tzOffset = new Date().getTimezoneOffset() * 60000;
         const today = new Date(Date.now() - tzOffset).toISOString().split('T')[0];
 
@@ -184,16 +183,20 @@ export function registerOrderHandlers() {
           reporte = { id: info.lastInsertRowid }
         }
 
+        // 2. ACTUALIZACIÓN CRÍTICA: Cambiamos a pagada Y vinculamos la orden con el ID del reporte
+        db.prepare("UPDATE orden SET estatus = 'pagada', ticket_impreso = 0, id_reporte_diario = ? WHERE id = ?").run(reporte.id, orderId)
+
+        // 3. Sumar datos al reporte diario
         const montoEfectivo = payment.method === 'efectivo' ? total : 0
         const montoTarjeta = payment.method === 'tarjeta' ? total : 0
         db.prepare(`UPDATE reporte_diario SET total_ventas = total_ventas + ?, total_pedidos = total_pedidos + 1, total_efectivo = total_efectivo + ?, total_tarjeta = total_tarjeta + ? WHERE id = ?`).run(total, montoEfectivo, montoTarjeta, reporte.id)
 
+        // 4. Registrar el pago
         db.prepare(`INSERT INTO pago (orden_id, metodo, monto_recibido) VALUES (?, ?, ?)`).run(orderId, payment.method, payment.received)
         
-        // --- LLAMADA AL MÓDULO DE INVENTARIO CENTRALIZADO ---
+        // 5. LLAMADA AL MÓDULO DE INVENTARIO CENTRALIZADO (Limpio y Seguro)
         const items = db.prepare('SELECT producto_id, cantidad FROM orden_item WHERE orden_id = ?').all(orderId) as any[]
         descontarInventarioPorVenta(items)
-        // ----------------------------------------------------------------
         
         return { success: true }
       })

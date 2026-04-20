@@ -12,6 +12,7 @@ import { registerOrderHandlers } from './modules/orders'
 import { registerReportHandlers } from './modules/reports'
 import { registerLicenseHandlers } from './modules/license'
 import { registerInventoryHandlers } from './modules/inventory'
+import { registerMaintenanceHandlers } from './modules/maintenance'
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
@@ -57,6 +58,7 @@ app.whenReady().then(() => {
   registerReportHandlers()
   registerLicenseHandlers()
   registerInventoryHandlers()
+  registerMaintenanceHandlers()
 
   // 4. Crear Ventana
   app.on('browser-window-created', (_, window) => { optimizer.watchWindowShortcuts(window) })

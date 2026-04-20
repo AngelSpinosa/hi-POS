@@ -104,7 +104,7 @@ export function getRecetaByProducto(productoId: number): any[] {
   const stmt = db.prepare(`
     SELECT r.id, r.producto_id, r.insumo_id, r.cantidad_requerida, 
            i.nombre as insumo_nombre, i.unidad_medida, i.codigo
-    FROM RecetaProducto r
+    FROM receta_producto r
     JOIN Insumo i ON r.insumo_id = i.id
     WHERE r.producto_id = ?
   `);
@@ -114,11 +114,11 @@ export function getRecetaByProducto(productoId: number): any[] {
 export function saveRecetaProducto(productoId: number, ingredientes: Omit<receta_producto, 'id' | 'producto_id'>[]): void {
   const transaction = db.transaction((id: number, ings: any[]) => {
     // 1. Limpiamos la receta anterior
-    db.prepare('DELETE FROM RecetaProducto WHERE producto_id = ?').run(id);
+    db.prepare('DELETE FROM receta_producto WHERE producto_id = ?').run(id);
     
     // 2. Insertamos los nuevos ingredientes
     const insertStmt = db.prepare(`
-      INSERT INTO RecetaProducto (producto_id, insumo_id, cantidad_requerida) 
+      INSERT INTO receta_producto (producto_id, insumo_id, cantidad_requerida) 
       VALUES (?, ?, ?)
     `);
     
@@ -136,7 +136,7 @@ export function saveRecetaProducto(productoId: number, ingredientes: Omit<receta
  */
 export function descontarInventarioPorVenta(itemsVendidos: { producto_id: number; cantidad: number }[]): void {
   const transaction = db.transaction((items: any[]) => {
-    const getRecetaStmt = db.prepare('SELECT insumo_id, cantidad_requerida FROM RecetaProducto WHERE producto_id = ?');
+    const getRecetaStmt = db.prepare('SELECT insumo_id, cantidad_requerida FROM receta_producto WHERE producto_id = ?');
     const insertMovStmt = db.prepare(`
       INSERT INTO movimiento_inventario (insumo_id, tipo, cantidad, motivo, fecha)
       VALUES (@insumo_id, 'SALIDA', @cantidad, 'Venta automática POS', datetime('now', 'localtime'))

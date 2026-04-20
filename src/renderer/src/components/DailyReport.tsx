@@ -17,8 +17,9 @@ export function DailyReport() {
   const [cashInDrawer, setCashInDrawer] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   
-  // Estado para modal de detalle
+  // Estado para modales
   const [selectedOrder, setSelectedOrder] = useState<{id: number, items: CartItem[]} | null>(null)
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false) // NUEVO ESTADO PARA EXCEL
 
   const fetchReport = async () => {
     // @ts-ignore
@@ -65,8 +66,6 @@ export function DailyReport() {
     }
   }
 
-  // 🧠 CÁLCULOS DINÁMICOS BASADOS EN LA LISTA REAL DE ÓRDENES
-  // Esto garantiza que las tarjetas siempre coincidan con la tabla, sin importar la hora del sistema
   const totalVentas = orders.reduce((sum, order) => sum + order.total, 0);
   const totalPedidos = orders.length;
   const expectedCash = orders.filter(o => o.metodo === 'efectivo').reduce((sum, o) => sum + o.total, 0);
@@ -75,7 +74,6 @@ export function DailyReport() {
   const realCash = parseFloat(cashInDrawer) || 0
   const difference = realCash - expectedCash
 
-  // Constante visual: ¿Ya habíamos guardado esto antes?
   const isAlreadySaved = report?.dinero_real !== null && report?.dinero_real !== undefined
 
   const handleSaveCut = async () => {
@@ -115,7 +113,27 @@ export function DailyReport() {
     }
   }
 
-  // 💡 LÓGICA DE BOTONES: Generamos las fechas locales exactas para saber cuál iluminar
+  // --- NUEVA LÓGICA PARA EXPORTAR A EXCEL (CU-49) ---
+  const handleExportExcel = async (range: 'selected' | 'yesterday' | 'week') => {
+    try {
+      // @ts-ignore
+      const res = await window.electron.ipcRenderer.invoke('export-excel', { range, referenceDate: date });
+      if (res.canceled) {
+        setIsExportModalOpen(false);
+        return;
+      }
+      if (res.success) {
+        alert('✅ Reporte exportado a Excel con éxito.');
+        setIsExportModalOpen(false);
+      } else {
+        alert('❌ Error al exportar: ' + res.error);
+      }
+    } catch (e) {
+      alert('❌ Error de comunicación al exportar a Excel.');
+    }
+  }
+  // ---------------------------------------------------
+
   const todayStr = getLocalDate();
   const yesterdayDate = new Date();
   yesterdayDate.setDate(yesterdayDate.getDate() - 1);
@@ -159,7 +177,7 @@ export function DailyReport() {
         </div>
       </div>
 
-      {/* TARJETAS DE KPIs (Ahora usan los cálculos dinámicos locales) */}
+      {/* TARJETAS DE KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '15px', marginBottom: '30px' }}>
         <div style={{ background: '#2d2d2d', padding: '20px', borderRadius: '10px', borderLeft: '4px solid #22c55e' }}>
           <div style={{ color: '#9ca3af', fontSize: '0.9rem' }}>Ventas Totales</div>
@@ -273,6 +291,27 @@ export function DailyReport() {
             {isSaving ? 'Guardando...' : (isAlreadySaved ? '🔄 Actualizar Corte' : '💾 Guardar Corte')}
           </button>
 
+          {/* NUEVO: BOTÓN DE EXPORTAR A EXCEL */}
+          <button 
+            onClick={() => setIsExportModalOpen(true)}
+            style={{ 
+              width: '100%', 
+              padding: '12px', 
+              marginTop: '10px', 
+              background: 'transparent', 
+              color: '#10b981', 
+              border: '1px solid #10b981', 
+              borderRadius: '5px', 
+              fontWeight: 'bold', 
+              cursor: 'pointer',
+              transition: 'all 0.2s'
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = '#10b981'; e.currentTarget.style.color = '#000'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#10b981'; }}
+          >
+            📊 Exportar a Excel
+          </button>
+
         </div>
 
       </div>
@@ -283,6 +322,46 @@ export function DailyReport() {
           items={selectedOrder.items} 
           onClose={() => setSelectedOrder(null)} 
         />
+      )}
+
+      {/* NUEVO: MODAL DE EXCEL */}
+      {isExportModalOpen && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 5000, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+          <div style={{ background: '#1a1a1a', padding: '30px', borderRadius: '15px', width: '400px', border: '1px solid #404040', color: 'white', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)' }}>
+            <h3 style={{ margin: '0 0 15px 0', color: '#10b981', fontSize: '1.4rem' }}>📊 Exportar a Excel</h3>
+            <p style={{ color: '#9ca3af', marginBottom: '25px', lineHeight: '1.5' }}>
+              Selecciona el rango de tiempo que deseas exportar basándote en la fecha actual <strong style={{ color: '#fff' }}>({date})</strong>:
+            </p>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <button 
+                onClick={() => handleExportExcel('selected')}
+                style={{ padding: '14px', background: '#262626', color: 'white', border: '1px solid #404040', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
+              >
+                📅 Reporte de este día
+              </button>
+              <button 
+                onClick={() => handleExportExcel('yesterday')}
+                style={{ padding: '14px', background: '#262626', color: 'white', border: '1px solid #404040', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
+              >
+                ⏪ Reporte de ayer
+              </button>
+              <button 
+                onClick={() => handleExportExcel('week')}
+                style={{ padding: '14px', background: '#262626', color: 'white', border: '1px solid #404040', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
+              >
+                📆 Reportes de la última semana
+              </button>
+            </div>
+            
+            <button 
+              onClick={() => setIsExportModalOpen(false)}
+              style={{ width: '100%', padding: '14px', marginTop: '20px', background: 'transparent', color: '#ef4444', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
       )}
     </div>
   )
