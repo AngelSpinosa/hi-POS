@@ -53,30 +53,62 @@ export function registerMaintenanceHandlers() {
   });
 
   // ==========================================
+  // DATOS DE PRUEBA (DEMO)
+  // ==========================================
+  ipcMain.handle('inject-demo-data', () => {
+    if (!db) return { success: false, error: 'Sin conexión a BD' };
+
+    try {
+      const tx = db.transaction(() => {
+        // Asegurarse de tener al menos un administrador y un cajero
+        db.prepare("INSERT OR IGNORE INTO user (id, nombre, rol, pin, active) VALUES (998, 'Angel Admin', 'admin', '1234', 1)").run();
+        db.prepare("INSERT OR IGNORE INTO user (id, nombre, rol, pin, active) VALUES (999, 'Aldo Cajero', 'cajero', '0000', 1)").run();
+
+        // 10 Mesas
+        const insertMesa = db.prepare('INSERT OR IGNORE INTO mesa (numero, activa) VALUES (?, 1)');
+        for(let i = 1; i <= 10; i++) insertMesa.run(i);
+
+        // 5 Productos
+        db.prepare("INSERT INTO producto (nombre, precio, active) VALUES ('PIZZA PEPPERONI GRANDE', 180, 1)").run();
+        db.prepare("INSERT INTO producto (nombre, precio, active) VALUES ('PIZZA HAWAIANA MEDIANA', 150, 1)").run();
+        db.prepare("INSERT INTO producto (nombre, precio, active) VALUES ('REFRESCO 2L', 40, 1)").run();
+        db.prepare("INSERT INTO producto (nombre, precio, active) VALUES ('ORDEN DE ALITAS (6PZ)', 95, 1)").run();
+        
+        // 5 Insumos base
+        db.prepare("INSERT INTO insumo (codigo, nombre, unidad_medida, stock_actual, stock_minimo) VALUES ('INS-001', 'Masa para Pizza', 'KG', 10.0, 2.0)").run();
+        db.prepare("INSERT INTO insumo (codigo, nombre, unidad_medida, stock_actual, stock_minimo) VALUES ('INS-002', 'Queso Mozzarella', 'KG', 5.0, 1.0)").run();
+        db.prepare("INSERT INTO insumo (codigo, nombre, unidad_medida, stock_actual, stock_minimo) VALUES ('INS-003', 'Pepperoni en rebanadas', 'KG', 3.0, 0.5)").run();
+        db.prepare("INSERT INTO insumo (codigo, nombre, unidad_medida, stock_actual, stock_minimo) VALUES ('INS-004', 'Salsa de Tomate Base', 'L', 4.0, 1.0)").run();
+        db.prepare("INSERT INTO insumo (codigo, nombre, unidad_medida, stock_actual, stock_minimo) VALUES ('INS-005', 'Refresco 2L', 'PZ', 24.0, 5.0)").run();
+        
+      });
+      
+      tx();
+      return { success: true };
+    } catch(e: any) {
+      console.error('Error inyectando datos demo:', e);
+      return { success: false, error: e.message };
+    }
+  });
+
+  // ==========================================
   // CU-48: RESPALDAR Y RESTAURAR BD
   // ==========================================
 
   // EXPORTAR (Respaldar)
   ipcMain.handle('export-database', async () => {
     try {
-      // Pedimos al usuario dónde quiere guardar el respaldo
       const { canceled, filePath } = await dialog.showSaveDialog({
         title: 'Guardar Respaldo de Base de Datos',
         defaultPath: `Respaldo_POS_${new Date().toISOString().split('T')[0]}.db`,
-        filters: [
-          { name: 'Base de Datos SQLite', extensions: ['db', 'sqlite', 'posbackup'] }
-        ]
+        filters: [{ name: 'Base de Datos SQLite', extensions: ['db', 'sqlite', 'posbackup'] }]
       });
 
       if (canceled || !filePath) return { success: false, canceled: true };
-
-      // Copiamos el archivo .db actual hacia la nueva ruta
-      // @ts-ignore - db.name contiene la ruta física del archivo si usas better-sqlite3
+      // @ts-ignore
       fs.copyFileSync(db.name, filePath);
-      
       return { success: true };
     } catch (error: any) {
-      console.error('Error al exportar BD:', error);
       return { success: false, error: error.message };
     }
   });
@@ -84,33 +116,24 @@ export function registerMaintenanceHandlers() {
   // IMPORTAR (Restaurar)
   ipcMain.handle('import-database', async () => {
     try {
-      // Pedimos al usuario que seleccione su respaldo
       const { canceled, filePaths } = await dialog.showOpenDialog({
         title: 'Seleccionar Respaldo a Importar',
         properties: ['openFile'],
-        filters: [
-          { name: 'Base de Datos SQLite', extensions: ['db', 'sqlite', 'posbackup'] }
-        ]
+        filters: [{ name: 'Base de Datos SQLite', extensions: ['db', 'sqlite', 'posbackup'] }]
       });
 
       if (canceled || filePaths.length === 0) return { success: false, canceled: true };
 
       const backupPath = filePaths[0];
-
-      // 1. Cerramos la conexión a la base de datos actual para liberar el archivo
       db.close();
-
-      // 2. Sobrescribimos el archivo actual con el respaldo
       // @ts-ignore
       fs.copyFileSync(backupPath, db.name);
 
-      // 3. Reiniciamos la aplicación para que vuelva a conectar con los nuevos datos
       app.relaunch();
       app.exit(0);
 
-      return { success: true }; // Técnicamente no llegará aquí por el exit(), pero es buena práctica
+      return { success: true };
     } catch (error: any) {
-      console.error('Error al importar BD:', error);
       return { success: false, error: error.message };
     }
   });

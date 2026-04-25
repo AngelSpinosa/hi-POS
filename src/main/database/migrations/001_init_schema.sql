@@ -132,3 +132,17 @@ CREATE TABLE IF NOT EXISTS movimiento_inventario (
   fecha DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (insumo_id) REFERENCES insumo(id) ON DELETE CASCADE
 );
+
+-- =========================================
+-- NUEVAS TABLAS: CONFIGURACIÓN DEL SISTEMA
+-- =========================================
+
+-- 13. Tabla de Configuración de App (Siempre tendrá 1 sola fila)
+CREATE TABLE IF NOT EXISTS app_config (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  business_name VARCHAR(150),
+  logo_path TEXT,
+  color_primary VARCHAR(20) DEFAULT '#f97316',
+  color_secondary VARCHAR(20) DEFAULT '#3b82f6',
+  setup_completed BOOLEAN DEFAULT 0
+);

@@ -88,6 +88,17 @@ export interface movimiento_inventario {
   fecha: string;
 }
 
+// NUEVO: Configuración Global de la Aplicación
+export interface AppConfig {
+  id: number;
+  business_name: string | null;
+  logo_path: string | null;
+  color_primary: string;
+  color_secondary: string;
+  setup_completed: number; // 0 o 1
+}
+
+
 // ==========================================
 // 💻 TIPOS AUXILIARES DE LA UI (NO SON TABLAS)
 // ==========================================

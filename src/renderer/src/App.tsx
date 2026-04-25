@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import type { Mesa } from './types/db'
+import type { Mesa, AppConfig } from './types/db'
 import { TableGrid } from './components/TableGrid'
 import { DailyReport } from './components/DailyReport'
 import { Dashboard } from './components/Dashboard'
@@ -8,10 +8,10 @@ import { UserManagement } from './components/UserManagement'
 import { POSView } from './views/POSView' 
 import { ProductManagement } from './components/ProductManagement' 
 import { LicenseScreen } from './components/LicenseScreen'
-import { Settings } from './components/Settings' // NUEVO COMPONENTE
+import { Settings } from './components/Settings'
+import { OnboardingWizard } from './components/OnboardingWizard' // NUEVO COMPONENTE
 
-// NUEVO: Añadimos 'SETTINGS'
-type ViewState = 'DASHBOARD' | 'TABLES' | 'ORDER' | 'REPORT' | 'USERS' | 'PRODUCTS' | 'LICENSE_ERROR' | 'SETTINGS';
+type ViewState = 'DASHBOARD' | 'TABLES' | 'ORDER' | 'REPORT' | 'USERS' | 'PRODUCTS' | 'LICENSE_ERROR' | 'SETTINGS' | 'ONBOARDING';
 
 interface CurrentUser {
   id: number;
@@ -22,7 +22,11 @@ interface CurrentUser {
 function App() {
   const [view, setView] = useState<ViewState>('DASHBOARD')
   
-  const [isCheckingLicense, setIsCheckingLicense] = useState(true)
+  // NUEVOS ESTADOS DE CONFIGURACIÓN
+  const [appConfig, setAppConfig] = useState<AppConfig | null>(null)
+  const [isConfigLoading, setIsConfigLoading] = useState(true)
+
+  const [isCheckingLicense, setIsCheckingLicense] = useState(false)
   const [licenseErrorReason, setLicenseErrorReason] = useState<string>('')
   const [hasValidLicense, setHasValidLicense] = useState<boolean>(false) 
   const [licenseInfo, setLicenseInfo] = useState<{type: string, remainingDays?: number} | null>(null)
@@ -36,10 +40,37 @@ function App() {
   const [pendingView, setPendingView] = useState<ViewState | null>(null)
   const [pendingTableId, setPendingTableId] = useState<number | null>(null)
 
+  // 1. Al abrir la app, primero leemos la configuración
   useEffect(() => {
-    checkLicenseStatus()
+    loadAppConfig()
   }, [])
 
+  const loadAppConfig = async () => {
+    setIsConfigLoading(true)
+    try {
+      // @ts-ignore
+      const res = await window.electron.ipcRenderer.invoke('get-app-config')
+      if (res.success && res.data) {
+        setAppConfig(res.data)
+        
+        // Magia: Inyectamos los colores del cliente en toda la app vía CSS Variables
+        document.documentElement.style.setProperty('--color-primary', res.data.color_primary || '#f97316')
+        document.documentElement.style.setProperty('--color-secondary', res.data.color_secondary || '#3b82f6')
+        
+        // Decidimos el flujo: ¿Asistente o Login normal?
+        if (res.data.setup_completed === 0) {
+          setView('ONBOARDING')
+          setIsConfigLoading(false)
+          return; 
+        }
+      }
+    } catch (e) { console.error(e) }
+    
+    setIsConfigLoading(false)
+    checkLicenseStatus() // Si ya está configurado, revisamos licencia
+  }
+
+  // 2. Si ya pasó el setup, validamos licencia
   const checkLicenseStatus = async () => {
     setIsCheckingLicense(true)
     try {
@@ -101,7 +132,6 @@ function App() {
              setView('TABLES')
           }
         }
-        // NUEVO: Agregamos 'SETTINGS' a la lista de vistas protegidas solo para administradores
         else if (['REPORT', 'USERS', 'PRODUCTS', 'SETTINGS'].includes(pendingView || '')) {
           if (user.rol === 'admin') {
             if (pendingView) setView(pendingView)
@@ -146,13 +176,17 @@ function App() {
     }
   }
 
-  if (isCheckingLicense) {
+  if (isConfigLoading || isCheckingLicense) {
     return (
       <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: '#111', color: 'white', alignItems: 'center', justifyContent: 'center' }}>
-        <h1 style={{ color: '#f97316', marginBottom: '20px' }}>POS PIZZA 🍕</h1>
-        <div style={{ color: '#9ca3af', fontSize: '1.2rem' }}>Verificando licencia...</div>
+        <h1 style={{ color: 'var(--color-primary, #f97316)', marginBottom: '20px' }}>CARGANDO... 🍕</h1>
       </div>
     )
+  }
+
+  // SI LA BD ESTÁ VACÍA, MOSTRAMOS EL ASISTENTE
+  if (view === 'ONBOARDING') {
+    return <OnboardingWizard onComplete={loadAppConfig} />
   }
 
   if (view === 'LICENSE_ERROR') {
@@ -174,13 +208,14 @@ function App() {
         <PinPadModal title={pinTitle} isOpen={isPinModalOpen} onClose={() => { setIsPinModalOpen(false); setPendingView(null); }} onVerify={handlePinVerify} />
         <Dashboard 
           licenseInfo={licenseInfo}
+          appConfig={appConfig} // Pasamos la config para que use su nombre y colores
           onNavigate={(v) => {
             const titles: Record<string, string> = {
               'TABLES': 'Acceso a Mesas',
               'REPORT': 'Acceso a Reportes',
               'USERS': 'Gestión de Usuarios',
               'PRODUCTS': 'Gestión de Productos',
-              'SETTINGS': 'Configuración del Sistema' // NUEVO TITULO PARA EL PIN PAD
+              'SETTINGS': 'Configuración del Sistema'
             }
             requestViewChange(v as ViewState, titles[v])
           }}
@@ -216,7 +251,6 @@ function App() {
     return <ProductManagement onBack={handleBackToDashboard} />
   }
 
-  // NUEVA VISTA RENDERIZADA
   if (view === 'SETTINGS') {
     return <Settings onBack={handleBackToDashboard} />
   }
