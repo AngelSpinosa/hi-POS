@@ -1,24 +1,24 @@
 import { useEffect, useState } from 'react'
-import type { Producto, Mesa } from '../types/db'
+// Importamos ProductoPOS que ahora contiene la propiedad 'disponible'
+import type { Producto } from '../types/db'
 import { OrderCart } from '../components/OrderCart'
 import { PaymentModal } from '../components/PaymentModal'
 import { TicketReceipt } from '../components/TicketReceipt'
 import { PinPadModal } from '../components/PinPadModal'
 import { useActiveOrder } from '../hooks/useActiveOrder'
 
-// Componente KitchenCommand local (para no exportarlo si no se usa fuera)
+// Componente KitchenCommand local
 // eslint-disable-next-line react/prop-types
-function KitchenCommand({ items, tableNum, onClose }) {
+function KitchenCommand({ items, tableNum, onClose }: any) {
   return (
     <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.8)', zIndex: 3000, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
       <div style={{ backgroundColor: '#fff', color: '#000', padding: '20px', width: '250px', fontFamily: 'monospace' }}>
         <h3 style={{ textAlign: 'center', borderBottom: '2px dashed #000' }}>COCINA - MESA {tableNum}</h3>
         {/* eslint-disable-next-line react/prop-types */}
-        {items.map((item, idx) => (
+        {items.map((item: any, idx: number) => (
           <div key={idx} style={{ fontSize: '1.2rem', margin: '10px 0' }}>[ ] {item.cantidad} x {item.nombre}</div>
         ))}
-        <div style={{ borderTop: '2px dashed #000', marginTop: '20px', paddingTop: '10px', textAlign: 'center' }}>{new Date().toLocaleTimeString()}</div>
-        <button onClick={onClose} style={{ marginTop: '20px', width: '100%', padding: '10px', background: 'black', color: 'white', border: 'none', cursor: 'pointer' }}>CERRAR</button>
+        <button onClick={onClose} style={{ width: '100%', marginTop: '20px', padding: '10px', background: '#000', color: '#fff', border: 'none', cursor: 'pointer' }}>OK</button>
       </div>
     </div>
   )
@@ -26,92 +26,117 @@ function KitchenCommand({ items, tableNum, onClose }) {
 
 interface POSViewProps {
   tableId: number;
-  tableNumber: number;
+  userId?: number;
   onBack: () => void;
 }
 
-export function POSView({ tableId, tableNumber, onBack }: POSViewProps) {
+export function POSView({ tableId, userId, onBack }: POSViewProps) {
+  const order = useActiveOrder(tableId, userId)
   const [products, setProducts] = useState<Producto[]>([])
   
-  // Usamos nuestro Hook personalizado para toda la lógica
-  const order = useActiveOrder()
-  
-  // Estado local para cancelación segura
-  const [isCancelPinOpen, setIsCancelPinOpen] = useState(false)
+  // Estado para cancelar
+  const [isCancelModalOpen, setIsCancelModalOpen] = useState(false)
 
-  // Cargar productos y la orden al montar
   useEffect(() => {
-    const init = async () => {
-      // @ts-ignore
-      const prods = await window.electron.ipcRenderer.invoke('get-products')
-      setProducts(prods)
-      // Cargar la orden de la mesa
-      await order.loadOrder(tableId)
-    }
-    init()
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+    // LLamamos al endpoint que cruza productos con recetas e insumos
+    // @ts-ignore
+    window.electron.ipcRenderer.invoke('get-productos-pos').then((res) => {
+      if (Array.isArray(res)) {
+        // Utilizamos == en lugar de === para atrapar tanto el booleano true como el numero 1
+        // @ts-ignore
+        setProducts(res.filter(p => p.active == 1 || p.active === true))
+      }
+    })
+  }, [])
 
-  const total = order.cart.reduce((sum: number, item) => sum + item.precio * item.cantidad, 0)
+  const total = order.cart.reduce((sum, item) => sum + item.precio * item.cantidad, 0)
 
-  // Wrappers para acciones que requieren cerrar o volver
-  const handlePayment = async (method: 'efectivo' | 'tarjeta', received: number) => {
-    const success = await order.payOrder(method, received)
-    // No volvemos automáticamente aquí, esperamos a cerrar el ticket
+  const handlePaymentConfirm = async (method: 'efectivo' | 'tarjeta', received: number) => {
+    await order.processPayment(method, received, total)
   }
 
+  // Activa el modal del PIN al dar clic en cancelar en el carrito
+  const requestCancel = () => setIsCancelModalOpen(true)
+
+  // Recibe el PIN y ejecuta la cancelación
+  const handleCancelConfirm = async (pin: string) => {
+    const success = await order.cancelOrder(pin)
+    if (success) {
+      setIsCancelModalOpen(false)
+      onBack() 
+    }
+  }
+
+  // Declaramos la función para limpiar el ticket y regresar al mapa
   const handleTicketClose = () => {
     order.setTicketData(null)
-    // Si no es un pre-ticket (pendiente), significa que ya pagó -> Volver
-    if (order.ticketData?.payment.method !== 'PENDIENTE') {
-      onBack()
-    }
-  }
-
-  // Lógica de cancelación con PIN
-  const requestCancel = () => setIsCancelPinOpen(true)
-  
-  const handleCancelVerify = async (pin: string) => {
-    if (!order.activeOrderId) return
-    // Validamos PIN en backend directo con la acción de cancelar
-    // @ts-ignore
-    const result = await window.electron.ipcRenderer.invoke('cancel-order', { orderId: order.activeOrderId, pin })
-    
-    if (result.success) {
-      setIsCancelPinOpen(false)
-      onBack() // Éxito, volvemos a mesas
-    } else {
-      alert('Error: ' + result.error)
-    }
+    onBack() 
   }
 
   return (
-    <div className="pos-container">
-      {/* Header Navegación */}
-      <div style={{ position: 'absolute', top: 10, left: 20, zIndex: 100 }}>
-        <button onClick={onBack} style={{ padding: '10px 20px', background: '#404040', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' }}>
-          ← Volver a Mesas
-        </button>
-        <span style={{ marginLeft: '20px', color: 'white', fontWeight: 'bold' }}>Mesa #{tableNumber}</span>
-      </div>
+    <div style={{ display: 'flex', height: '100vh', backgroundColor: '#111', color: 'white' }}>
+      
+      {/* SECCIÓN IZQUIERDA: Menú de Productos */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+        <div style={{ padding: '20px', backgroundColor: '#1a1a1a', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #333' }}>
+          <button onClick={onBack} style={{ background: 'transparent', color: '#9ca3af', border: 'none', cursor: 'pointer', fontSize: '1.2rem', fontWeight: 'bold' }}>
+            ← Volver al Mapa
+          </button>
+          <h2 style={{ margin: 0, color: '#f97316' }}>Mesa {tableId}</h2>
+          <div style={{ width: '100px' }}></div>
+        </div>
 
-      <div className="products-section" style={{ paddingTop: '60px' }}>
-        <h2>Menú</h2>
-        <div className="products-grid">
-          {products.map((product) => (
-            <div key={product.id} className="product-card" onClick={() => order.addToCart(product)}>
-              <h3>{product.nombre}</h3>
-              <div className="product-price">${product.precio.toFixed(2)}</div>
-            </div>
-          ))}
+        <div style={{ flex: 1, padding: '30px', overflowY: 'auto' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '20px' }}>
+            {products.map((product) => {
+              // Verificamos si hay stock (el backend lo precalculó en product.disponible)
+              // @ts-ignore
+              const isAvailable = product.disponible !== false;
+
+              return (
+                <div 
+                  key={product.id} 
+                  onClick={() => isAvailable && order.addToCart(product)}
+                  style={{ 
+                    position: 'relative',
+                    background: isAvailable ? '#262626' : '#2a0c0c', 
+                    padding: '20px', 
+                    borderRadius: '15px', 
+                    cursor: isAvailable ? 'pointer' : 'not-allowed', 
+                    border: isAvailable ? '1px solid #404040' : '1px solid #7f1d1d', 
+                    textAlign: 'center', 
+                    transition: 'transform 0.1s',
+                    opacity: isAvailable ? 1 : 0.5
+                  }}
+                  onMouseDown={e => isAvailable && (e.currentTarget.style.transform = 'scale(0.95)')}
+                  onMouseUp={e => isAvailable && (e.currentTarget.style.transform = 'scale(1)')}
+                >
+                  {/* Etiqueta de agotado */}
+                  {!isAvailable && (
+                    <div style={{ position: 'absolute', top: '-10px', right: '-10px', background: '#dc2626', color: 'white', padding: '5px 10px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 'bold', boxShadow: '0 4px 6px rgba(0,0,0,0.5)' }}>
+                      AGOTADO
+                    </div>
+                  )}
+
+                  <h3 style={{ margin: '0 0 15px 0', fontSize: '1.1rem', color: isAvailable ? '#f3f4f6' : '#9ca3af' }}>{product.nombre}</h3>
+                  <div style={{ color: isAvailable ? '#22c55e' : '#7f1d1d', fontWeight: 'bold', fontSize: '1.4rem' }}>${product.precio.toFixed(2)}</div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
 
-      <div className="ticket-section" style={{ paddingTop: '60px' }}>
+      {/* SECCIÓN DERECHA: Carrito de Compras */}
+      <div style={{ width: '380px', backgroundColor: '#1a1a1a', borderLeft: '1px solid #333', padding: '20px' }}>
         <OrderCart 
-          cart={order.cart} total={total} orderId={order.activeOrderId}
+          cart={order.cart} 
+          total={total} 
+          orderId={order.activeOrderId}
           onPay={() => {}} 
-          onRemove={order.removeFromCart} onUpdateQuantity={order.updateQuantity}
-          onGenerateCommand={() => order.generateCommand(tableNumber)} 
+          onRemove={order.removeFromCart} 
+          onUpdateQuantity={order.updateQuantity}
+          onGenerateCommand={() => order.generateCommand(tableId)} 
           onRequestBill={order.requestBill}
           onFinalizePayment={() => order.setIsPaymentModalOpen(true)}
           onCancelOrder={requestCancel} 
@@ -119,30 +144,34 @@ export function POSView({ tableId, tableNumber, onBack }: POSViewProps) {
         />
       </div>
 
+      {/* MODALES */}
       <PaymentModal 
-        isOpen={order.isPaymentModalOpen} total={total}
-        onClose={() => order.setIsPaymentModalOpen(false)} onConfirmPayment={handlePayment}
+        isOpen={order.isPaymentModalOpen} 
+        total={total}
+        onClose={() => order.setIsPaymentModalOpen(false)} 
+        onConfirmPayment={handlePaymentConfirm}
       />
 
-      {/* Modales de Feedback */}
       {order.kitchenData && (
         <KitchenCommand items={order.kitchenData.items} tableNum={order.kitchenData.tableNum} onClose={() => order.setKitchenData(null)} />
       )}
 
       {order.ticketData && (
         <TicketReceipt 
-          {...order.ticketData}
+          orderId={order.ticketData.orderId}
+          items={order.ticketData.items}
+          total={order.ticketData.total}
+          payment={order.ticketData.payment as any}
           onClose={handleTicketClose}
           onPrint={handleTicketClose}
         />
       )}
 
-      {/* Modal de PIN para Cancelar (Local de esta vista) */}
       <PinPadModal
         title="Autorizar Cancelación 🗑️"
-        isOpen={isCancelPinOpen}
-        onClose={() => setIsCancelPinOpen(false)}
-        onVerify={handleCancelVerify}
+        isOpen={isCancelModalOpen}
+        onClose={() => setIsCancelModalOpen(false)}
+        onVerify={handleCancelConfirm}
       />
     </div>
   )
