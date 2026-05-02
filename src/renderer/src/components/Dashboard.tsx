@@ -10,7 +10,6 @@ interface DashboardProps {
 export function Dashboard({ onNavigate, licenseInfo, appConfig }: DashboardProps) {
   const [time, setTime] = useState(new Date())
 
-  // Reloj en tiempo real
   useEffect(() => {
     const timer = setInterval(() => setTime(new Date()), 1000)
     return () => clearInterval(timer)
@@ -24,7 +23,6 @@ export function Dashboard({ onNavigate, licenseInfo, appConfig }: DashboardProps
     return date.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })
   }
 
-  // Lógica para inyectar datos de prueba
   const handleInjectDemoData = async () => {
     if (confirm('🍔 ¿Estás seguro? Esto añadirá Mesas, Usuarios (Admin PIN: 1234), Productos e Insumos preconfigurados para que pruebes el sistema. Puedes borrarlos luego desde "Ajustes".')) {
       // @ts-ignore
@@ -59,20 +57,32 @@ export function Dashboard({ onNavigate, licenseInfo, appConfig }: DashboardProps
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#1a1a1a', color: 'white' }}>
       
-      {/* Header Dinámico con la Configuración de Marca */}
+      {/* HEADER DINÁMICO CON LOGO */}
       <div style={{ padding: '20px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #333' }}>
-        <div>
-          <h1 style={{ margin: 0, fontSize: '2.2rem', color: 'var(--color-primary, #f97316)' }}>
-            {appConfig?.business_name ? appConfig.business_name.toUpperCase() : 'POS PIZZERÍA'} 🍕
-          </h1>
-          <p style={{ margin: '3px 0 0 0', color: '#9ca3af', fontSize: '0.9rem' }}>Sistema de Punto de Venta v1.0</p>
-          
-          {licenseInfo?.type === 'DEMO' && (
-            <div style={{ marginTop: '10px', display: 'inline-block', padding: '5px 12px', background: '#450a0a', border: '1px solid #ef4444', borderRadius: '20px', color: '#fca5a5', fontSize: '0.8rem', fontWeight: 'bold' }}>
-              ⚠️ Modo Demo, le quedan {licenseInfo.remainingDays} días de prueba
-            </div>
+        
+        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+          {/* Renderizado de logo si existe */}
+          {appConfig?.logo_path && (
+            <img 
+              src={appConfig.logo_path} 
+              alt="Logo del Negocio" 
+              style={{ width: '60px', height: '60px', objectFit: 'contain', borderRadius: '8px', background: '#fff', padding: '2px' }} 
+            />
           )}
+          <div>
+            <h1 style={{ margin: 0, fontSize: '2.2rem', color: 'var(--color-primary, #f97316)' }}>
+              {appConfig?.business_name ? appConfig.business_name.toUpperCase() : 'POS PIZZERÍA'} {!appConfig?.logo_path && '🍕'}
+            </h1>
+            <p style={{ margin: '3px 0 0 0', color: '#9ca3af', fontSize: '0.9rem' }}>Sistema de Punto de Venta v1.0</p>
+            
+            {licenseInfo?.type === 'DEMO' && (
+              <div style={{ marginTop: '10px', display: 'inline-block', padding: '5px 12px', background: '#450a0a', border: '1px solid #ef4444', borderRadius: '20px', color: '#fca5a5', fontSize: '0.8rem', fontWeight: 'bold' }}>
+                ⚠️ Modo Demo, le quedan {licenseInfo.remainingDays} días de prueba
+              </div>
+            )}
+          </div>
         </div>
+
         <div style={{ textAlign: 'right' }}>
           <div style={{ fontSize: '1.8rem', fontWeight: 'bold', fontFamily: 'monospace' }}>
             {formatTime(time)}
@@ -134,7 +144,7 @@ export function Dashboard({ onNavigate, licenseInfo, appConfig }: DashboardProps
 
         </div>
 
-        {/* BANNER DE DATOS DE PRUEBA (CU-54 / Extras) */}
+        {/* BANNER DE DATOS DE PRUEBA */}
         <div style={{ maxWidth: '1200px', margin: '40px auto 0 auto', background: 'rgba(59, 130, 246, 0.05)', border: '1px dashed var(--color-secondary, #3b82f6)', borderRadius: '15px', padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <h3 style={{ margin: '0 0 5px 0', color: 'var(--color-secondary, #93c5fd)' }}>¿Es tu primera vez explorando el sistema?</h3>

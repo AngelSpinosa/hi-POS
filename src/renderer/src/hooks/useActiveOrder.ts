@@ -110,7 +110,7 @@ export function useActiveOrder(tableId: number, userId?: number) {
         setTicketData({
           orderId: activeOrderId, items: [...cart], total,
           date: new Date().toLocaleString(),
-          payment: { method, received, change: received - total }
+         payment: { method, amount: received, change: received - total }
         })
         setIsPaymentModalOpen(false)
         return true

@@ -18,7 +18,7 @@ export function PinPadModal({ title = "Ingrese su PIN", isOpen, onClose, onVerif
     }
   }
 
-  const handleClear = () => setPin('')
+  //const handleClear = () => setPin('')
   const handleBackspace = () => setPin(prev => prev.slice(0, -1))
   
   const handleSubmit = () => {

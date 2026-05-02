@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState } from 'react'
 import type { Mesa, AppConfig } from './types/db'
 import { TableGrid } from './components/TableGrid'
 import { DailyReport } from './components/DailyReport'
