@@ -1,74 +1,76 @@
-import { app } from 'electron'
-import { join, resolve } from 'path'
+import { app, dialog } from 'electron'
+import { join, resolve, dirname } from 'path'
 import { is } from '@electron-toolkit/utils'
 import fs from 'fs'
 import Database from 'better-sqlite3'
+import { INIT_SCHEMA } from './schema' // Importamos tu genial solución de schema.ts
 
 export function runMigrations() {
   const dbPath = is.dev
-    ? resolve(process.cwd(), 'data/pos.db')            // misma lógica que database.ts
+    ? resolve(process.cwd(), 'data/pos.db')
     : join(app.getPath('userData'), 'pos.db')
 
-  // Si la BD ya existe, no hacemos nada (datos de demo/producción intactos)
-  if (fs.existsSync(dbPath)) {
-    console.log('BD ya existe, omitiendo migraciones.')
-    return
+  // 1. Asegurar que el directorio exista (crucial en producción)
+  const dbDir = dirname(dbPath)
+  if (!fs.existsSync(dbDir)) {
+    fs.mkdirSync(dbDir, { recursive: true })
   }
 
-  console.log('🔄 Iniciando sistema de migraciones...')
+  console.log('🔄 Iniciando verificación del esquema de la base de datos...')
 
-  const db = new Database(dbPath)
+  let db;
 
-  // Las migraciones viven dentro del proyecto, junto a este archivo
-  const migrationsDir = is.dev
-    ? resolve(process.cwd(), 'src/main/database/migrations')
-    : join(__dirname, 'migrations')                     // en build, Electron copia la carpeta aquí
+  try {
+    // 2. Abrimos conexión inicial
+    db = new Database(dbPath)
 
-  // 1. Verificar si la tabla de control ya existe
-  const checkTable = db.prepare(`
-    SELECT name FROM sqlite_master WHERE type='table' AND name='migrations';
-  `).get()
-
-  if (!checkTable) {
-    console.log('⚠️ Tabla de migraciones no detectada. Se creará con el primer script.')
-  }
-
-  // 2. Leer y ordenar archivos .sql
-  const files = fs.readdirSync(migrationsDir)
-    .filter(file => file.endsWith('.sql'))
-    .sort()
-
-  // 3. Ejecutar migraciones pendientes
-  files.forEach(file => {
-    let migrated = false
+    // 3. Verificación ROBUSTA
+    const checkTable = db.prepare(`
+      SELECT name FROM sqlite_master WHERE type='table' AND name='licencia';
+    `).get()
 
     if (checkTable) {
-      const row = db.prepare('SELECT id FROM migrations WHERE filename = ?').get(file)
-      if (row) migrated = true
+      console.log('✅ Base de datos detectada y operativa (Tablas existentes).')
+      db.close()
+      return // Salimos, no es necesario recrear
     }
 
-    if (!migrated) {
-      console.log(`🚀 Ejecutando migración: ${file}`)
+    // 4. Si llegamos aquí, la BD está vacía o es nueva.
+    console.log('⚠️ Base de datos vacía. Inyectando esquema inicial...')
+    
+    // Validar que el string de schema.ts realmente haya llegado
+    if (!INIT_SCHEMA || INIT_SCHEMA.trim() === '') {
+      throw new Error('La variable INIT_SCHEMA está vacía. Verifica tu archivo schema.ts.')
+    }
 
-      const sql = fs.readFileSync(join(migrationsDir, file), 'utf-8')
+    // Ejecutamos todo el string de schema.ts de golpe
+    db.exec(INIT_SCHEMA)
 
-      const runTransaction = db.transaction(() => {
-        db.exec(sql)
-        db.prepare('INSERT INTO migrations (filename) VALUES (?)').run(file)
-      })
+    // Verificamos que la inyección realmente haya surtido efecto
+    const verifyPostExec = db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='licencia';`).get()
+    if (!verifyPostExec) {
+      throw new Error('La ejecución terminó, pero la tabla "licencia" no se creó. Revisa tu SQL.')
+    }
 
+    console.log('🎉 Esquema inicializado correctamente con todas sus tablas.')
+
+  } catch (error: any) {
+    console.error('❌ Error crítico al inicializar la base de datos:', error)
+    
+    // 🔥 ESTO ES LO MÁS IMPORTANTE 🔥
+    // Si algo falla en producción, te forzará una ventana emergente mostrándote el error exacto.
+    dialog.showErrorBox(
+      'Error Crítico de Base de Datos',
+      `No se pudo inicializar la base de datos de hi-POSApp.\n\nDetalle del error:\n${error.message}\n\nPor favor, verifica que tu archivo schema.ts no tenga errores de sintaxis (comas o paréntesis faltantes).`
+    )
+  } finally {
+    // 5. Cerramos la conexión sin importar si hubo error o éxito
+    if (db) {
       try {
-        runTransaction()
-        console.log(`✅ ${file} completado con éxito.`)
-      } catch (error: any) {
-        console.error(`❌ Error en ${file}:`, error.message)
-        process.exit(1)
+        db.close()
+      } catch (e) {
+        console.error('Error al cerrar DB temporal', e)
       }
-    } else {
-      console.log(`⏭️  Saltando ${file} (ya aplicado).`)
     }
-  })
-
-  console.log('🏁 Todas las migraciones están al día.')
-  db.close()
+  }
 }
