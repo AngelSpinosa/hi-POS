@@ -1,30 +1,103 @@
 /* src/renderer/src/assets/base.css */
-:root {
-  /* --- COLORES BASE --- */
-  --color-bg-main: #1a1a1a;      /* Fondo principal oscuro */
-  --color-bg-card: #2d2d2d;      /* Fondo de tarjetas/botones */
-  --color-bg-ticket: #262626;    /* Fondo del ticket lateral */
-  
-  /* --- TIPOGRAFÍA --- */
-  --color-text-main: #ffffff;
-  --color-text-muted: #a3a3a3;
-  
-  /* --- ACCIONES Y ESTADOS --- */
-  --color-primary: #e74c3c;      /* Rojo Pizza (Botones principales/Header) */
-  --color-accent: #fbbf24;       /* Amarillo/Dorado (Precios) */
-  --color-success: #22c55e;      /* Verde (Botón Cobrar) */
-  --color-border: #404040;       /* Bordes sutiles */
-  
-  /* --- ESPACIADO --- */
-  --radius-std: 8px;             /* Bordes redondeados estándar */
+
+/* --- IMPORTACIÓN DE FUENTES LOCALES --- */
+@font-face {
+  font-family: 'IBM Plex Mono';
+  src: url('./fonts/IBMPlexMono-SemiBold.ttf') format('truetype');
+  font-weight: 600; /* SemiBold */
+  font-style: normal;
 }
 
+@font-face {
+  font-family: 'IBM Plex Mono';
+  src: url('./fonts/IBMPlexMono-Bold.ttf') format('truetype');
+  font-weight: 700; /* Bold */
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Roboto';
+  src: url('./fonts/Roboto-Regular.ttf') format('truetype');
+  font-weight: 400; /* Regular */
+  font-style: normal;
+}
+
+:root {
+  /* --- PALETA OFICIAL (Valores por defecto dinámicos) --- */
+  --color-primary: #FCA311;      /* Naranja - Principal */
+  --color-secondary: #90A955;    /* Verde Claro - Secundario */
+
+  /* --- COLORES BASE (Neutros para soportar cualquier tema futuro) --- */
+  --color-bg-main: #121212;      /* Fondo principal casi negro */
+  --color-bg-card: #1e1e1e;      /* Fondo de tarjetas (ligeramente más claro) */
+  --color-bg-ticket: #132A13;    /* Verde Oscuro de tu paleta para el panel lateral */
+  
+  /* --- TIPOGRAFÍA --- */
+  --font-heading: 'IBM Plex Mono', monospace;
+  --font-body: 'Roboto', sans-serif;
+  
+  --color-text-main: #F8F3B9;    /* Crema de tu paleta para textos principales */
+  --color-text-muted: #9ca3af;   /* Gris claro para textos secundarios */
+  
+  /* --- ACCIONES Y ESTADOS --- */
+  --color-accent: var(--color-primary);
+  --color-success: #90A955;      /* Verde claro para los éxitos/cobros */
+  --color-danger: #ef4444;       /* Rojo universal para cancelar/eliminar */
+  --color-border: rgba(248, 243, 185, 0.1); /* Borde sutil basado en el color crema */
+  
+  /* --- ESPACIADO Y DISEÑO MODERNO --- */
+  --radius-sm: 8px;
+  --radius-std: 14px;            
+  --radius-lg: 20px;
+  --shadow-sm: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+  --shadow-hover: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
+  --transition-fast: 0.15s ease-in-out;
+}
+
+/* --- REGLAS BASE --- */
 body {
   background-color: var(--color-bg-main);
   color: var(--color-text-main);
-  font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-family: var(--font-body); /* Todo el body usará Roboto Regular por defecto */
+  font-weight: 400;
   margin: 0;
   padding: 0;
-  overflow: hidden; /* App de escritorio no debe tener scroll en body */
-  user-select: none; /* UI de POS no se debe poder seleccionar texto */
+  overflow: hidden; 
+  user-select: none; 
+  -webkit-font-smoothing: antialiased;
+}
+
+/* --- ASIGNACIÓN DE TIPOGRAFÍAS --- */
+h1 {
+  font-family: var(--font-heading);
+  font-weight: 700; /* Toma el archivo IBMPlexMono-Bold */
+  margin: 0;
+}
+
+h2 {
+  font-family: var(--font-heading);
+  font-weight: 600; /* Toma el archivo IBMPlexMono-SemiBold */
+  margin: 0;
+}
+
+p {
+  font-family: var(--font-body);
+  font-weight: 400; /* Toma el archivo Roboto-Regular */
+  margin: 0;
+}
+
+/* --- SCROLLBARS PERSONALIZADAS (Estilo Moderno) --- */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-bg-main); 
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(248, 243, 185, 0.2); 
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-secondary); 
 }

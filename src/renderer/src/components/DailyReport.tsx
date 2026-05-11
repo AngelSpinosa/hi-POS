@@ -1,14 +1,18 @@
 import { useState, useEffect } from 'react'
 import type { ReporteDiario, OrdenHistorial, CartItem } from '../types/db'
 import { OrderDetailModal } from './OrderDetailModal'
-
-// 🛠️ HELPER: Obtener fecha estrictamente en la ZONA HORARIA LOCAL (Evita el bug de medianoche)
+//HELPER: Obtener fecha estrictamente en la ZONA HORARIA LOCAL (Evita el bug de medianoche)
 const getLocalDate = (d = new Date()) => {
   const tzOffset = d.getTimezoneOffset() * 60000;
   return new Date(d.getTime() - tzOffset).toISOString().split('T')[0];
 }
 
-export function DailyReport() {
+// Añadimos la interfaz para recibir la función de volver atrás
+interface DailyReportProps {
+  onBack?: () => void;
+}
+
+export function DailyReport({ onBack }: DailyReportProps) {
   const [date, setDate] = useState(getLocalDate())
   const [report, setReport] = useState<ReporteDiario | any>(null)
   const [orders, setOrders] = useState<OrdenHistorial[]>([])
@@ -19,7 +23,24 @@ export function DailyReport() {
   
   // Estado para modales
   const [selectedOrder, setSelectedOrder] = useState<{id: number, items: CartItem[]} | null>(null)
-  const [isExportModalOpen, setIsExportModalOpen] = useState(false) // NUEVO ESTADO PARA EXCEL
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false)
+
+  // Estado para el reloj de la cabecera
+  const [time, setTime] = useState(new Date())
+
+  // Reloj en tiempo real
+  useEffect(() => {
+    const timer = setInterval(() => setTime(new Date()), 1000)
+    return () => clearInterval(timer)
+  }, [])
+
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
+  }
+
+  const formatDate = (date: Date) => {
+    return date.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  }
 
   const fetchReport = async () => {
     // @ts-ignore
@@ -29,11 +50,10 @@ export function DailyReport() {
       setReport(fetchedReport)
       setOrders(res.orders || [])
 
-      // Si este día ya tiene un corte guardado, cargamos el dinero real automáticamente
       if (fetchedReport?.dinero_real !== undefined && fetchedReport?.dinero_real !== null) {
         setCashInDrawer(fetchedReport.dinero_real.toString())
       } else {
-        setCashInDrawer('') // Limpiamos si es un día nuevo sin corte
+        setCashInDrawer('') 
       }
     }
   }
@@ -94,12 +114,7 @@ export function DailyReport() {
     setIsSaving(true)
     try {
       // @ts-ignore
-      const res = await window.electron.ipcRenderer.invoke('save-daily-cut', {
-        date,
-        realCash,
-        difference
-      })
-
+      const res = await window.electron.ipcRenderer.invoke('save-daily-cut', { date, realCash, difference })
       if (res.success) {
         alert('✅ Corte de caja guardado con éxito.')
         fetchReport() 
@@ -113,7 +128,6 @@ export function DailyReport() {
     }
   }
 
-  // --- NUEVA LÓGICA PARA EXPORTAR A EXCEL (CU-49) ---
   const handleExportExcel = async (range: 'selected' | 'yesterday' | 'week') => {
     try {
       // @ts-ignore
@@ -132,7 +146,6 @@ export function DailyReport() {
       alert('❌ Error de comunicación al exportar a Excel.');
     }
   }
-  // ---------------------------------------------------
 
   const todayStr = getLocalDate();
   const yesterdayDate = new Date();
@@ -140,182 +153,158 @@ export function DailyReport() {
   const yesterdayStr = getLocalDate(yesterdayDate);
 
   return (
-    <div style={{ padding: '20px', color: 'white', height: '100%', overflowY: 'auto' }}>
+    <div className="report-container">
       
-      {/* HEADER Y FECHA */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <h1 style={{ margin: 0 }}>Reporte Diario 📊</h1>
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <button 
-            onClick={() => setDate(yesterdayStr)}
-            style={{ 
-              padding: '8px 12px', 
-              background: date === yesterdayStr ? '#3b82f6' : '#404040', 
-              border: 'none', color: 'white', borderRadius: '5px', cursor: 'pointer',
-              transition: 'background 0.2s'
-            }}
-          >
-            Ayer
-          </button>
-          <button 
-            onClick={() => setDate(todayStr)}
-            style={{ 
-              padding: '8px 12px', 
-              background: date === todayStr ? '#3b82f6' : '#404040', 
-              border: 'none', color: 'white', borderRadius: '5px', cursor: 'pointer',
-              transition: 'background 0.2s'
-            }}
-          >
-            Hoy
-          </button>
-          <input 
-            type="date" 
-            value={date} 
-            onChange={(e) => setDate(e.target.value)}
-            style={{ padding: '8px', background: '#262626', border: '1px solid #404040', color: 'white', borderRadius: '5px' }}
-          />
+      {/* CABECERA AL ESTILO FIGMA */}
+      <div className="report-header">
+        <button className="btn-back" onClick={onBack}>
+          ← Menú principal
+        </button>
+        <div className="time-display">
+          <div className="time-hours">HORA : {formatTime(time)}</div>
+          <div className="time-date">{formatDate(time)}</div>
         </div>
       </div>
 
-      {/* TARJETAS DE KPIs */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '15px', marginBottom: '30px' }}>
-        <div style={{ background: '#2d2d2d', padding: '20px', borderRadius: '10px', borderLeft: '4px solid #22c55e' }}>
-          <div style={{ color: '#9ca3af', fontSize: '0.9rem' }}>Ventas Totales</div>
-          <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>${totalVentas.toFixed(2)}</div>
-        </div>
-        <div style={{ background: '#2d2d2d', padding: '20px', borderRadius: '10px', borderLeft: '4px solid #3b82f6' }}>
-          <div style={{ color: '#9ca3af', fontSize: '0.9rem' }}>Pedidos Pagados</div>
-          <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>{totalPedidos}</div>
-        </div>
-        <div style={{ background: '#2d2d2d', padding: '20px', borderRadius: '10px', borderLeft: '4px solid #eab308' }}>
-          <div style={{ color: '#9ca3af', fontSize: '0.9rem' }}>Efectivo</div>
-          <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>${expectedCash.toFixed(2)}</div>
-        </div>
-        <div style={{ background: '#2d2d2d', padding: '20px', borderRadius: '10px', borderLeft: '4px solid #a855f7' }}>
-          <div style={{ color: '#9ca3af', fontSize: '0.9rem' }}>Tarjeta</div>
-          <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>${totalTarjeta.toFixed(2)}</div>
-        </div>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '20px' }}>
+      <div className="report-content">
         
-        {/* LISTA DE VENTAS */}
-        <div style={{ background: '#2d2d2d', borderRadius: '10px', padding: '20px' }}>
-          <h3 style={{ marginTop: 0 }}>Historial de Ventas</h3>
-          <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-              <thead style={{ color: '#9ca3af', borderBottom: '1px solid #404040' }}>
-                <tr>
-                  <th style={{ padding: '10px' }}>Hora</th>
-                  <th>Mesa</th>
-                  <th>Total</th>
-                  <th>Método</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {orders.map(order => (
-                  <tr key={order.id} style={{ borderBottom: '1px solid #404040' }}>
-                    <td style={{ padding: '10px' }}>{new Date(order.creado_en).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</td>
-                    <td>#{order.mesa}</td>
-                    <td style={{ fontWeight: 'bold', color: '#22c55e' }}>${order.total.toFixed(2)}</td>
-                    <td style={{ textTransform: 'capitalize' }}>{order.metodo}</td>
-                    <td style={{ textAlign: 'right' }}>
-                      <button 
-                        onClick={() => handleOpenDetail(order.id)}
-                        style={{ background: 'transparent', border: '1px solid #666', color: 'white', borderRadius: '4px', cursor: 'pointer', padding: '2px 8px' }}
-                      >Ver</button>
-                    </td>
-                  </tr>
-                ))}
-                {orders.length === 0 && (
-                  <tr><td colSpan={5} style={{ textAlign: 'center', padding: '20px', color: '#666' }}>Sin ventas registradas este día</td></tr>
-                )}
-              </tbody>
-            </table>
+        {/* TÍTULO Y FILTROS */}
+        <div className="report-top-bar">
+          <h1 className="report-title">Reporte Diario</h1>
+          <div className="date-filters">
+            <button 
+              className={`btn-filter ${date === yesterdayStr ? 'active-blue' : ''}`}
+              onClick={() => setDate(yesterdayStr)}
+            >
+              Ayer
+            </button>
+            <button 
+              className={`btn-filter ${date === todayStr ? 'active-blue' : ''}`}
+              onClick={() => setDate(todayStr)}
+            >
+              Hoy
+            </button>
+            <input 
+              type="date" 
+              className="date-input"
+              value={date} 
+              onChange={(e) => setDate(e.target.value)}
+            />
           </div>
         </div>
 
-        {/* CORTE DE CAJA RÁPIDO */}
-        <div style={{ background: '#2d2d2d', borderRadius: '10px', padding: '20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-             <h3 style={{ marginTop: 0 }}>Corte de Caja (MVP)</h3>
-             {isAlreadySaved && (
-               <span style={{ fontSize: '0.8rem', background: '#065f46', color: '#34d399', padding: '2px 8px', borderRadius: '10px' }}>✓ Guardado</span>
-             )}
+        {/* 4 KPIs SUPERIORES */}
+        <div className="kpi-grid">
+          <div className="kpi-card green">
+            <div className="kpi-title">Ventas Totales</div>
+            <div className="kpi-value">${totalVentas.toFixed(2)}</div>
           </div>
+          <div className="kpi-card blue">
+            <div className="kpi-title">Pedidos pagados</div>
+            <div className="kpi-value">{totalPedidos}</div>
+          </div>
+          <div className="kpi-card cream">
+            <div className="kpi-title">Efectivo</div>
+            <div className="kpi-value">${expectedCash.toFixed(2)}</div>
+          </div>
+          <div className="kpi-card orange">
+            <div className="kpi-title">Tarjeta</div>
+            <div className="kpi-value">${totalTarjeta.toFixed(2)}</div>
+          </div>
+        </div>
+
+        {/* ÁREA PRINCIPAL DIVIDIDA EN 2 COLUMNAS */}
+        <div className="report-panels">
           
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{ display: 'block', color: '#9ca3af', marginBottom: '5px' }}>Total Esperado (Efectivo)</label>
-            <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>${expectedCash.toFixed(2)}</div>
+          {/* PANEL IZQUIERDO: HISTORIAL */}
+          <div className="report-panel">
+            <h2 className="panel-title">Historial de ventas</h2>
+            <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+              <table className="history-table">
+                <thead>
+                  <tr>
+                    <th>Hora</th>
+                    <th>Mesa</th>
+                    <th>Total</th>
+                    <th>Método de P.</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {orders.map(order => (
+                    <tr key={order.id}>
+                      <td>{new Date(order.creado_en).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</td>
+                      <td>#{order.mesa}</td>
+                      <td>${order.total.toFixed(2)}</td>
+                      <td style={{ textTransform: 'capitalize' }}>{order.metodo}</td>
+                      <td style={{ textAlign: 'right' }}>
+                        <button className="btn-ver" onClick={() => handleOpenDetail(order.id)}>
+                          Ver
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {orders.length === 0 && (
+                    <tr><td colSpan={5} style={{ textAlign: 'center', padding: '30px', color: '#666', borderBottom: 'none' }}>Sin ventas registradas este día</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
 
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{ display: 'block', color: '#9ca3af', marginBottom: '5px' }}>Dinero Real en Caja</label>
+          {/* PANEL DERECHO: CORTE DE CAJA */}
+          <div className="report-panel">
+            <h2 className="panel-title">Corte de caja</h2>
+            
+            <span className="cut-label">Total esperado (efectivo)</span>
+            <h3 className="cut-value-large">${expectedCash.toFixed(2)}</h3>
+
+            <label className="cut-input-label">Dinero real en caja</label>
             <input 
               type="number" 
               min="0"
+              className="cut-input"
               value={cashInDrawer}
               onChange={handleCashChange}
               onKeyDown={preventInvalidChars}
               placeholder="0.00"
-              style={{ width: '100%', padding: '10px', background: '#1a1a1a', border: '1px solid #404040', color: 'white', fontSize: '1.2rem', borderRadius: '5px' }}
             />
-          </div>
 
-          <div style={{ padding: '15px', borderRadius: '5px', background: difference === 0 ? '#064e3b' : difference > 0 ? '#064e3b' : '#7f1d1d' }}>
-            <div style={{ color: '#9ca3af', fontSize: '0.9rem' }}>Diferencia</div>
-            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: difference === 0 ? '#34d399' : difference > 0 ? '#34d399' : '#f87171' }}>
-              {difference > 0 ? '+' : ''}{difference.toFixed(2)}
+            <div className={`diff-box ${difference < 0 ? 'danger' : 'success'}`}>
+              <div className="diff-label">Diferencia</div>
+              <h3 className="diff-value">
+                {difference > 0 ? '+' : ''}{difference.toFixed(2)}
+              </h3>
+              <p className="diff-msg">
+                {difference === 0 ? '¡Caja cuadrada!' : difference > 0 ? 'Sobra dinero' : 'Falta dinero'}
+              </p>
             </div>
-            <small style={{ color: '#d1d5db' }}>
-              {difference === 0 ? '¡Caja cuadrada!' : difference > 0 ? 'Sobra dinero' : 'Falta dinero'}
-            </small>
+
+            <button 
+              className="btn-save-cut"
+              onClick={handleSaveCut}
+              disabled={isSaving || orders.length === 0}
+            >
+              {isSaving ? 'Guardando...' : (isAlreadySaved ? 'Actualizar Corte' : 'Guardar Corte')}
+            </button>
+
+            <button 
+              className="btn-export-excel"
+              onClick={() => setIsExportModalOpen(true)}
+            >
+              Exportar a Excel
+            </button>
           </div>
-
-          <button 
-            onClick={handleSaveCut}
-            disabled={isSaving || orders.length === 0}
-            style={{ 
-              width: '100%', 
-              padding: '12px', 
-              marginTop: '20px', 
-              background: (isSaving || orders.length === 0) ? '#404040' : (isAlreadySaved ? '#059669' : '#3b82f6'), 
-              color: 'white', 
-              border: 'none', 
-              borderRadius: '5px', 
-              fontWeight: 'bold', 
-              cursor: (isSaving || orders.length === 0) ? 'not-allowed' : 'pointer' 
-            }}
-          >
-            {isSaving ? 'Guardando...' : (isAlreadySaved ? '🔄 Actualizar Corte' : '💾 Guardar Corte')}
-          </button>
-
-          {/* NUEVO: BOTÓN DE EXPORTAR A EXCEL */}
-          <button 
-            onClick={() => setIsExportModalOpen(true)}
-            style={{ 
-              width: '100%', 
-              padding: '12px', 
-              marginTop: '10px', 
-              background: 'transparent', 
-              color: '#10b981', 
-              border: '1px solid #10b981', 
-              borderRadius: '5px', 
-              fontWeight: 'bold', 
-              cursor: 'pointer',
-              transition: 'all 0.2s'
-            }}
-            onMouseEnter={e => { e.currentTarget.style.background = '#10b981'; e.currentTarget.style.color = '#000'; }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#10b981'; }}
-          >
-            📊 Exportar a Excel
-          </button>
-
         </div>
 
       </div>
 
+      {/* LOGO INFERIOR */}
+      <div className="hipos-logo">
+        hi-POS
+      </div>
+
+      {/* MODALES */}
       {selectedOrder && (
         <OrderDetailModal 
           orderId={selectedOrder.id} 
@@ -324,40 +313,27 @@ export function DailyReport() {
         />
       )}
 
-      {/* NUEVO: MODAL DE EXCEL */}
       {isExportModalOpen && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 5000, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-          <div style={{ background: '#1a1a1a', padding: '30px', borderRadius: '15px', width: '400px', border: '1px solid #404040', color: 'white', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)' }}>
-            <h3 style={{ margin: '0 0 15px 0', color: '#10b981', fontSize: '1.4rem' }}>📊 Exportar a Excel</h3>
-            <p style={{ color: '#9ca3af', marginBottom: '25px', lineHeight: '1.5' }}>
-              Selecciona el rango de tiempo que deseas exportar basándote en la fecha actual <strong style={{ color: '#fff' }}>({date})</strong>:
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <h3 className="modal-title">📊 Exportar a Excel</h3>
+            <p className="modal-text">
+              Selecciona el rango de tiempo que deseas exportar basándote en la fecha actual <strong>({date})</strong>:
             </p>
             
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <button 
-                onClick={() => handleExportExcel('selected')}
-                style={{ padding: '14px', background: '#262626', color: 'white', border: '1px solid #404040', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
-              >
+            <div className="modal-options">
+              <button className="btn-modal-option" onClick={() => handleExportExcel('selected')}>
                 📅 Reporte de este día
               </button>
-              <button 
-                onClick={() => handleExportExcel('yesterday')}
-                style={{ padding: '14px', background: '#262626', color: 'white', border: '1px solid #404040', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
-              >
+              <button className="btn-modal-option" onClick={() => handleExportExcel('yesterday')}>
                 ⏪ Reporte de ayer
               </button>
-              <button 
-                onClick={() => handleExportExcel('week')}
-                style={{ padding: '14px', background: '#262626', color: 'white', border: '1px solid #404040', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
-              >
+              <button className="btn-modal-option" onClick={() => handleExportExcel('week')}>
                 📆 Reportes de la última semana
               </button>
             </div>
             
-            <button 
-              onClick={() => setIsExportModalOpen(false)}
-              style={{ width: '100%', padding: '14px', marginTop: '20px', background: 'transparent', color: '#ef4444', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}
-            >
+            <button className="btn-modal-cancel" onClick={() => setIsExportModalOpen(false)}>
               Cancelar
             </button>
           </div>
