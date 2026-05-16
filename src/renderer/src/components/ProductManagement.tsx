@@ -285,325 +285,368 @@ export function ProductManagement({ onBack }: ProductManagementProps) {
     } else { alert('⛔ PIN Incorrecto o sin permisos.') }
   }
 
-  return (
-    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#111', fontFamily: 'sans-serif' }}>
-      {/* HEADER */}
-      <div style={{ padding: '20px 30px', display: 'flex', justifyContent: 'space-between', background: '#1a1a1a', alignItems: 'center', borderBottom: '1px solid #333' }}>
-        <button onClick={onBack} style={{ background: 'transparent', color: '#9ca3af', border: 'none', cursor: 'pointer', fontSize: '1.1rem', fontWeight: 'bold' }}>← Menú principal</button>
-        <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#10b981' }}>Almacén y Menú</div>
-        <div style={{ textAlign: 'right', color: '#9ca3af' }}>
-          <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: 'white' }}>{timeString}</div>
-          <div style={{ fontSize: '0.8rem' }}>{formattedDate}</div>
+return (
+    <div style={{ 
+      height: '100%', display: 'flex', flexDirection: 'column', 
+      boxSizing: 'border-box'
+    }}>
+
+      {/* TABS (Botonera hueca estilo Figma) */}
+      <div style={{ margin: '30px 40px', border: '1px solid #ffffff', borderRadius: '16px', display: 'flex', padding: '10px' }}>
+        <button 
+          onClick={() => { setActiveTab('productos'); setSearchTerm(''); }} 
+          style={{ 
+            flex: 1, padding: '14px', background: 'transparent', 
+            color: activeTab === 'productos' ? '#00E676' : 'white', 
+            border: activeTab === 'productos' ? '1px solid #00E676' : '1px solid transparent', 
+            borderRadius: '30px', cursor: 'pointer', fontSize: '1.1rem', fontWeight: 'bold', 
+            transition: 'all 0.2s', fontFamily: 'inherit' 
+          }}
+        >
+          Platillos/Productos
+        </button>
+        <button 
+          onClick={() => { setActiveTab('insumos'); setSearchTerm(''); }} 
+          style={{ 
+            flex: 1, padding: '14px', background: 'transparent', 
+            color: activeTab === 'insumos' ? '#00E676' : 'white', 
+            border: activeTab === 'insumos' ? '1px solid #00E676' : '1px solid transparent', 
+            borderRadius: '30px', cursor: 'pointer', fontSize: '1.1rem', fontWeight: 'bold', 
+            transition: 'all 0.2s', fontFamily: 'inherit' 
+          }}
+        >
+          Inventario/Insumos
+        </button>
+        <button 
+          onClick={() => { setActiveTab('historial'); setSearchTerm(''); }} 
+          style={{ 
+            flex: 1, padding: '14px', background: 'transparent', 
+            color: activeTab === 'historial' ? '#00E676' : 'white', 
+            border: activeTab === 'historial' ? '1px solid #00E676' : '1px solid transparent', 
+            borderRadius: '30px', cursor: 'pointer', fontSize: '1.1rem', fontWeight: 'bold', 
+            transition: 'all 0.2s', fontFamily: 'inherit' 
+          }}
+        >
+          Historial de movimientos
+        </button>
+      </div>
+
+      {/* BÚSQUEDA Y ACCIONES */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px', padding: '0 40px' }}>
+        <div style={{ width: '200px' }}>{/* Spacer visual */}</div>
+        
+        <div style={{ position: 'relative', width: '450px' }}>
+          <svg style={{ position: 'absolute', left: '15px', top: '50%', transform: 'translateY(-50%)' }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          <input 
+            type="text" 
+            placeholder={searchPlaceholder} 
+            value={searchTerm} 
+            onChange={(e) => setSearchTerm(e.target.value)} 
+            style={{ 
+              width: '100%', padding: '12px 20px 12px 45px', borderRadius: '30px', 
+              background: 'transparent', border: '1px solid #555', color: 'white', 
+              fontSize: '0.95rem', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' 
+            }} 
+          />
+        </div>
+        
+        <div style={{ width: '200px', display: 'flex', justifyContent: 'flex-end' }}>
+          {activeTab === 'productos' && (
+            <button onClick={handleOpenCreate} style={{ padding: '12px 20px', background: '#00E676', color: 'black', border: 'none', borderRadius: '30px', fontWeight: 'bold', fontSize: '0.9rem', cursor: 'pointer', fontFamily: 'inherit' }}>
+              + Nuevo producto
+            </button>
+          )}
+          {activeTab === 'insumos' && (
+            <button onClick={handleOpenCreateInsumo} style={{ padding: '12px 20px', background: '#00E676', color: 'black', border: 'none', borderRadius: '30px', fontWeight: 'bold', fontSize: '0.9rem', cursor: 'pointer', fontFamily: 'inherit' }}>
+              + Nuevo insumo
+            </button>
+          )}
+          {activeTab === 'historial' && (
+             <div style={{ width: '100%' }}></div> /* Empty spacer */
+          )}
         </div>
       </div>
 
-      <div style={{ flex: 1, padding: '30px', overflowY: 'auto' }}>
-        {/* TABS (Ahora con 3 opciones) */}
-        <div style={{ display: 'flex', maxWidth: '850px', marginBottom: '30px', background: '#1a1a1a', borderRadius: '12px', padding: '5px', border: '1px solid #333' }}>
-          <button onClick={() => { setActiveTab('productos'); setSearchTerm(''); }} style={{ flex: 1, padding: '12px', background: activeTab === 'productos' ? '#262626' : 'transparent', color: activeTab === 'productos' ? '#10b981' : '#6b7280', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '1.1rem', fontWeight: 'bold', transition: 'all 0.2s', boxShadow: activeTab === 'productos' ? '0 2px 4px rgba(0,0,0,0.2)' : 'none' }}>Platillos / Productos</button>
-          <button onClick={() => { setActiveTab('insumos'); setSearchTerm(''); }} style={{ flex: 1, padding: '12px', background: activeTab === 'insumos' ? '#262626' : 'transparent', color: activeTab === 'insumos' ? '#10b981' : '#6b7280', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '1.1rem', fontWeight: 'bold', transition: 'all 0.2s', boxShadow: activeTab === 'insumos' ? '0 2px 4px rgba(0,0,0,0.2)' : 'none' }}>Inventario / Insumos</button>
-          <button onClick={() => { setActiveTab('historial'); setSearchTerm(''); }} style={{ flex: 1, padding: '12px', background: activeTab === 'historial' ? '#262626' : 'transparent', color: activeTab === 'historial' ? '#10b981' : '#6b7280', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '1.1rem', fontWeight: 'bold', transition: 'all 0.2s', boxShadow: activeTab === 'historial' ? '0 2px 4px rgba(0,0,0,0.2)' : 'none' }}>Historial de Movimientos</button>
-        </div>
-
-        {/* BÚSQUEDA COMÚN Y ACCIONES PRINCIPALES */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
-          <div style={{ position: 'relative', width: '100%', maxWidth: '400px' }}>
-            <span style={{ position: 'absolute', left: '15px', top: '12px', fontSize: '1.1rem' }}>🔍</span>
-            <input type="text" placeholder={searchPlaceholder} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ width: '100%', padding: '12px 20px 12px 45px', borderRadius: '25px', background: '#1a1a1a', border: '1px solid #333', color: 'white', fontSize: '1rem', outline: 'none', boxSizing: 'border-box', transition: 'border-color 0.2s' }} onFocus={(e) => e.target.style.border = '1px solid #10b981'} onBlur={(e) => e.target.style.border = '1px solid #333'} />
-          </div>
-          
-          {activeTab === 'productos' && (
-            <button onClick={handleOpenCreate} style={{ padding: '12px 25px', background: '#10b981', color: 'white', border: 'none', borderRadius: '25px', fontWeight: 'bold', fontSize: '1rem', cursor: 'pointer', boxShadow: '0 4px 6px -1px rgba(16, 185, 129, 0.2)', transition: 'background-color 0.2s' }} onMouseEnter={e => e.currentTarget.style.backgroundColor = '#059669'} onMouseLeave={e => e.currentTarget.style.backgroundColor = '#10b981'}>+ Nuevo producto</button>
-          )}
-          {activeTab === 'insumos' && (
-            <button onClick={handleOpenCreateInsumo} style={{ padding: '12px 25px', background: '#10b981', color: 'white', border: 'none', borderRadius: '25px', fontWeight: 'bold', fontSize: '1rem', cursor: 'pointer', boxShadow: '0 4px 6px -1px rgba(16, 185, 129, 0.2)', transition: 'background-color 0.2s' }} onMouseEnter={e => e.currentTarget.style.backgroundColor = '#059669'} onMouseLeave={e => e.currentTarget.style.backgroundColor = '#10b981'}>+ Nuevo insumo</button>
-          )}
-        </div>
-
-        {/* CONTENIDO DE LAS PESTAÑAS */}
+      {/* CONTENEDOR PRINCIPAL SCROLL */}
+      <div style={{ flex: 1, padding: '0 40px 40px 40px', overflowY: 'auto' }}>
+        
         {isLoading ? (
-          <div style={{ textAlign: 'center', color: '#9ca3af', marginTop: '50px', fontSize: '1.2rem' }}>Cargando datos...</div>
+          <div style={{ textAlign: 'center', color: '#9ca3af', marginTop: '50px' }}>Cargando datos...</div>
         ) : activeTab === 'productos' ? (
+          
+          /* PESTAÑA 1: PLATILLOS (GRID 2 COLUMNAS) */
           <>
             {filteredProducts.length === 0 ? (
-              <div style={{ textAlign: 'center', color: '#6b7280', marginTop: '50px', fontSize: '1.2rem' }}>{searchTerm ? `No se encontraron productos con "${searchTerm}"` : 'No hay productos registrados.'}</div>
+              <div style={{ textAlign: 'center', color: '#6b7280', marginTop: '50px' }}>No hay productos.</div>
             ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '20px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '25px' }}>
                 {filteredProducts.map(prod => (
-                  <div key={prod.id} style={{ background: '#1a1a1a', padding: '25px', borderRadius: '15px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', border: '1px solid #333', color: 'white', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', transition: 'transform 0.2s, border-color 0.2s' }} onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.borderColor = '#404040'; }} onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.borderColor = '#333'; }}>
-                    <div>
-                      <div style={{ fontSize: '1.2rem', fontWeight: '600', marginBottom: '8px' }}>{prod.nombre}</div>
-                      <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: prod.active ? '#10b981' : '#ef4444', marginBottom: '20px', padding: '2px 8px', background: prod.active ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)', borderRadius: '10px', display: 'inline-block' }}>{prod.active ? 'Activo' : 'Inactivo'}</div>
+                  <div key={prod.id} style={{ border: '1px solid #555', borderRadius: '16px', padding: '25px', background: '#161616', display: 'flex', justifyContent: 'space-between', transition: 'transform 0.2s' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'white' }}>{prod.nombre}</div>
+                      <div style={{ color: prod.active ? '#00E676' : '#ef4444', fontSize: '0.95rem' }}>
+                        {prod.active ? 'Disponible' : 'No disponible'}
+                      </div>
+                      <div style={{ color: 'white', fontSize: '0.95rem', marginBottom: '15px' }}>
+                        Cantidades disponibles
+                      </div>
+                      
                       <div style={{ display: 'flex', gap: '10px' }}>
-                        <button onClick={() => handleOpenRecipe(prod)} style={{ padding: '8px 12px', background: 'transparent', border: '1px solid #f59e0b', color: '#f59e0b', borderRadius: '20px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem', transition: 'all 0.2s' }} onMouseEnter={e => { e.currentTarget.style.background = '#f59e0b'; e.currentTarget.style.color = 'black'; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#f59e0b'; }}>📋 Receta</button>
-                        <button onClick={() => handleOpenEdit(prod)} style={{ padding: '8px 12px', background: 'transparent', border: '1px solid #3b82f6', color: '#3b82f6', borderRadius: '20px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem', transition: 'all 0.2s' }} onMouseEnter={e => { e.currentTarget.style.background = '#3b82f6'; e.currentTarget.style.color = 'white'; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#3b82f6'; }}>Editar</button>
-                        <button onClick={() => handleToggleStatusRequest(prod.id, prod.active)} style={{ padding: '8px 12px', background: 'transparent', color: '#ef4444', border: '1px solid #ef4444', borderRadius: '20px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem', transition: 'all 0.2s' }} onMouseEnter={e => { e.currentTarget.style.background = '#ef4444'; e.currentTarget.style.color = 'white'; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#ef4444'; }}>{prod.active ? 'Ocultar' : 'Activar'}</button>
+                        <button onClick={() => handleOpenEdit(prod)} style={{ padding: '8px 25px', background: '#00B4D8', color: 'white', border: 'none', borderRadius: '20px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem', fontFamily: 'inherit' }}>
+                          Editar
+                        </button>
+                        <button onClick={() => handleToggleStatusRequest(prod.id, prod.active)} style={{ padding: '8px 25px', background: prod.active ? '#FF0000' : '#555', color: 'white', border: 'none', borderRadius: '20px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem', fontFamily: 'inherit' }}>
+                          {prod.active ? 'Desactivar' : 'Activar'}
+                        </button>
+                        <button onClick={() => handleOpenRecipe(prod)} style={{ padding: '8px 20px', background: 'transparent', color: 'white', border: '1px solid white', borderRadius: '20px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem', fontFamily: 'inherit' }}>
+                          Receta
+                        </button>
                       </div>
                     </div>
-                    <div style={{ color: '#10b981', fontWeight: 'bold', fontSize: '1.4rem' }}>${Number(prod.precio).toFixed(2)}</div>
+                    <div>
+                      <div style={{ background: '#FCA311', color: 'white', padding: '6px 15px', borderRadius: '8px', fontWeight: 'bold', fontSize: '1.2rem' }}>
+                        ${Number(prod.precio).toFixed(2)}
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
             )}
           </>
+
         ) : activeTab === 'insumos' ? (
-          <>
-            <div style={{ background: '#1a1a1a', borderRadius: '15px', border: '1px solid #333', overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', color: 'white', textAlign: 'left' }}>
-                <thead>
-                  <tr style={{ background: '#262626', borderBottom: '1px solid #333', color: '#9ca3af', fontSize: '0.9rem', textTransform: 'uppercase' }}>
-                    <th style={{ padding: '18px 20px', fontWeight: '600' }}>Código</th>
-                    <th style={{ padding: '18px 20px', fontWeight: '600' }}>Nombre del insumo</th>
-                    <th style={{ padding: '18px 20px', fontWeight: '600' }}>Unidad</th>
-                    <th style={{ padding: '18px 20px', fontWeight: '600', textAlign: 'right' }}>Stock actual</th>
-                    <th style={{ padding: '18px 20px', fontWeight: '600', textAlign: 'right' }}>Stock mínimo</th>
-                    <th style={{ padding: '18px 20px', fontWeight: '600', textAlign: 'right' }}>Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredInsumos.map(insumo => {
-                    const isLowStock = insumo.stock_actual <= insumo.stock_minimo;
-                    return (
-                      <tr key={insumo.id} style={{ borderBottom: '1px solid #262626', transition: 'background-color 0.2s' }} onMouseEnter={e => e.currentTarget.style.backgroundColor = '#2a2a2a'} onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}>
-                        <td style={{ padding: '15px 20px', color: '#6b7280', fontFamily: 'monospace' }}>{insumo.codigo}</td>
-                        <td style={{ padding: '15px 20px', fontWeight: '500' }}>{insumo.nombre} {isLowStock && <span style={{ marginLeft: '10px', background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', padding: '2px 8px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 'bold' }}>Alerta Stock</span>}</td>
-                        <td style={{ padding: '15px 20px', color: '#9ca3af' }}>{insumo.unidad_medida}</td>
-                        <td style={{ padding: '15px 20px', textAlign: 'right', fontWeight: 'bold', color: isLowStock ? '#ef4444' : '#10b981', fontSize: '1.1rem' }}>{insumo.stock_actual}</td>
-                        <td style={{ padding: '15px 20px', textAlign: 'right', color: '#6b7280' }}>{insumo.stock_minimo}</td>
-                        <td style={{ padding: '15px 20px', textAlign: 'right' }}>
-                          <button onClick={() => handleOpenMovement(insumo, 'ENTRADA')} style={{ background: 'transparent', color: '#10b981', border: 'none', cursor: 'pointer', marginRight: '15px', fontWeight: 'bold' }} title="Agregar Stock">+ Stock</button>
-                          <button onClick={() => handleOpenMovement(insumo, 'MERMA')} style={{ background: 'transparent', color: '#f59e0b', border: 'none', cursor: 'pointer', marginRight: '20px', fontWeight: 'bold' }} title="Registrar Pérdida/Merma">- Merma</button>
-                          <button onClick={() => handleOpenEditInsumo(insumo)} style={{ background: 'transparent', color: '#3b82f6', border: 'none', cursor: 'pointer', marginRight: '15px', fontWeight: 'bold' }}>Editar</button>
-                          <button onClick={() => handleDeleteInsumoRequest(insumo.id)} style={{ background: 'transparent', color: '#ef4444', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}>Eliminar</button>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                  {filteredInsumos.length === 0 && (
-                    <tr><td colSpan={6} style={{ padding: '40px', textAlign: 'center', color: '#6b7280' }}>{searchTerm ? 'No se encontraron insumos' : 'No hay insumos registrados.'}</td></tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </>
-        ) : (
-          // NUEVA PESTAÑA: HISTORIAL DE MOVIMIENTOS
-          <div style={{ background: '#1a1a1a', borderRadius: '15px', border: '1px solid #333', overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', color: 'white', textAlign: 'left' }}>
+          
+          /* PESTAÑA 2: INSUMOS (TABLA) */
+          <div style={{ border: '1px solid #ffffff', borderRadius: '16px', overflow: 'hidden', background: 'transparent' }}>
+            <table className="custom-table">
               <thead>
-                <tr style={{ background: '#262626', borderBottom: '1px solid #333', color: '#9ca3af', fontSize: '0.9rem', textTransform: 'uppercase' }}>
-                  <th style={{ padding: '18px 20px', fontWeight: '600' }}>Fecha y Hora</th>
-                  <th style={{ padding: '18px 20px', fontWeight: '600' }}>Insumo</th>
-                  <th style={{ padding: '18px 20px', fontWeight: '600' }}>Tipo</th>
-                  <th style={{ padding: '18px 20px', fontWeight: '600', textAlign: 'right' }}>Cantidad</th>
-                  <th style={{ padding: '18px 20px', fontWeight: '600' }}>Motivo / Justificación</th>
+                <tr>
+                  <th>Código</th>
+                  <th>Nombre del insumo</th>
+                  <th>Unidad</th>
+                  <th>Stock actual</th>
+                  <th>Stock minimo</th>
+                  <th>Acciones</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredMovimientos.map(mov => {
-                  // Colores dinámicos según el tipo de movimiento
-                  let colorTipo = '#10b981'; // Verde para Entrada
-                  if (mov.tipo === 'SALIDA') colorTipo = '#3b82f6'; // Azul para Salida POS
-                  if (mov.tipo === 'MERMA') colorTipo = '#ef4444'; // Rojo para Merma
-                  
-                  // Formateo simple de fecha
-                  const fechaMov = new Date(mov.fecha).toLocaleString('es-MX', {
-                    year: 'numeric', month: 'short', day: 'numeric',
-                    hour: '2-digit', minute: '2-digit', hour12: true
-                  });
-
-                  return (
-                    <tr key={mov.id} style={{ borderBottom: '1px solid #262626', transition: 'background-color 0.2s' }} onMouseEnter={e => e.currentTarget.style.backgroundColor = '#2a2a2a'} onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}>
-                      <td style={{ padding: '15px 20px', color: '#9ca3af', fontSize: '0.9rem' }}>{fechaMov}</td>
-                      <td style={{ padding: '15px 20px', fontWeight: '500' }}>
-                        <div style={{ fontSize: '0.8rem', color: '#6b7280', fontFamily: 'monospace', marginBottom: '2px' }}>{mov.codigo}</div>
-                        {mov.insumo_nombre}
-                      </td>
-                      <td style={{ padding: '15px 20px' }}>
-                        <span style={{ border: `1px solid ${colorTipo}`, color: colorTipo, padding: '4px 10px', borderRadius: '15px', fontSize: '0.8rem', fontWeight: 'bold' }}>
-                          {mov.tipo}
-                        </span>
-                      </td>
-                      <td style={{ padding: '15px 20px', textAlign: 'right', fontWeight: 'bold', fontSize: '1.1rem', color: colorTipo }}>
-                        {mov.tipo === 'ENTRADA' ? '+' : '-'}{mov.cantidad} <span style={{ fontSize: '0.8rem', color: '#6b7280', fontWeight: 'normal' }}>{mov.unidad_medida}</span>
-                      </td>
-                      <td style={{ padding: '15px 20px', color: '#d1d5db' }}>{mov.motivo}</td>
-                    </tr>
-                  )
-                })}
-                {filteredMovimientos.length === 0 && (
-                  <tr><td colSpan={5} style={{ padding: '40px', textAlign: 'center', color: '#6b7280' }}>{searchTerm ? 'No se encontraron movimientos' : 'No hay historial de movimientos.'}</td></tr>
+                {filteredInsumos.map(insumo => (
+                  <tr key={insumo.id}>
+                    <td>{insumo.codigo}</td>
+                    <td>{insumo.nombre}</td>
+                    <td>{insumo.unidad_medida}</td>
+                    <td style={{ color: insumo.stock_actual <= insumo.stock_minimo ? '#ff0000' : 'white' }}>
+                      {insumo.stock_actual}
+                    </td>
+                    <td>{insumo.stock_minimo}</td>
+                    <td>
+                      <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                        <button onClick={() => handleOpenMovement(insumo, 'ENTRADA')} style={{ background: '#00E676', color: 'black', border: 'none', padding: '6px 12px', borderRadius: '20px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem', fontFamily: 'inherit' }}>
+                          + Stock
+                        </button>
+                        <button onClick={() => handleOpenMovement(insumo, 'MERMA')} style={{ background: '#FF0000', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '20px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem', fontFamily: 'inherit' }}>
+                          - Merma
+                        </button>
+                        <button onClick={() => handleOpenEditInsumo(insumo)} style={{ background: '#00B4D8', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '20px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem', fontFamily: 'inherit' }}>
+                          Editar
+                        </button>
+                        <button onClick={() => handleDeleteInsumoRequest(insumo.id)} style={{ background: '#FF0000', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '20px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem', fontFamily: 'inherit' }}>
+                          Eliminar
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {filteredInsumos.length === 0 && (
+                  <tr><td colSpan={6} style={{ padding: '40px' }}>No hay insumos.</td></tr>
                 )}
               </tbody>
             </table>
           </div>
+
+        ) : (
+          
+          /* PESTAÑA 3: HISTORIAL (TABLA) */
+          <div style={{ border: '1px solid #ffffff', borderRadius: '16px', overflow: 'hidden', background: 'transparent' }}>
+            <table className="custom-table">
+              <thead>
+                <tr>
+                  <th>Fecha y hora</th>
+                  <th>Insumo</th>
+                  <th>Tipo</th>
+                  <th>Cantidad</th>
+                  <th>Motivo/Justificación</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredMovimientos.map(mov => {
+                  const fechaMov = new Date(mov.fecha).toLocaleString('es-MX', {
+                    day: '2-digit', month: '2-digit', year: 'numeric',
+                    hour: '2-digit', minute: '2-digit', hour12: false
+                  });
+                  return (
+                    <tr key={mov.id}>
+                      <td>{fechaMov}</td>
+                      <td>{mov.insumo_nombre}</td>
+                      <td>{mov.tipo}</td>
+                      <td style={{ color: mov.tipo === 'ENTRADA' ? '#00E676' : mov.tipo === 'MERMA' ? '#FF0000' : '#00B4D8' }}>
+                        {mov.tipo === 'ENTRADA' ? '+' : '-'}{mov.cantidad}
+                      </td>
+                      <td>{mov.motivo}</td>
+                    </tr>
+                  )
+                })}
+                {filteredMovimientos.length === 0 && (
+                  <tr><td colSpan={5} style={{ padding: '40px' }}>No hay historial.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
         )}
       </div>
 
-      {/* MODAL MOVIMIENTO (REABASTO O MERMA) - CU-45 y CU-46 */}
+      {/* ================= MODALES REDISEÑADOS ================= */}
+      
+      {/* MODAL MOVIMIENTO */}
       {isMovementModalOpen && movementInsumo && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>
-          <div style={{ background: '#1a1a1a', padding: '35px', borderRadius: '20px', width: '450px', color: 'white', border: '1px solid #333', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)' }}>
-            <h2 style={{ margin: '0 0 5px 0', fontSize: '1.5rem', color: movementType === 'ENTRADA' ? '#10b981' : '#f59e0b' }}>
-              {movementType === 'ENTRADA' ? '📥 Registrar Reabasto' : '⚠️ Registrar Merma'}
+        <div className="modal-overlay" onClick={() => setIsMovementModalOpen(false)}>
+          <div style={{ background: '#161616', padding: '35px', borderRadius: '16px', width: '450px', border: '1px solid #333', display: 'flex', flexDirection: 'column', gap: '20px' }} onClick={e => e.stopPropagation()}>
+            <h2 style={{ margin: 0, fontSize: '1.5rem', color: movementType === 'ENTRADA' ? '#00E676' : '#FF0000' }}>
+              {movementType === 'ENTRADA' ? 'Registrar Reabasto' : 'Registrar Merma'}
             </h2>
-            <p style={{ margin: '0 0 25px 0', color: '#9ca3af' }}>
-              Insumo: <strong style={{color: 'white'}}>{movementInsumo.nombre} ({movementInsumo.unidad_medida})</strong><br/>
-              Stock Actual: <strong style={{color: 'white'}}>{movementInsumo.stock_actual}</strong>
-            </p>
+            <p style={{ margin: 0, color: 'white' }}>Insumo: <strong>{movementInsumo.nombre}</strong></p>
             
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', marginBottom: '8px', color: '#9ca3af', fontWeight: 'bold', fontSize: '0.9rem' }}>
-                Cantidad a {movementType === 'ENTRADA' ? 'Sumar' : 'Restar'}
-              </label>
-              <input 
-                type="number" step="0.01" min="0.01"
-                value={movementCantidad} onChange={e => setMovementCantidad(e.target.value)}
-                style={{ width: '100%', padding: '14px', borderRadius: '10px', border: '1px solid #333', background: '#111', color: 'white', fontSize: '1.2rem', fontFamily: 'monospace', outline: 'none', boxSizing: 'border-box' }}
-                placeholder="0.00"
-                autoFocus
-              />
+            <div>
+              <label style={{ display: 'block', marginBottom: '8px', color: '#ccc' }}>Cantidad</label>
+              <input type="number" step="0.01" min="0.01" value={movementCantidad} onChange={e => setMovementCantidad(e.target.value)} style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #555', background: 'transparent', color: 'white', boxSizing: 'border-box', fontFamily: 'inherit' }} autoFocus />
             </div>
-            
-            <div style={{ marginBottom: '30px' }}>
-              <label style={{ display: 'block', marginBottom: '8px', color: '#9ca3af', fontWeight: 'bold', fontSize: '0.9rem' }}>
-                Motivo / Justificación
-              </label>
-              <input 
-                type="text"
-                value={movementMotivo} onChange={e => setMovementMotivo(e.target.value)}
-                style={{ width: '100%', padding: '14px', borderRadius: '10px', border: '1px solid #333', background: '#111', color: 'white', fontSize: '1rem', outline: 'none', boxSizing: 'border-box' }}
-              />
+            <div>
+              <label style={{ display: 'block', marginBottom: '8px', color: '#ccc' }}>Motivo</label>
+              <input type="text" value={movementMotivo} onChange={e => setMovementMotivo(e.target.value)} style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #555', background: 'transparent', color: 'white', boxSizing: 'border-box', fontFamily: 'inherit' }} />
             </div>
 
-            <div style={{ display: 'flex', gap: '15px' }}>
-              <button onClick={() => setIsMovementModalOpen(false)} style={{ flex: 1, padding: '14px', background: '#262626', color: '#9ca3af', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer' }}>Cancelar</button>
-              <button 
-                onClick={handleSaveMovement} 
-                style={{ flex: 1, padding: '14px', background: movementType === 'ENTRADA' ? '#10b981' : '#f59e0b', color: movementType === 'ENTRADA' ? 'white' : 'black', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer' }}
-              >
-                Confirmar {movementType === 'ENTRADA' ? 'Reabasto' : 'Merma'}
-              </button>
+            <div style={{ display: 'flex', gap: '15px', marginTop: '10px' }}>
+              <button onClick={() => setIsMovementModalOpen(false)} style={{ flex: 1, padding: '12px', background: 'transparent', color: 'white', border: '1px solid white', borderRadius: '8px', cursor: 'pointer', fontFamily: 'inherit' }}>Cancelar</button>
+              <button onClick={handleSaveMovement} style={{ flex: 1, padding: '12px', background: movementType === 'ENTRADA' ? '#00E676' : '#FF0000', color: movementType === 'ENTRADA' ? 'black' : 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontFamily: 'inherit' }}>Confirmar</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* MODAL RECETAS (CU-44) */}
+      {/* MODAL RECETAS */}
       {isRecipeModalOpen && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>
-          <div style={{ background: '#1a1a1a', padding: '35px', borderRadius: '20px', width: '550px', color: 'white', border: '1px solid #333', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)' }}>
-            <h2 style={{ margin: '0 0 5px 0', fontSize: '1.5rem', color: '#f59e0b' }}>Receta del Producto</h2>
-            <p style={{ margin: '0 0 25px 0', color: '#9ca3af' }}>Define qué insumos se descontarán al vender: <strong style={{color: 'white'}}>{recipeProductName}</strong></p>
+        <div className="modal-overlay" onClick={() => setIsRecipeModalOpen(false)}>
+          <div style={{ background: '#161616', padding: '35px', borderRadius: '16px', width: '550px', border: '1px solid #333', display: 'flex', flexDirection: 'column', gap: '20px' }} onClick={e => e.stopPropagation()}>
+            <h2 style={{ margin: 0, fontSize: '1.5rem', color: 'white' }}>Receta: {recipeProductName}</h2>
             
-            <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', background: '#111', padding: '15px', borderRadius: '10px', border: '1px solid #333' }}>
-              <div style={{ flex: 2 }}>
-                <select value={selectedInsumoId} onChange={e => setSelectedInsumoId(Number(e.target.value))} style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #333', background: '#1a1a1a', color: 'white', outline: 'none' }}>
-                  <option value="">-- Seleccionar Insumo --</option>
-                  {insumos.map(ins => <option key={ins.id} value={ins.id}>{ins.nombre} ({ins.unidad_medida})</option>)}
-                </select>
-              </div>
-              <div style={{ flex: 1 }}>
-                <input type="number" step="0.01" min="0" placeholder="Cantidad" value={recipeCantidad} onChange={e => setRecipeCantidad(e.target.value)} style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #333', background: '#1a1a1a', color: 'white', outline: 'none', boxSizing: 'border-box' }} />
-              </div>
-              <button onClick={handleAddIngredient} style={{ padding: '0 20px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}>Añadir</button>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <select value={selectedInsumoId} onChange={e => setSelectedInsumoId(Number(e.target.value))} style={{ flex: 2, padding: '12px', borderRadius: '8px', border: '1px solid #555', background: '#111', color: 'white', fontFamily: 'inherit' }}>
+                <option value="">-- Seleccionar Insumo --</option>
+                {insumos.map(ins => <option key={ins.id} value={ins.id}>{ins.nombre} ({ins.unidad_medida})</option>)}
+              </select>
+              <input type="number" step="0.01" min="0" placeholder="Cant." value={recipeCantidad} onChange={e => setRecipeCantidad(e.target.value)} style={{ flex: 1, padding: '12px', borderRadius: '8px', border: '1px solid #555', background: 'transparent', color: 'white', fontFamily: 'inherit', boxSizing: 'border-box' }} />
+              <button onClick={handleAddIngredient} style={{ padding: '0 20px', background: '#00E676', color: 'black', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontFamily: 'inherit' }}>Añadir</button>
             </div>
 
-            <div style={{ maxHeight: '200px', overflowY: 'auto', marginBottom: '25px', background: '#111', borderRadius: '10px', border: '1px solid #333' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-                <thead>
-                  <tr style={{ background: '#262626', color: '#9ca3af', fontSize: '0.85rem' }}>
-                    <th style={{ padding: '10px 15px' }}>Insumo</th>
-                    <th style={{ padding: '10px 15px', textAlign: 'right' }}>Cantidad Requerida</th>
-                    <th style={{ padding: '10px 15px', textAlign: 'center' }}>-</th>
-                  </tr>
+            <div style={{ maxHeight: '200px', overflowY: 'auto', border: '1px solid #555', borderRadius: '8px' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'center' }}>
+                <thead style={{ background: '#222' }}>
+                  <tr><th style={{ padding: '10px' }}>Insumo</th><th style={{ padding: '10px' }}>Cantidad</th><th style={{ padding: '10px' }}>Quitar</th></tr>
                 </thead>
                 <tbody>
-                  {recipeItems.length === 0 ? (
-                    <tr><td colSpan={3} style={{ padding: '20px', textAlign: 'center', color: '#6b7280' }}>Sin ingredientes definidos.</td></tr>
-                  ) : (
-                    recipeItems.map(item => (
-                      <tr key={item.insumo_id} style={{ borderBottom: '1px solid #262626' }}>
-                        <td style={{ padding: '10px 15px' }}>{item.insumo_nombre}</td>
-                        <td style={{ padding: '10px 15px', textAlign: 'right', fontWeight: 'bold', color: '#10b981' }}>{item.cantidad_requerida} {item.unidad_medida}</td>
-                        <td style={{ padding: '10px 15px', textAlign: 'center' }}><button onClick={() => handleRemoveIngredient(item.insumo_id)} style={{ background: 'transparent', color: '#ef4444', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}>X</button></td>
-                      </tr>
-                    ))
-                  )}
+                  {recipeItems.map(item => (
+                    <tr key={item.insumo_id} style={{ borderBottom: '1px solid #333' }}>
+                      <td style={{ padding: '10px' }}>{item.insumo_nombre}</td>
+                      <td style={{ padding: '10px', color: '#00E676' }}>{item.cantidad_requerida} {item.unidad_medida}</td>
+                      <td style={{ padding: '10px' }}><button onClick={() => handleRemoveIngredient(item.insumo_id)} style={{ background: 'transparent', color: '#FF0000', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}>✕</button></td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
 
-            <div style={{ display: 'flex', gap: '15px' }}>
-              <button onClick={() => setIsRecipeModalOpen(false)} style={{ flex: 1, padding: '14px', background: '#262626', color: '#9ca3af', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer' }}>Cancelar</button>
-              <button onClick={handleSaveRecipe} style={{ flex: 1, padding: '14px', background: '#10b981', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer' }}>Guardar Receta</button>
+            <div style={{ display: 'flex', gap: '15px', marginTop: '10px' }}>
+              <button onClick={() => setIsRecipeModalOpen(false)} style={{ flex: 1, padding: '12px', background: 'transparent', color: 'white', border: '1px solid white', borderRadius: '8px', cursor: 'pointer', fontFamily: 'inherit' }}>Cerrar</button>
+              <button onClick={handleSaveRecipe} style={{ flex: 1, padding: '12px', background: 'white', color: 'black', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontFamily: 'inherit' }}>Guardar Cambios</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* MODAL FORMULARIO PRODUCTOS */}
+      {/* MODAL NUEVO/EDITAR PRODUCTO */}
       {isEditing && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>
-          <div style={{ background: '#1a1a1a', padding: '35px', borderRadius: '20px', width: '420px', color: 'white', border: '1px solid #333', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)' }}>
-            <h2 style={{ margin: '0 0 25px 0', fontSize: '1.5rem', color: '#10b981' }}>{editingId ? 'Editar Producto' : 'Nuevo Producto'}</h2>
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', marginBottom: '8px', color: '#9ca3af', fontWeight: 'bold', fontSize: '0.9rem' }}>Nombre del Producto</label>
-              <input value={formName} onChange={e => setFormName(e.target.value)} style={{ width: '100%', padding: '14px', borderRadius: '10px', border: '1px solid #333', background: '#111', color: 'white', fontSize: '1rem', outline: 'none', boxSizing: 'border-box' }} placeholder="Ej. PIZZA HAWAIANA" autoFocus />
+        <div className="modal-overlay" onClick={() => setIsEditing(false)}>
+          <div style={{ background: '#161616', padding: '35px', borderRadius: '16px', width: '420px', border: '1px solid #333', display: 'flex', flexDirection: 'column', gap: '20px' }} onClick={e => e.stopPropagation()}>
+            <h2 style={{ margin: 0, fontSize: '1.5rem', color: 'white' }}>{editingId ? 'Editar Platillo' : 'Nuevo Platillo'}</h2>
+            <div>
+              <label style={{ display: 'block', marginBottom: '8px', color: '#ccc' }}>Nombre</label>
+              <input value={formName} onChange={e => setFormName(e.target.value)} style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #555', background: 'transparent', color: 'white', boxSizing: 'border-box', fontFamily: 'inherit' }} autoFocus />
             </div>
-            <div style={{ marginBottom: '30px' }}>
-              <label style={{ display: 'block', marginBottom: '8px', color: '#9ca3af', fontWeight: 'bold', fontSize: '0.9rem' }}>Precio ($)</label>
-              <input type="number" min="0" value={formPrice} onChange={e => setFormPrice(e.target.value)} style={{ width: '100%', padding: '14px', borderRadius: '10px', border: '1px solid #333', background: '#111', color: 'white', fontSize: '1rem', fontFamily: 'monospace', outline: 'none', boxSizing: 'border-box' }} placeholder="0.00" />
+            <div>
+              <label style={{ display: 'block', marginBottom: '8px', color: '#ccc' }}>Precio ($)</label>
+              <input type="number" min="0" value={formPrice} onChange={e => setFormPrice(e.target.value)} style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #555', background: 'transparent', color: 'white', boxSizing: 'border-box', fontFamily: 'inherit' }} />
             </div>
-            <div style={{ display: 'flex', gap: '15px' }}>
-              <button onClick={() => setIsEditing(false)} style={{ flex: 1, padding: '14px', background: '#262626', color: '#9ca3af', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer' }}>Cancelar</button>
-              <button onClick={handleSaveClick} style={{ flex: 1, padding: '14px', background: '#10b981', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer' }}>Confirmar</button>
+            <div style={{ display: 'flex', gap: '15px', marginTop: '10px' }}>
+              <button onClick={() => setIsEditing(false)} style={{ flex: 1, padding: '12px', background: 'transparent', color: 'white', border: '1px solid white', borderRadius: '8px', cursor: 'pointer', fontFamily: 'inherit' }}>Cancelar</button>
+              <button onClick={handleSaveClick} style={{ flex: 1, padding: '12px', background: '#00E676', color: 'black', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontFamily: 'inherit' }}>Confirmar</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* MODAL FORMULARIO INSUMOS */}
+      {/* MODAL NUEVO/EDITAR INSUMO */}
       {isEditingInsumo && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>
-          <div style={{ background: '#1a1a1a', padding: '35px', borderRadius: '20px', width: '500px', color: 'white', border: '1px solid #333', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)' }}>
-            <h2 style={{ margin: '0 0 25px 0', fontSize: '1.5rem', color: '#10b981' }}>{editingInsumoId ? 'Editar Insumo' : 'Nuevo Insumo'}</h2>
-            <div style={{ display: 'flex', gap: '15px', marginBottom: '15px' }}>
+        <div className="modal-overlay" onClick={() => setIsEditingInsumo(false)}>
+          <div style={{ background: '#161616', padding: '35px', borderRadius: '16px', width: '500px', border: '1px solid #333', display: 'flex', flexDirection: 'column', gap: '20px' }} onClick={e => e.stopPropagation()}>
+            <h2 style={{ margin: 0, fontSize: '1.5rem', color: 'white' }}>{editingInsumoId ? 'Editar Insumo' : 'Nuevo Insumo'}</h2>
+            <div style={{ display: 'flex', gap: '15px' }}>
               <div style={{ flex: 1 }}>
-                <label style={{ display: 'block', marginBottom: '8px', color: '#9ca3af', fontWeight: 'bold', fontSize: '0.9rem' }}>Código</label>
-                <input value={formInsumoCodigo} onChange={e => setFormInsumoCodigo(e.target.value)} style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #333', background: '#111', color: 'white', fontSize: '1rem', outline: 'none', boxSizing: 'border-box' }} placeholder="Ej. INS-001" />
+                <label style={{ display: 'block', marginBottom: '8px', color: '#ccc' }}>Código</label>
+                <input value={formInsumoCodigo} onChange={e => setFormInsumoCodigo(e.target.value)} style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #555', background: 'transparent', color: 'white', boxSizing: 'border-box', fontFamily: 'inherit' }} />
               </div>
               <div style={{ flex: 2 }}>
-                <label style={{ display: 'block', marginBottom: '8px', color: '#9ca3af', fontWeight: 'bold', fontSize: '0.9rem' }}>Nombre</label>
-                <input value={formInsumoNombre} onChange={e => setFormInsumoNombre(e.target.value)} style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #333', background: '#111', color: 'white', fontSize: '1rem', outline: 'none', boxSizing: 'border-box' }} placeholder="Ej. Masa para Pizza" />
+                <label style={{ display: 'block', marginBottom: '8px', color: '#ccc' }}>Nombre</label>
+                <input value={formInsumoNombre} onChange={e => setFormInsumoNombre(e.target.value)} style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #555', background: 'transparent', color: 'white', boxSizing: 'border-box', fontFamily: 'inherit' }} />
               </div>
             </div>
-            <div style={{ marginBottom: '15px' }}>
-              <label style={{ display: 'block', marginBottom: '8px', color: '#9ca3af', fontWeight: 'bold', fontSize: '0.9rem' }}>Unidad de Medida</label>
-              <select value={formInsumoUnidad} onChange={e => setFormInsumoUnidad(e.target.value)} style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #333', background: '#111', color: 'white', fontSize: '1rem', outline: 'none', boxSizing: 'border-box', appearance: 'none' }}>
+            <div>
+              <label style={{ display: 'block', marginBottom: '8px', color: '#ccc' }}>Unidad de Medida</label>
+              <select value={formInsumoUnidad} onChange={e => setFormInsumoUnidad(e.target.value)} style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #555', background: '#111', color: 'white', boxSizing: 'border-box', fontFamily: 'inherit' }}>
                 <option value="KG">Kilogramos (KG)</option><option value="G">Gramos (G)</option><option value="L">Litros (L)</option><option value="ML">Mililitros (ML)</option><option value="PZ">Piezas (PZ)</option>
               </select>
             </div>
-            <div style={{ display: 'flex', gap: '15px', marginBottom: '30px' }}>
+            <div style={{ display: 'flex', gap: '15px' }}>
               <div style={{ flex: 1 }}>
-                <label style={{ display: 'block', marginBottom: '8px', color: '#9ca3af', fontWeight: 'bold', fontSize: '0.9rem' }}>Stock Actual</label>
-                <input type="number" step="0.01" min="0" value={formInsumoStock} onChange={e => setFormInsumoStock(e.target.value)} style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #333', background: '#111', color: 'white', fontSize: '1rem', fontFamily: 'monospace', outline: 'none', boxSizing: 'border-box' }} />
+                <label style={{ display: 'block', marginBottom: '8px', color: '#ccc' }}>Stock Actual</label>
+                <input type="number" step="0.01" min="0" value={formInsumoStock} onChange={e => setFormInsumoStock(e.target.value)} style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #555', background: 'transparent', color: 'white', boxSizing: 'border-box', fontFamily: 'inherit' }} />
               </div>
               <div style={{ flex: 1 }}>
-                <label style={{ display: 'block', marginBottom: '8px', color: '#9ca3af', fontWeight: 'bold', fontSize: '0.9rem' }}>Stock Mínimo (Alerta)</label>
-                <input type="number" step="0.01" min="0" value={formInsumoStockMinimo} onChange={e => setFormInsumoStockMinimo(e.target.value)} style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #333', background: '#111', color: 'white', fontSize: '1rem', fontFamily: 'monospace', outline: 'none', boxSizing: 'border-box' }} />
+                <label style={{ display: 'block', marginBottom: '8px', color: '#ccc' }}>Stock Mínimo</label>
+                <input type="number" step="0.01" min="0" value={formInsumoStockMinimo} onChange={e => setFormInsumoStockMinimo(e.target.value)} style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #555', background: 'transparent', color: 'white', boxSizing: 'border-box', fontFamily: 'inherit' }} />
               </div>
             </div>
-            <div style={{ display: 'flex', gap: '15px' }}>
-              <button onClick={() => setIsEditingInsumo(false)} style={{ flex: 1, padding: '14px', background: '#262626', color: '#9ca3af', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer' }}>Cancelar</button>
-              <button onClick={handleSaveInsumoClick} style={{ flex: 1, padding: '14px', background: '#10b981', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer' }}>Confirmar</button>
+            <div style={{ display: 'flex', gap: '15px', marginTop: '10px' }}>
+              <button onClick={() => setIsEditingInsumo(false)} style={{ flex: 1, padding: '12px', background: 'transparent', color: 'white', border: '1px solid white', borderRadius: '8px', cursor: 'pointer', fontFamily: 'inherit' }}>Cancelar</button>
+              <button onClick={handleSaveInsumoClick} style={{ flex: 1, padding: '12px', background: '#00E676', color: 'black', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontFamily: 'inherit' }}>Confirmar</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* MODAL DE SEGURIDAD (PIN) */}
-      <PinPadModal title="Autorización de Admin 🛡️" isOpen={isPinModalOpen} onClose={() => setIsPinModalOpen(false)} onVerify={handlePinVerified} />
+      <PinPadModal title="Autorización 🛡️" isOpen={isPinModalOpen} onClose={() => setIsPinModalOpen(false)} onVerify={handlePinVerified} />
+
+      {/* ESTILOS INTERNOS PARA EVITAR DOBLES BORDES EN LA TABLA HUECA */}
+      <style>{`
+        .custom-table { width: 100%; border-collapse: collapse; text-align: center; }
+        .custom-table th, .custom-table td { border: 1px solid #ffffff; padding: 15px; }
+        .custom-table tr:first-child th { border-top: none; }
+        .custom-table tr:last-child td { border-bottom: none; }
+        .custom-table tr th:first-child, .custom-table tr td:first-child { border-left: none; }
+        .custom-table tr th:last-child, .custom-table tr td:last-child { border-right: none; }
+        input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+      `}</style>
+
     </div>
   )
 }

@@ -21,7 +21,8 @@ interface CurrentUser {
 
 function App() {
   const [view, setView] = useState<ViewState>('DASHBOARD')
-  
+  const [currentTime, setCurrentTime] = useState(new Date())
+
   // NUEVOS ESTADOS DE CONFIGURACIÓN
   const [appConfig, setAppConfig] = useState<AppConfig | null>(null)
   const [isConfigLoading, setIsConfigLoading] = useState(true)
@@ -39,6 +40,12 @@ function App() {
   const [pinTitle, setPinTitle] = useState('Ingrese su PIN') 
   const [pendingView, setPendingView] = useState<ViewState | null>(null)
   const [pendingTableId, setPendingTableId] = useState<number | null>(null)
+
+  // NUEVO: Efecto para mantener el reloj actualizado
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000)
+    return () => clearInterval(timer)
+  }, [])
 
   // 1. Al abrir la app, primero leemos la configuración
   useEffect(() => {
@@ -226,16 +233,21 @@ function App() {
 
   if (view === 'REPORT') {
     return (
-      <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ padding: '10px 20px', display: 'flex', justifyContent: 'space-between', background: '#1a1a1a', alignItems: 'center' }}>
-          <button onClick={handleBackToDashboard} style={{ background: 'transparent', color: '#9ca3af', border: 'none', cursor: 'pointer', fontSize: '1rem' }}>
-            {hasValidLicense ? '← Menú Principal' : '← Volver a Activación'}
+      <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--color-bg-main, #121212)', color: 'white', fontFamily: 'var(--font-heading, monospace)' }}>
+        <div style={{ padding: '25px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #333' }}>
+          <button onClick={handleBackToDashboard} style={{ background: 'transparent', color: 'white', border: 'none', cursor: 'pointer', fontSize: '1.2rem', fontWeight: 'bold', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span>←</span> {hasValidLicense ? 'Menú principal' : 'Volver a Activación'}
           </button>
-          <div style={{ fontWeight: 'bold', color: 'white' }}>
-            REPORTE DIARIO {hasValidLicense ? '' : '(SOLO LECTURA)'}
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'white', textTransform: 'uppercase' }}>
+              REPORTE DIARIO {hasValidLicense ? '' : '(SOLO LECTURA)'}
+            </div>
+            <div style={{ fontSize: '1.1rem', color: '#F8F3B9', marginTop: '5px', fontWeight: 'bold' }}>
+              HORA : {currentTime.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase()}
+            </div>
           </div>
         </div>
-        <div style={{ flex: 1, overflow: 'hidden' }}>
+        <div style={{ flex: 1 , overflow: 'hidden' }}>
           <DailyReport />
         </div>
       </div>
@@ -244,24 +256,78 @@ function App() {
 
   if (view === 'USERS') {
     // @ts-ignore
-    return <UserManagement onBack={handleBackToDashboard} />
+    return (
+      <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--color-bg-main, #121212)', color: 'white', fontFamily: 'var(--font-heading, monospace)' }}>
+        <div style={{ padding: '25px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #333' }}>
+          <button onClick={handleBackToDashboard} style={{ background: 'transparent', color: 'white', border: 'none', cursor: 'pointer', fontSize: '1.2rem', fontWeight: 'bold', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span>←</span> Menú principal
+          </button>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'white', textTransform: 'uppercase' }}>
+              GESTIÓN DE PERSONAL
+            </div>
+          </div>
+        </div>
+        <div style={{ flex: 1, overflow: 'hidden' }}>
+          <UserManagement onBack={handleBackToDashboard} />
+        </div>
+      </div>
+    )
   }
 
   if (view === 'PRODUCTS') {
-    return <ProductManagement onBack={handleBackToDashboard} />
+    return (
+      <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--color-bg-main, #121212)', color: 'white', fontFamily: 'var(--font-heading, monospace)' }}>
+        <div style={{ padding: '25px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #333' }}>
+          <button onClick={handleBackToDashboard} style={{ background: 'transparent', color: 'white', border: 'none', cursor: 'pointer', fontSize: '1.2rem', fontWeight: 'bold', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span>←</span> Menú principal
+          </button>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'white', textTransform: 'uppercase' }}>
+              ALMACÉN Y MENÚ
+            </div>
+          </div>
+        </div>
+        <div style={{ flex: 1, overflow: 'hidden' }}>
+          <ProductManagement onBack={handleBackToDashboard} />
+        </div>
+      </div>
+    )
   }
 
   if (view === 'SETTINGS') {
-    return <Settings onBack={handleBackToDashboard} />
+    return (
+      <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--color-bg-main, #121212)', color: 'white', fontFamily: 'var(--font-heading, monospace)' }}>
+        <div style={{ padding: '25px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #333' }}>
+          <button onClick={handleBackToDashboard} style={{ background: 'transparent', color: 'white', border: 'none', cursor: 'pointer', fontSize: '1.2rem', fontWeight: 'bold', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span>←</span> Menú principal
+          </button>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'white', textTransform: 'uppercase' }}>
+              CONFIGURACIÓN DEL SISTEMA
+            </div>
+          </div>
+        </div>
+        <div style={{ flex: 1, overflow: 'hidden' }}>
+          <Settings onBack={handleBackToDashboard} />
+        </div>
+      </div>
+    )
   }
 
   if (view === 'TABLES') {
     return (
-      <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--color-bg-main, #121212)', color: 'white', fontFamily: 'var(--font-heading, monospace)' }}>
         <PinPadModal title={pinTitle} isOpen={isPinModalOpen} onClose={() => { setIsPinModalOpen(false); setPendingTableId(null); }} onVerify={handlePinVerify} />
-        <div style={{ padding: '10px 20px', display: 'flex', justifyContent: 'space-between', background: '#1a1a1a', alignItems: 'center' }}>
-          <button onClick={handleBackToDashboard} style={{ background: 'transparent', color: '#9ca3af', border: 'none', cursor: 'pointer', fontSize: '1rem' }}>← Menú Principal</button>
-          <div style={{ fontWeight: 'bold', color: 'white' }}>MAPA DE MESAS</div>
+        <div style={{ padding: '25px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #333' }}>
+          <button onClick={handleBackToDashboard} style={{ background: 'transparent', color: 'white', border: 'none', cursor: 'pointer', fontSize: '1.2rem', fontWeight: 'bold', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span>←</span> Menú principal
+          </button>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'white', textTransform: 'uppercase' }}>
+              MAPA DE MESAS
+            </div>
+          </div>
         </div>
         <div style={{ flex: 1, overflow: 'hidden' }}>
           <TableGrid tables={tables} onSelectTable={handleSelectTableRequest} />

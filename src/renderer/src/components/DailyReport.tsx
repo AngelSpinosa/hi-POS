@@ -116,10 +116,10 @@ export function DailyReport({ onBack }: DailyReportProps) {
       // @ts-ignore
       const res = await window.electron.ipcRenderer.invoke('save-daily-cut', { date, realCash, difference })
       if (res.success) {
-        alert('✅ Corte de caja guardado con éxito.')
+        alert('Corte de caja guardado con éxito.')
         fetchReport() 
       } else {
-        alert('❌ Error: ' + res.error)
+        alert(' Error: ' + res.error)
       }
     } catch (error) {
       alert('Error de conexión al guardar el corte.')
@@ -137,13 +137,13 @@ export function DailyReport({ onBack }: DailyReportProps) {
         return;
       }
       if (res.success) {
-        alert('✅ Reporte exportado a Excel con éxito.');
+        alert('Reporte exportado a Excel con éxito.');
         setIsExportModalOpen(false);
       } else {
-        alert('❌ Error al exportar: ' + res.error);
+        alert('Error al exportar: ' + res.error);
       }
     } catch (e) {
-      alert('❌ Error de comunicación al exportar a Excel.');
+      alert('Error de comunicación al exportar a Excel.');
     }
   }
 
@@ -152,20 +152,9 @@ export function DailyReport({ onBack }: DailyReportProps) {
   yesterdayDate.setDate(yesterdayDate.getDate() - 1);
   const yesterdayStr = getLocalDate(yesterdayDate);
 
-  return (
-    <div className="report-container">
+ return (
+    <div className="report-container" style={{ height: '100%', paddingTop: '20px' }}>
       
-      {/* CABECERA AL ESTILO FIGMA */}
-      <div className="report-header">
-        <button className="btn-back" onClick={onBack}>
-          ← Menú principal
-        </button>
-        <div className="time-display">
-          <div className="time-hours">HORA : {formatTime(time)}</div>
-          <div className="time-date">{formatDate(time)}</div>
-        </div>
-      </div>
-
       <div className="report-content">
         
         {/* TÍTULO Y FILTROS */}
@@ -316,20 +305,20 @@ export function DailyReport({ onBack }: DailyReportProps) {
       {isExportModalOpen && (
         <div className="modal-overlay">
           <div className="modal-content">
-            <h3 className="modal-title">📊 Exportar a Excel</h3>
+            <h3 className="modal-title">Exportar a Excel</h3>
             <p className="modal-text">
               Selecciona el rango de tiempo que deseas exportar basándote en la fecha actual <strong>({date})</strong>:
             </p>
             
             <div className="modal-options">
               <button className="btn-modal-option" onClick={() => handleExportExcel('selected')}>
-                📅 Reporte de este día
+                Reporte de este día
               </button>
               <button className="btn-modal-option" onClick={() => handleExportExcel('yesterday')}>
-                ⏪ Reporte de ayer
+                Reporte de ayer
               </button>
               <button className="btn-modal-option" onClick={() => handleExportExcel('week')}>
-                📆 Reportes de la última semana
+                Reportes de la última semana
               </button>
             </div>
             
