@@ -79,91 +79,177 @@ export function LicenseScreen({ onLicenseActivated, reason, onViewReports }: Lic
   }
 
   return (
-    <div style={{ height: '100vh', display: 'flex', backgroundColor: '#111', color: 'white', alignItems: 'center', justifyContent: 'center', fontFamily: 'sans-serif' }}>
+    <div style={{ 
+      height: '100vh', 
+      display: 'flex', 
+      backgroundColor: 'var(--color-bg-main, #121212)', 
+      color: 'white', 
+      alignItems: 'center', 
+      justifyContent: 'center', 
+      fontFamily: 'var(--font-heading, monospace)' 
+    }}>
       
       <div style={{ 
-        backgroundColor: '#1a1a1a', 
-        padding: '40px', 
-        borderRadius: '15px', 
-        width: '550px', 
-        // EFECTO VISUAL DE CASTIGO: Borde y sombra roja si hizo trampa
+        backgroundColor: '#161616', 
+        padding: '50px 40px', 
+        borderRadius: '16px', 
+        width: '560px', 
         border: isTimeTampering ? '2px solid #ef4444' : '1px solid #333', 
         boxShadow: isTimeTampering ? '0 0 30px rgba(239, 68, 68, 0.4)' : '0 10px 25px rgba(0,0,0,0.5)',
-        transition: 'all 0.3s ease'
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '25px',
+        boxSizing: 'border-box'
       }}>
         
-        {/* Header */}
-        <div style={{ textAlign: 'center', marginBottom: '30px' }}>
-          <h1 style={{ margin: '0 0 10px 0', color: '#f97316', fontSize: '2rem' }}>POS PIZZA 🍕</h1>
-          <h2 style={{ margin: 0, color: '#fff', fontSize: '1.2rem' }}>Activación de Licencia</h2>
+        {/* Header (Títulos y Razón) */}
+        <div style={{ textAlign: 'center' }}>
+          <h1 style={{ margin: '0 0 10px 0', color: '#ffffff', fontSize: '2.5rem', fontWeight: 'bold' }}>
+            Hi-POS
+          </h1>
+          <h2 style={{ margin: '0 0 15px 0', color: '#ffffff', fontSize: '1.2rem', fontWeight: 'normal' }}>
+            Activación de licencia
+          </h2>
           
-          <p style={{ color: '#ef4444', marginTop: '10px', fontWeight: 'bold', fontSize: isTimeTampering ? '1.1rem' : '1rem' }}>
+          <p style={{ color: '#ef4444', margin: 0, fontWeight: 'bold', fontSize: '1rem' }}>
             {getReasonMessage()}
           </p>
           
-          {/* Subtítulo explicativo del castigo */}
           {isTimeTampering && (
-            <p style={{ color: '#fca5a5', fontSize: '0.9rem', marginTop: '5px', backgroundColor: '#450a0a', padding: '10px', borderRadius: '5px' }}>
+            <p style={{ color: '#fca5a5', fontSize: '0.9rem', marginTop: '15px', backgroundColor: '#450a0a', padding: '10px', borderRadius: '5px' }}>
               El sistema se ha bloqueado por seguridad. Para recuperar el acceso, <strong>restaure la fecha y hora real</strong> de su computadora.
             </p>
           )}
         </div>
 
-        {/* Instrucciones y Device ID */}
-        <div style={{ backgroundColor: '#262626', padding: '20px', borderRadius: '10px', marginBottom: '25px', border: '1px solid #404040' }}>
-          <p style={{ margin: '0 0 10px 0', color: '#9ca3af', fontSize: '0.9rem', textAlign: 'center' }}>
-            Para obtener tu código de activación, envía el siguiente <strong>ID de Dispositivo</strong> a tu proveedor:
+        {/* Sección 1: Instrucciones y Device ID */}
+        <div style={{ 
+          border: '1px solid #ffffff', 
+          padding: '20px', 
+          borderRadius: '12px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '15px'
+        }}>
+          <p style={{ margin: 0, color: '#d1d5db', fontSize: '0.85rem', textAlign: 'center', lineHeight: '1.4' }}>
+            Para obtener tu código de activación, envía el siguiente ID<br/>de dispositivo a tu proveedor:
           </p>
           
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', justifyContent: 'center' }}>
-            <div style={{ flex: 1, backgroundColor: '#000', padding: '15px', borderRadius: '8px', textAlign: 'center', fontSize: '1.5rem', fontFamily: 'monospace', color: '#22c55e', letterSpacing: '2px', userSelect: 'all' }}>
+          <div style={{ display: 'flex', gap: '15px', alignItems: 'stretch', justifyContent: 'center' }}>
+            <div style={{ 
+              flex: 1, 
+              backgroundColor: '#000000', 
+              padding: '12px 15px', 
+              borderRadius: '6px', 
+              border: '1px solid #00d044',
+              color: '#ff0000', 
+              fontSize: '0.95rem',
+              display: 'flex',
+              alignItems: 'center',
+              overflow: 'hidden',
+              whiteSpace: 'nowrap',
+              textOverflow: 'ellipsis'
+            }}>
               {deviceId}
             </div>
             
             <button 
               onClick={handleCopy}
-              style={{ padding: '15px', backgroundColor: copied ? '#3b82f6' : '#4b5563', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', transition: 'background-color 0.2s', minWidth: '100px' }}
+              style={{ 
+                padding: '0 15px', 
+                backgroundColor: '#000000', 
+                color: '#ffffff', 
+                border: '1px solid #00d044', 
+                borderRadius: '6px', 
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontSize: '0.85rem',
+                transition: 'background-color 0.2s'
+              }}
             >
-              {copied ? '¡Copiado! ✓' : 'Copiar 📋'}
+              {copied ? 'Copiado' : 'Copiar'}
+              {!copied && (
+                <svg width="14" height="16" viewBox="0 0 14 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M9.5 2H10.5C11.6046 2 12.5 2.89543 12.5 4V13C12.5 14.1046 11.6046 15 10.5 15H3.5C2.39543 15 1.5 14.1046 1.5 13V4C1.5 2.89543 2.39543 2 3.5 2H4.5M9.5 2C9.5 3.10457 8.60457 4 7.5 4C6.39543 4 5.5 3.10457 5.5 2M9.5 2C9.5 0.89543 8.60457 0 7.5 0C6.39543 0 5.5 0.89543 5.5 2" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              )}
             </button>
           </div>
         </div>
 
-        {/* Input para el Código */}
-        <div style={{ marginBottom: '20px' }}>
-          <label style={{ display: 'block', marginBottom: '8px', color: '#9ca3af', fontWeight: 'bold' }}>Ingresa tu Código de Activación:</label>
+        {/* Sección 2: Input para el Código de Activación */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <label style={{ color: '#d1d5db', fontSize: '0.85rem' }}>Ingresa tu código de activación:</label>
           <input 
             type="text" 
             value={licenseCode}
             onChange={(e) => setLicenseCode(e.target.value)}
             placeholder="Ej. DEMO|00:11:22...|2024-12-31|FIRMA"
-            style={{ width: '100%', padding: '15px', borderRadius: '8px', border: '1px solid #404040', background: '#111', color: 'white', fontSize: '1rem', fontFamily: 'monospace', outline: 'none', boxSizing: 'border-box' }}
+            style={{ 
+              width: '100%', 
+              padding: '14px 15px', 
+              borderRadius: '6px', 
+              border: '1px solid #555555', 
+              background: '#111111', 
+              color: 'white', 
+              fontSize: '0.9rem', 
+              fontFamily: 'inherit', 
+              outline: 'none', 
+              boxSizing: 'border-box' 
+            }}
           />
         </div>
 
         {errorMsg && (
-          <div style={{ color: '#ef4444', backgroundColor: '#450a0a', padding: '10px', borderRadius: '5px', marginBottom: '20px', textAlign: 'center', fontSize: '0.9rem', border: '1px solid #991b1b' }}>
+          <div style={{ color: '#ef4444', textAlign: 'center', fontSize: '0.9rem', marginTop: '-10px' }}>
             {errorMsg}
           </div>
         )}
 
-        <button 
-          onClick={handleActivate}
-          disabled={isLoading || !licenseCode}
-          style={{ width: '100%', padding: '15px', backgroundColor: (isLoading || !licenseCode) ? '#404040' : '#22c55e', color: 'white', border: 'none', borderRadius: '8px', fontSize: '1.1rem', fontWeight: 'bold', cursor: (isLoading || !licenseCode) ? 'not-allowed' : 'pointer', transition: 'background-color 0.2s' }}
-        >
-          {isLoading ? 'Validando...' : 'ACTIVAR SOFTWARE'}
-        </button>
-
-        {/* Botón para ver reportes en solo lectura */}
-        {onViewReports && (
+        {/* Sección 3: Botones de Acción */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginTop: '10px' }}>
           <button 
-            onClick={onViewReports}
-            style={{ width: '100%', padding: '12px', marginTop: '15px', backgroundColor: 'transparent', color: '#9ca3af', border: '1px solid #404040', borderRadius: '8px', fontSize: '0.9rem', fontWeight: 'bold', cursor: 'pointer' }}
+            onClick={handleActivate}
+            disabled={isLoading || !licenseCode}
+            style={{ 
+              width: '100%', 
+              padding: '14px', 
+              backgroundColor: (isLoading || !licenseCode) ? '#1a5c32' : '#00E676', 
+              color: '#ffffff', 
+              border: 'none', 
+              borderRadius: '6px', 
+              fontSize: '1rem', 
+              fontWeight: 'bold', 
+              cursor: (isLoading || !licenseCode) ? 'not-allowed' : 'pointer', 
+              fontFamily: 'inherit',
+              transition: 'filter 0.2s',
+              textTransform: 'uppercase'
+            }}
           >
-            Ver Historial de Ventas (Solo Lectura) 📊
+            {isLoading ? 'Validando...' : 'ACTIVAR SOFTWARE'}
           </button>
-        )}
+
+          {onViewReports && (
+            <button 
+              onClick={onViewReports}
+              style={{ 
+                width: '100%', 
+                padding: '12px', 
+                backgroundColor: 'transparent', 
+                color: '#ffffff', 
+                border: '1px solid #ffffff', 
+                borderRadius: '6px', 
+                fontSize: '0.85rem', 
+                cursor: 'pointer',
+                fontFamily: 'inherit'
+              }}
+            >
+              Ver Historial de ventas (Solo Lectura)
+            </button>
+          )}
+        </div>
 
       </div>
     </div>

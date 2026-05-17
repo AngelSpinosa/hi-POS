@@ -6,7 +6,7 @@ interface UserManagementProps {
   onBack: () => void; // <-- 1. Asegúrate de tener esto declarado
 }
 
-export function UserManagement({ onBack }: UserManagementProps) {
+export function UserManagement({}: UserManagementProps) {
   const [users, setUsers] = useState<User[]>([])
   
   // Estado del formulario (Crear/Editar)
@@ -116,123 +116,124 @@ export function UserManagement({ onBack }: UserManagementProps) {
     else alert('Error: ' + res.error)
   }
 
-  return (
-    <div style={{ padding: '20px', color: 'white', height: '100%', overflowY: 'auto' }}>
-      
-      <div style={{ padding: '15px 30px', display: 'flex', justifyContent: 'space-between', background: '#2d2d2d', alignItems: 'center', color: 'white', borderBottom: '1px solid #404040' }}>
-        <button onClick={onBack} style={{ background: 'transparent', color: '#9ca3af', border: 'none', cursor: 'pointer', fontSize: '1rem', fontWeight: 'bold' }}>
-          ← Volver al Menú
-        </button>
-        <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#a855f7' }}>GESTIÓN DE PERSONAL 👥</div>
-        <div style={{ width: '130px' }}></div> {/* Espaciador para centrar el título */}
-      </div>
+return (
+    <div style={{ height: '100%', padding: '40px 60px', overflowY: 'auto', boxSizing: 'border-box' }}>
+      <div style={{ maxWidth: '850px', margin: '0 auto' }}>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
-        <h1 style={{ margin: 0 }}>Gestión de Personal 👥</h1>
-        {!isEditing && (
-          <button 
-            onClick={handleOpenCreate}
-            style={{ padding: '10px 20px', background: '#2563eb', border: 'none', color: 'white', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold' }}
-          >
-            + Nuevo Empleado
-          </button>
-        )}
-      </div>
-
-      {/* FORMULARIO DE CREACIÓN / EDICIÓN */}
-      {isEditing && (
-        <div style={{ marginBottom: '30px', padding: '20px', background: '#2d2d2d', borderRadius: '10px', border: '1px solid #3b82f6', boxShadow: '0 0 15px rgba(59, 130, 246, 0.3)' }}>
-          <h3 style={{ marginTop: 0, color: '#3b82f6' }}>
-            {editingId ? 'Editar Empleado' : 'Registrar Nuevo Empleado'}
-          </h3>
-          
-          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '15px', marginBottom: '15px' }}>
-            <div>
-              <label style={{ display: 'block', color: '#9ca3af', marginBottom: '5px' }}>Nombre Completo</label>
-              <input 
-                type="text" value={formName} onChange={e => setFormName(e.target.value)}
-                style={{ width: '100%', padding: '10px', background: '#1a1a1a', border: '1px solid #404040', color: 'white', borderRadius: '5px' }}
-              />
-            </div>
-            <div>
-              <label style={{ display: 'block', color: '#9ca3af', marginBottom: '5px' }}>PIN de Acceso</label>
-              <input 
-                type="text" value={formPin} onChange={e => setFormPin(e.target.value.replace(/\D/g,''))}
-                maxLength={4}
-                style={{ width: '100%', padding: '10px', background: '#1a1a1a', border: '1px solid #404040', color: 'white', borderRadius: '5px' }}
-              />
-            </div>
-            <div>
-              <label style={{ display: 'block', color: '#9ca3af', marginBottom: '5px' }}>Rol</label>
-              <select 
-                value={formRol} onChange={e => setFormRol(e.target.value)}
-                style={{ width: '100%', padding: '10px', background: '#1a1a1a', border: '1px solid #404040', color: 'white', borderRadius: '5px' }}
-              >
-                <option value="cajero">Cajero</option>
-                <option value="admin">Administrador</option>
-              </select>
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px' }}>
+          <h2 style={{ fontSize: '2rem', fontWeight: 'bold', margin: 0, color: 'white' }}>
+            Gestión del personal
+          </h2>
+          {!isEditing && (
             <button 
-              onClick={() => setIsEditing(false)}
-              style={{ padding: '10px 20px', background: 'transparent', border: '1px solid #666', color: '#ccc', borderRadius: '5px', cursor: 'pointer' }}
+              onClick={handleOpenCreate}
+              style={{ padding: '12px 25px', background: '#0022ff', color: 'white', border: 'none', borderRadius: '30px', fontWeight: 'bold', fontSize: '0.95rem', cursor: 'pointer', fontFamily: 'inherit' }}
             >
-              Cancelar
+              + Nuevo empleado
             </button>
-            <button 
-              onClick={handleSaveClick}
-              style={{ padding: '10px 20px', background: '#22c55e', border: 'none', color: 'white', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold' }}
-            >
-              {editingId ? 'Guardar Cambios' : 'Crear Usuario'}
-            </button>
-          </div>
+          )}
         </div>
-      )}
 
-      {/* LISTA DE USUARIOS */}
-      <div style={{ display: 'grid', gap: '15px' }}>
-        {users.map(user => (
-          <div key={user.id} style={{ 
-            display: 'flex', justifyContent: 'space-between', alignItems: 'center', 
-            padding: '20px', background: '#2d2d2d', borderRadius: '10px',
-            opacity: user.active ? 1 : 0.6,
-            borderLeft: user.active ? (user.rol === 'admin' ? '4px solid #fbbf24' : '4px solid #22c55e') : '4px solid #666'
-          }}>
-            <div>
-              <div style={{ fontSize: '1.2rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                {user.nombre}
-                {user.rol === 'admin' && <span style={{ fontSize: '0.7rem', background: '#fbbf24', color: 'black', padding: '2px 6px', borderRadius: '4px' }}>ADMIN</span>}
+        {/* FORMULARIO DE CREACIÓN / EDICIÓN TIPO HOLLOW */}
+        {isEditing && (
+          <div style={{ marginBottom: '40px', padding: '35px', background: 'transparent', borderRadius: '20px', border: '1px solid #555' }}>
+            <h3 style={{ marginTop: 0, marginBottom: '25px', fontSize: '1.4rem', color: 'white' }}>
+              {editingId ? 'Editar empleado' : 'Registrar nuevo empleado'}
+            </h3>
+            
+            <div style={{ display: 'flex', gap: '20px', marginBottom: '25px' }}>
+              <div style={{ flex: 2 }}>
+                <input 
+                  type="text" value={formName} onChange={e => setFormName(e.target.value)}
+                  placeholder="Nombre"
+                  style={{ width: '100%', padding: '14px 20px', background: 'transparent', border: '1px solid #555', color: 'white', borderRadius: '30px', boxSizing: 'border-box', fontFamily: 'inherit', fontSize: '1rem', outline: 'none' }}
+                />
               </div>
-              <div style={{ color: '#9ca3af', fontSize: '0.9rem', marginTop: '5px' }}>
-                PIN: ••••
+              <div style={{ flex: 1 }}>
+                <input 
+                  type="password" value={formPin} onChange={e => setFormPin(e.target.value.replace(/\D/g,''))}
+                  maxLength={4}
+                  placeholder="PIN"
+                  style={{ width: '100%', padding: '14px 20px', background: 'transparent', border: '1px solid #555', color: 'white', borderRadius: '30px', boxSizing: 'border-box', fontFamily: 'inherit', fontSize: '1rem', outline: 'none', textAlign: 'center', letterSpacing: '3px' }}
+                />
+              </div>
+              <div style={{ flex: 1 }}>
+                <select 
+                  value={formRol} onChange={e => setFormRol(e.target.value)}
+                  style={{ width: '100%', padding: '14px 20px', background: 'transparent', border: '1px solid #555', color: 'white', borderRadius: '30px', boxSizing: 'border-box', fontFamily: 'inherit', fontSize: '1rem', outline: 'none', appearance: 'none' }}
+                >
+                  <option value="cajero" style={{ background: '#111' }}>Cajero</option>
+                  <option value="admin" style={{ background: '#111' }}>Administrador</option>
+                </select>
               </div>
             </div>
-            
-            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+
+            <div style={{ display: 'flex', gap: '15px', justifyContent: 'flex-end' }}>
               <button 
-                onClick={() => handleOpenEdit(user)}
-                style={{ padding: '8px 15px', background: '#3b82f6', border: 'none', color: 'white', borderRadius: '5px', cursor: 'pointer' }}
+                onClick={() => setIsEditing(false)}
+                style={{ padding: '12px 30px', background: 'transparent', border: '1px solid #555', color: 'white', borderRadius: '30px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 'bold', fontSize: '0.95rem' }}
               >
-                Editar
+                Cancelar
               </button>
-              
-              {user.id !== 1 && (
-                <button 
-                  onClick={() => handleToggleStatus(user.id, user.active)}
-                  style={{ 
-                    padding: '8px 15px', 
-                    background: user.active ? '#ef4444' : '#10b981', 
-                    border: 'none', color: 'white', borderRadius: '5px', cursor: 'pointer', minWidth: '90px'
-                  }}
-                >
-                  {user.active ? 'Desactivar' : 'Activar'}
-                </button>
-              )}
+              <button 
+                onClick={handleSaveClick}
+                style={{ padding: '12px 30px', background: '#00E676', border: 'none', color: 'black', borderRadius: '30px', cursor: 'pointer', fontWeight: 'bold', fontFamily: 'inherit', fontSize: '0.95rem' }}
+              >
+                {editingId ? 'Guardar cambios' : 'Crear usuario'}
+              </button>
             </div>
           </div>
-        ))}
+        )}
+
+        {/* LISTA DE USUARIOS (TARJETAS HOLLOW CON BORDES DE COLOR) */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {users.map(user => {
+            const isAdmin = user.rol === 'admin';
+            const borderColor = !user.active ? '#555555' : (isAdmin ? '#FFFF00' : '#0022ff');
+
+            return (
+              <div key={user.id} style={{ 
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center', 
+                padding: '20px 30px', background: 'transparent', borderRadius: '30px',
+                opacity: user.active ? 1 : 0.6,
+                border: `2px solid ${borderColor}`,
+                transition: 'all 0.2s ease'
+              }}>
+                <div>
+                  <div style={{ fontSize: '1.3rem', fontWeight: 'bold', color: 'white', marginBottom: '5px' }}>
+                    {user.nombre}
+                  </div>
+                  <div style={{ color: 'white', fontSize: '0.9rem' }}>
+                    Rol: {isAdmin ? 'Administrador' : 'Cajero'}
+                  </div>
+                </div>
+                
+                <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
+                  <button 
+                    onClick={() => handleOpenEdit(user)}
+                    style={{ padding: '8px 25px', background: '#00B4D8', border: 'none', color: 'black', borderRadius: '20px', cursor: 'pointer', fontWeight: 'bold', fontFamily: 'inherit', fontSize: '0.85rem' }}
+                  >
+                    Editar
+                  </button>
+                  
+                  {user.id !== 1 && (
+                    <button 
+                      onClick={() => handleToggleStatus(user.id, user.active)}
+                      style={{ 
+                        padding: '8px 25px', 
+                        background: user.active ? '#FF0000' : '#555555', 
+                        border: 'none', color: 'white', borderRadius: '20px', cursor: 'pointer', minWidth: '100px', fontWeight: 'bold', fontFamily: 'inherit', fontSize: '0.85rem'
+                      }}
+                    >
+                      {user.active ? 'Desactivar' : 'Activar'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+
       </div>
 
       {/* MODAL DE SEGURIDAD PARA CONFIRMAR EDICIÓN */}

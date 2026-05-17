@@ -147,125 +147,206 @@ export function Settings({ onBack }: SettingsProps) {
   }
 
   return (
-    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#111', color: 'white', fontFamily: 'sans-serif' }}>
-      <div style={{ padding: '20px 30px', display: 'flex', alignItems: 'center', background: '#1a1a1a', borderBottom: '1px solid #333' }}>
-        <button onClick={onBack} style={{ background: 'transparent', color: '#9ca3af', border: 'none', cursor: 'pointer', fontSize: '1.1rem', fontWeight: 'bold', marginRight: '30px' }}>
-          ← Volver al Menú
-        </button>
-        <h2 style={{ margin: 0, color: '#3b82f6', fontSize: '1.5rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
-          CONFIGURACIÓN DEL SISTEMA ⚙️
-        </h2>
-      </div>
+    <div style={{ 
+      height: '100vh', display: 'flex', flexDirection: 'column', 
+      backgroundColor: 'var(--color-bg-main, #121212)', color: 'white', 
+      fontFamily: 'var(--font-heading, monospace)' 
+    }}>
+      
+      <div style={{ flex: 1, padding: '40px 60px', overflowY: 'auto' }}>
+        <div style={{ maxWidth: '850px', margin: '0 auto' }}>
+          
+          <h2 style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '40px', color: 'white' }}>
+            Configuración del sistema
+          </h2>
 
-      <div style={{ flex: 1, padding: '40px', overflowY: 'auto' }}>
-        <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-
-          <div style={{ marginBottom: '40px' }}>
-            <h3 style={{ color: '#f97316', borderBottom: '1px solid #333', paddingBottom: '10px', marginBottom: '20px' }}>
-              Impresión y Tickets
+          {/* SECCIÓN 1: TICKETS E IMPRESIONES */}
+          <div style={{ marginBottom: '50px' }}>
+            <h3 style={{ color: '#FCA311', borderBottom: '1px solid #333', paddingBottom: '10px', marginBottom: '20px', fontSize: '1.2rem' }}>
+              Tickets e impresiones
             </h3>
-            <div style={{ background: '#1a1a1a', border: '1px dashed #404040', borderRadius: '10px', padding: '20px', color: '#9ca3af' }}>
-              🖨️ Configuraciones de impresora térmica, logo del negocio y mensaje al pie del ticket se agregarán aquí en la versión Post-MVP.
-            </div>
-          </div>
-
-          <div style={{ marginBottom: '40px' }}>
-            <h3 style={{ color: '#f97316', borderBottom: '1px solid #333', paddingBottom: '10px', marginBottom: '20px' }}>
-              Base de Datos
-            </h3>
-            <div style={{ background: '#1a1a1a', border: '1px solid #333', borderRadius: '10px', padding: '25px' }}>
-              <div style={{ color: '#d1d5db', marginBottom: '20px' }}>💾 Opciones para respaldar la información (Backup), limpiar el historial de ventas y restablecer de fábrica.</div>
-              <div style={{ display: 'flex', gap: '15px' }}>
-                <button onClick={handleExportBackup} style={{ padding: '10px 20px', background: '#262626', color: '#10b981', border: '1px solid #10b981', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>Exportar Respaldo (.db)</button>
-                <button onClick={handleImportBackup} style={{ padding: '10px 20px', background: '#262626', color: '#eab308', border: '1px solid #eab308', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>Importar Respaldo</button>
-                <button onClick={() => setIsResetModalOpen(true)} style={{ padding: '10px 20px', background: 'transparent', color: '#ef4444', border: '1px solid #ef4444', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', marginLeft: 'auto' }}>Restablecer de Fábrica ⚠️</button>
+            
+            <div style={{ border: '1px solid #333', borderRadius: '12px', padding: '30px', background: 'transparent' }}>
+              <div style={{ color: '#9ca3af', fontSize: '1rem', lineHeight: '1.5' }}>
+                🖨️ Configuraciones de impresora térmica, logo del negocio y mensaje al pie del ticket se agregarán aquí en la versión Post-MVP.
               </div>
             </div>
           </div>
 
-          <div style={{ marginBottom: '40px' }}>
-            <h3 style={{ color: '#f97316', borderBottom: '1px solid #333', paddingBottom: '10px', marginBottom: '20px' }}>
-              Licencia y Sistema
+          {/* SECCIÓN 2: BASE DE DATOS */}
+          <div style={{ marginBottom: '50px' }}>
+            <h3 style={{ color: '#FCA311', borderBottom: '1px solid #333', paddingBottom: '10px', marginBottom: '20px', fontSize: '1.2rem' }}>
+              Base de datos
             </h3>
-            <div style={{ background: '#1a1a1a', border: '1px solid #333', borderRadius: '10px', padding: '25px' }}>
-              {licenseInfo ? (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '25px' }}>
-                  <div style={{ background: '#111', padding: '15px', borderRadius: '8px', border: '1px solid #404040' }}>
-                    <div style={{ color: '#9ca3af', fontSize: '0.85rem', marginBottom: '8px' }}>DEVICE ID (Identificador Físico MAC)</div>
-                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                      <code style={{ color: '#3b82f6', fontSize: '1rem', flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={licenseInfo.deviceId}>{licenseInfo.deviceId}</code>
-                      <button onClick={() => { navigator.clipboard.writeText(licenseInfo.deviceId); alert('¡ID Copiado al portapapeles!'); }} style={{ background: '#3b82f6', color: 'white', border: 'none', borderRadius: '4px', padding: '6px 12px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold' }}>Copiar</button>
+            
+            <div style={{ border: '1px solid #333', borderRadius: '12px', padding: '30px', background: 'transparent' }}>
+              <div style={{ marginBottom: '25px' }}>
+                <h4 style={{ color: 'white', fontSize: '1.1rem', margin: '0 0 10px 0' }}>Respaldos y mantenimiento</h4>
+                <p style={{ color: '#9ca3af', fontSize: '0.95rem', margin: 0, lineHeight: '1.5' }}>
+                  Opciones para respaldar información, limpiar el historial de eventos y restablecer de fábrica.
+                </p>
+              </div>
+              
+              <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
+                <button 
+                  onClick={handleExportBackup} 
+                  style={{ padding: '12px 25px', background: 'transparent', color: '#00E676', border: '1px solid #00E676', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontFamily: 'inherit', fontSize: '0.95rem' }}
+                >
+                  Exportar respaldo
+                </button>
+                <button 
+                  onClick={handleImportBackup} 
+                  style={{ padding: '12px 25px', background: 'transparent', color: '#FCA311', border: '1px solid #FCA311', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontFamily: 'inherit', fontSize: '0.95rem' }}
+                >
+                  Importar respaldo
+                </button>
+                <button 
+                  onClick={() => setIsResetModalOpen(true)} 
+                  style={{ padding: '12px 25px', background: 'transparent', color: '#FF0000', border: '1px solid #FF0000', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontFamily: 'inherit', fontSize: '0.95rem' }}
+                >
+                  Restablecer datos
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* SECCIÓN 3: LICENCIA Y SISTEMA */}
+          <div style={{ marginBottom: '50px' }}>
+            <h3 style={{ color: '#FCA311', borderBottom: '1px solid #333', paddingBottom: '10px', marginBottom: '20px', fontSize: '1.2rem' }}>
+              Licencia y sistema
+            </h3>
+            
+            <div style={{ border: '1px solid #333', borderRadius: '12px', padding: '30px', background: 'transparent' }}>
+              <div style={{ display: 'flex', gap: '25px', marginBottom: '35px' }}>
+                {/* Tarjeta Device ID */}
+                <div style={{ flex: 1, background: '#1a1a1a', padding: '25px', borderRadius: '12px', border: '1px solid #444', display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                  <div style={{ color: 'white', fontSize: '1.2rem', fontWeight: 'bold' }}>DEVICE ID</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '15px' }}>
+                    <code style={{ color: '#9ca3af', fontSize: '0.95rem', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {licenseInfo?.deviceId || 'Cargando...'}
+                    </code>
+                    <button 
+                      onClick={() => { navigator.clipboard.writeText(licenseInfo?.deviceId || ''); alert('¡ID Copiado al portapapeles!'); }} 
+                      style={{ background: '#00B4D8', color: 'black', border: 'none', borderRadius: '6px', padding: '8px 16px', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 'bold', fontFamily: 'inherit' }}
+                    >
+                      Copiar
+                    </button>
+                  </div>
+                </div>
+                
+                {/* Tarjeta Estado Licencia */}
+                <div style={{ flex: 1, background: '#1a1a1a', padding: '25px', borderRadius: '12px', border: licenseInfo?.valid ? '1px solid #FCA311' : '1px solid #FF0000', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ color: 'white', fontSize: '1rem', fontWeight: 'normal' }}>Estado de licencia</div>
+                  <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: licenseInfo?.valid ? '#FCA311' : '#FF0000' }}>
+                    {licenseInfo?.valid ? licenseInfo.type.toUpperCase() : 'INVÁLIDA'}
+                  </div>
+                  <div style={{ color: '#9ca3af', fontSize: '0.9rem' }}>
+                    {licenseInfo?.valid ? (licenseInfo.expires === 'PERPETUAL' ? 'Expira: Nunca' : `Quedan ${licenseInfo.remainingDays} días`) : 'Activación Requerida'}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'center' }}>
+                <button 
+                  onClick={() => setIsLicenseModalOpen(true)} 
+                  style={{ padding: '14px 25px', background: 'transparent', color: '#FCA311', border: '1px solid #FCA311', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontFamily: 'inherit', fontSize: '1rem', width: '100%', maxWidth: '400px' }}
+                >
+                  Renovar / Cambiar licencia
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* SECCIÓN 4: IDENTIDAD VISUAL */}
+          <div style={{ marginBottom: '50px' }}>
+            <h3 style={{ color: '#FCA311', borderBottom: '1px solid #333', paddingBottom: '10px', marginBottom: '20px', fontSize: '1.2rem' }}>
+              Identidad visual
+            </h3>
+            
+            <div style={{ border: '1px solid #333', borderRadius: '12px', padding: '30px', background: 'transparent' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '25px', marginBottom: '35px' }}>
+                {/* Columna Izquierda */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '25px' }}>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '10px', color: 'white', fontWeight: 'bold', fontSize: '0.95rem' }}>Nombre del negocio</label>
+                    <input 
+                      type="text" value={businessName} onChange={e => setBusinessName(e.target.value)} 
+                      style={{ width: '100%', padding: '12px 15px', borderRadius: '8px', border: '1px solid #555', background: 'transparent', color: 'white', boxSizing: 'border-box', fontFamily: 'inherit', outline: 'none' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '10px', color: 'white', fontWeight: 'bold', fontSize: '0.95rem' }}>Color principal</label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '15px', background: 'transparent', padding: '8px 15px', borderRadius: '8px', border: '1px solid #555' }}>
+                      <input type="color" value={colorPrimary} onChange={e => setColorPrimary(e.target.value)} style={{ width: '25px', height: '25px', cursor: 'pointer', border: 'none', background: 'transparent', padding: 0 }} />
+                      <span style={{ color: 'white', fontFamily: 'inherit' }}>{colorPrimary.toUpperCase()}</span>
                     </div>
                   </div>
-                  <div style={{ background: '#111', padding: '15px', borderRadius: '8px', border: licenseInfo.valid ? (licenseInfo.remainingDays <= 5 ? '1px solid #eab308' : '1px solid #10b981') : '1px solid #ef4444' }}>
-                    <div style={{ color: '#9ca3af', fontSize: '0.85rem', marginBottom: '8px' }}>ESTADO DE LICENCIA</div>
-                    <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: licenseInfo.valid ? (licenseInfo.remainingDays <= 5 ? '#eab308' : '#10b981') : '#ef4444' }}>{licenseInfo.valid ? licenseInfo.type.toUpperCase() : 'INVÁLIDA / EXPIRADA'}</div>
-                    <div style={{ color: '#d1d5db', fontSize: '0.9rem', marginTop: '5px' }}>{licenseInfo.valid ? (licenseInfo.expires === 'PERPETUAL' ? 'Expira: Nunca' : `Expira: ${licenseInfo.expires} (Quedan ${licenseInfo.remainingDays} días)`) : (<span style={{color: '#ef4444'}}>Motivo: {licenseInfo.reason || 'NO_LICENSE'}</span>)}</div>
+                </div>
+                
+                {/* Columna Derecha */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '25px' }}>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '10px', color: 'white', fontWeight: 'bold', fontSize: '0.95rem' }}>Logo</label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                      <div style={{ width: '45px', height: '45px', borderRadius: '8px', background: 'white', display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>
+                        {logoBase64 ? (<img src={logoBase64} alt="Logo" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />) : null}
+                      </div>
+                      <button 
+                        onClick={handleSelectLogo} 
+                        style={{ padding: '10px 20px', background: 'transparent', color: 'white', border: '1px solid #555', borderRadius: '8px', cursor: 'pointer', fontSize: '0.9rem', fontFamily: 'inherit' }}
+                      >
+                        {logoBase64 ? 'Cambiar' : 'Subir'}
+                      </button>
+                    </div>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '10px', color: 'white', fontWeight: 'bold', fontSize: '0.95rem' }}>Color secundario</label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '15px', background: 'transparent', padding: '8px 15px', borderRadius: '8px', border: '1px solid #555' }}>
+                      <input type="color" value={colorSecondary} onChange={e => setColorSecondary(e.target.value)} style={{ width: '25px', height: '25px', cursor: 'pointer', border: 'none', background: 'transparent', padding: 0 }} />
+                      <span style={{ color: 'white', fontFamily: 'inherit' }}>{colorSecondary.toUpperCase()}</span>
+                    </div>
                   </div>
                 </div>
-              ) : (<div style={{ color: '#9ca3af', marginBottom: '20px' }}>Cargando información de licencia...</div>)}
-              <button onClick={() => setIsLicenseModalOpen(true)} style={{ padding: '12px 25px', background: 'transparent', color: '#f97316', border: '1px solid #f97316', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', width: '100%', transition: 'all 0.2s' }}>🔑 RENOVAR / CAMBIAR LICENCIA</button>
-            </div>
-          </div>
+              </div>
 
-          <div style={{ marginBottom: '40px' }}>
-            <h3 style={{ color: '#f97316', borderBottom: '1px solid #333', paddingBottom: '10px', marginBottom: '20px' }}>Identidad Visual</h3>
-            <div style={{ background: '#1a1a1a', border: '1px solid #333', borderRadius: '10px', padding: '25px' }}>
-              <div style={{ display: 'flex', gap: '20px', marginBottom: '25px' }}>
-                <div style={{ flex: 1 }}>
-                  <label style={{ display: 'block', marginBottom: '10px', color: '#d1d5db', fontWeight: 'bold', fontSize: '0.9rem' }}>Nombre del Negocio</label>
-                  <input type="text" value={businessName} onChange={e => setBusinessName(e.target.value)} style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #404040', background: '#111', color: 'white', boxSizing: 'border-box' }}/>
-                </div>
-                <div style={{ flex: 1 }}>
-                  <label style={{ display: 'block', marginBottom: '10px', color: '#d1d5db', fontWeight: 'bold', fontSize: '0.9rem' }}>Logo</label>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                    <div style={{ width: '50px', height: '50px', borderRadius: '8px', background: '#111', border: '1px dashed #404040', display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>{logoBase64 ? (<img src={logoBase64} alt="Logo" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />) : (<span style={{ fontSize: '1.2rem', opacity: 0.5 }}>📸</span>)}</div>
-                    <button onClick={handleSelectLogo} style={{ padding: '10px 15px', background: '#262626', color: 'white', border: '1px solid #404040', borderRadius: '8px', cursor: 'pointer', fontSize: '0.9rem' }}>{logoBase64 ? 'Cambiar Logo' : 'Subir Imagen'}</button>
-                  </div>
-                </div>
+              <div style={{ display: 'flex', justifyContent: 'center' }}>
+                <button 
+                  onClick={handleSaveIdentity} 
+                  style={{ padding: '14px 25px', background: '#00E676', color: 'black', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontFamily: 'inherit', fontSize: '1rem', width: '100%', maxWidth: '400px' }}
+                >
+                  Guardar Cambios
+                </button>
               </div>
-              <div style={{ display: 'flex', gap: '20px', marginBottom: '30px' }}>
-                <div style={{ flex: 1 }}>
-                  <label style={{ display: 'block', marginBottom: '10px', color: '#d1d5db', fontWeight: 'bold', fontSize: '0.9rem' }}>Color Principal</label>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '15px', background: '#111', padding: '10px', borderRadius: '8px', border: '1px solid #404040' }}><input type="color" value={colorPrimary} onChange={e => setColorPrimary(e.target.value)} style={{ width: '35px', height: '35px', cursor: 'pointer', border: 'none', background: 'transparent' }} /><span style={{ color: '#9ca3af', fontFamily: 'monospace' }}>{colorPrimary.toUpperCase()}</span></div>
-                </div>
-                <div style={{ flex: 1 }}>
-                  <label style={{ display: 'block', marginBottom: '10px', color: '#d1d5db', fontWeight: 'bold', fontSize: '0.9rem' }}>Color Secundario</label>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '15px', background: '#111', padding: '10px', borderRadius: '8px', border: '1px solid #404040' }}><input type="color" value={colorSecondary} onChange={e => setColorSecondary(e.target.value)} style={{ width: '35px', height: '35px', cursor: 'pointer', border: 'none', background: 'transparent' }} /><span style={{ color: '#9ca3af', fontFamily: 'monospace' }}>{colorSecondary.toUpperCase()}</span></div>
-                </div>
-              </div>
-              <button onClick={handleSaveIdentity} style={{ padding: '12px 25px', background: '#10b981', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', width: '100%', transition: 'all 0.2s', boxShadow: '0 4px 6px rgba(0,0,0,0.2)' }}>💾 GUARDAR IDENTIDAD VISUAL</button>
             </div>
           </div>
 
           {/* SECCIÓN 5: GESTIÓN DE MESAS */}
-          <div style={{ marginBottom: '40px' }}>
-            <h3 style={{ color: '#f97316', borderBottom: '1px solid #333', paddingBottom: '10px', marginBottom: '20px' }}>
-              Gestión de Mesas
+          <div style={{ marginBottom: '60px' }}>
+            <h3 style={{ color: '#FCA311', borderBottom: '1px solid #333', paddingBottom: '10px', marginBottom: '20px', fontSize: '1.2rem' }}>
+              Gestión de mesas
             </h3>
-            <div style={{ background: '#1a1a1a', border: '1px solid #333', borderRadius: '10px', padding: '25px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            
+            <div style={{ border: '1px solid #333', borderRadius: '12px', padding: '30px', background: 'transparent', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <div style={{ color: '#d1d5db', fontSize: '1.1rem', fontWeight: 'bold' }}>Mesas Activas en el Mapa</div>
-                <div style={{ fontSize: '0.9rem', color: '#9ca3af', marginTop: '5px' }}>Añade o elimina mesas físicas de tu local.</div>
+                <div style={{ color: 'white', fontSize: '1.1rem', fontWeight: 'bold', marginBottom: '5px' }}>Mesas activas en el mapa</div>
+                <div style={{ fontSize: '0.95rem', color: '#9ca3af' }}>Añade o elimina mesas físicas en tu local</div>
               </div>
               
-              <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '25px' }}>
                 <button 
                   onClick={handleRemoveTable}
-                  style={{ width: '45px', height: '45px', borderRadius: '50%', background: '#450a0a', color: '#ef4444', border: '1px solid #ef4444', fontSize: '1.5rem', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 'bold' }}
-                  title="Eliminar última mesa"
+                  style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'transparent', color: '#FF0000', border: '1px solid #FF0000', fontSize: '1.5rem', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 'bold' }}
                 >
                   -
                 </button>
                 
-                <div style={{ fontSize: '2rem', fontWeight: 'bold', color: 'white', minWidth: '50px', textAlign: 'center' }}>
+                <div style={{ fontSize: '1.8rem', fontWeight: 'bold', color: 'white', minWidth: '40px', textAlign: 'center' }}>
                   {activeTablesCount}
                 </div>
                 
                 <button 
                   onClick={handleAddTable}
-                  style={{ width: '45px', height: '45px', borderRadius: '50%', background: '#064e3b', color: '#10b981', border: '1px solid #10b981', fontSize: '1.5rem', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 'bold' }}
-                  title="Añadir una mesa"
+                  style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'transparent', color: '#00E676', border: '1px solid #00E676', fontSize: '1.5rem', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 'bold' }}
                 >
                   +
                 </button>
@@ -276,41 +357,65 @@ export function Settings({ onBack }: SettingsProps) {
         </div>
       </div>
 
+      {/* ================= MODALES ================= */}
+      
+      {/* MODAL LICENCIA */}
       {isLicenseModalOpen && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>
-          <div style={{ background: '#1a1a1a', padding: '35px', borderRadius: '15px', width: '550px', color: 'white', border: '1px solid #404040', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)' }}>
-            <h2 style={{ margin: '0 0 15px 0', fontSize: '1.5rem', color: '#f97316' }}>🔑 Activar Licencia</h2>
-            <p style={{ color: '#d1d5db', marginBottom: '25px', lineHeight: '1.5', fontSize: '0.9rem' }}>Ingresa el código proporcionado por tu distribuidor. El sistema validará la firma digital criptográfica con tu dirección MAC.</p>
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 5000, backdropFilter: 'blur(5px)' }}>
+          <div style={{ background: '#111111', padding: '35px', borderRadius: '16px', width: '500px', color: 'white', border: '1px solid #ffffff', boxShadow: '0 20px 50px rgba(0,0,0,0.8)', display: 'flex', flexDirection: 'column' }}>
+            <h2 style={{ margin: '0 0 15px 0', fontSize: '1.8rem', color: 'white' }}>Activar licencia</h2>
+            <p style={{ color: '#9ca3af', marginBottom: '25px', lineHeight: '1.5', fontSize: '0.95rem' }}>Ingresa el código proporcionado por tu distribuidor para validar el sistema.</p>
             <div style={{ marginBottom: '30px' }}>
-              <label style={{ display: 'block', color: '#9ca3af', marginBottom: '8px', fontWeight: 'bold' }}>Código de Activación (Base64 / RSA)</label>
-              <input type="text" value={newLicenseCode} onChange={e => setNewLicenseCode(e.target.value)} placeholder="TIPO|MAC|FECHA|FIRMA_BASE64..." style={{ width: '100%', padding: '15px', background: '#111', border: '1px solid #404040', color: '#3b82f6', borderRadius: '8px', fontSize: '0.95rem', boxSizing: 'border-box', fontFamily: 'monospace', letterSpacing: '0.5px' }} autoFocus />
+              <input type="text" value={newLicenseCode} onChange={e => setNewLicenseCode(e.target.value)} placeholder="TIPO|MAC|FECHA|FIRMA..." style={{ width: '100%', padding: '15px', background: 'transparent', border: '1px solid #555', color: '#00B4D8', borderRadius: '8px', fontSize: '1rem', boxSizing: 'border-box', fontFamily: 'inherit', outline: 'none' }} autoFocus />
             </div>
             <div style={{ display: 'flex', gap: '15px' }}>
-              <button onClick={() => setIsLicenseModalOpen(false)} style={{ flex: 1, padding: '14px', background: '#333', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}>Cancelar</button>
-              <button onClick={handleUpdateLicense} style={{ flex: 1, padding: '14px', background: '#f97316', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}>Verificar y Activar</button>
+              <button onClick={() => setIsLicenseModalOpen(false)} style={{ flex: 1, padding: '14px', background: 'transparent', color: 'white', border: '1px solid white', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontFamily: 'inherit' }}>Cancelar</button>
+              <button onClick={handleUpdateLicense} style={{ flex: 1, padding: '14px', background: '#FCA311', color: 'black', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontFamily: 'inherit' }}>Verificar y activar</button>
             </div>
           </div>
         </div>
       )}
 
+      {/* MODAL RESTABLECER */}
       {isResetModalOpen && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>
-          <div style={{ background: '#1a1a1a', padding: '35px', borderRadius: '15px', width: '500px', color: 'white', border: '1px solid #404040', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)' }}>
-            <h2 style={{ margin: '0 0 15px 0', fontSize: '1.5rem', color: '#ef4444', display: 'flex', alignItems: 'center', gap: '10px' }}>⚠️ Restablecer Sistema</h2>
-            <p style={{ color: '#d1d5db', marginBottom: '25px', lineHeight: '1.5' }}>Selecciona qué datos deseas eliminar de forma permanente. Esta acción <strong>NO se puede deshacer</strong>.</p>
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 5000, backdropFilter: 'blur(5px)' }}>
+          <div style={{ background: '#111111', padding: '35px', borderRadius: '16px', width: '500px', color: 'white', border: '1px solid #ffffff', boxShadow: '0 20px 50px rgba(0,0,0,0.8)', display: 'flex', flexDirection: 'column' }}>
+            <h2 style={{ margin: '0 0 15px 0', fontSize: '1.8rem', color: '#FF0000' }}>Restablecer sistema</h2>
+            <p style={{ color: '#9ca3af', marginBottom: '25px', lineHeight: '1.5', fontSize: '0.95rem' }}>Selecciona qué datos deseas eliminar de forma permanente. Esta acción <strong>NO se puede deshacer</strong>.</p>
+            
             <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginBottom: '30px' }}>
-              <label style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', cursor: 'pointer', background: '#262626', padding: '15px', borderRadius: '8px', border: resetOptions.transactions ? '1px solid #ef4444' : '1px solid #404040' }}><input type="checkbox" checked={resetOptions.transactions} onChange={(e) => setResetOptions({...resetOptions, transactions: e.target.checked})} style={{ marginTop: '4px', transform: 'scale(1.2)' }}/><div><div style={{ fontWeight: 'bold', color: 'white', marginBottom: '4px' }}>Transacciones y Ventas (Caja en $0)</div><div style={{ fontSize: '0.85rem', color: '#9ca3af' }}>Borra todas las órdenes, pagos, tickets y reportes. <strong>El stock de inventario regresará a CERO para forzar un nuevo conteo inicial.</strong></div></div></label>
-              <label style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', cursor: 'pointer', background: '#262626', padding: '15px', borderRadius: '8px', border: resetOptions.catalog ? '1px solid #ef4444' : '1px solid #404040' }}><input type="checkbox" checked={resetOptions.catalog} onChange={(e) => setResetOptions({...resetOptions, catalog: e.target.checked})} style={{ marginTop: '4px', transform: 'scale(1.2)' }}/><div><div style={{ fontWeight: 'bold', color: 'white', marginBottom: '4px' }}>Catálogo y Menú</div><div style={{ fontSize: '0.85rem', color: '#9ca3af' }}>Borra todos los platillos, insumos y recetas guardadas.</div></div></label>
-              <label style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', cursor: 'pointer', background: '#262626', padding: '15px', borderRadius: '8px', border: resetOptions.users ? '1px solid #ef4444' : '1px solid #404040' }}><input type="checkbox" checked={resetOptions.users} onChange={(e) => setResetOptions({...resetOptions, users: e.target.checked})} style={{ marginTop: '4px', transform: 'scale(1.2)' }}/><div><div style={{ fontWeight: 'bold', color: 'white', marginBottom: '4px' }}>Personal y Usuarios</div><div style={{ fontSize: '0.85rem', color: '#9ca3af' }}>Borra a todos los meseros y cajeros (se conservará al Administrador Principal para no bloquear el sistema).</div></div></label>
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: '15px', cursor: 'pointer', background: 'transparent', padding: '15px', borderRadius: '8px', border: resetOptions.transactions ? '1px solid #FF0000' : '1px solid #555' }}>
+                <input type="checkbox" checked={resetOptions.transactions} onChange={(e) => setResetOptions({...resetOptions, transactions: e.target.checked})} style={{ marginTop: '5px', transform: 'scale(1.3)' }}/>
+                <div>
+                  <div style={{ fontWeight: 'bold', color: 'white', marginBottom: '5px', fontSize: '1.05rem' }}>Transacciones y ventas</div>
+                  <div style={{ fontSize: '0.85rem', color: '#9ca3af', lineHeight: '1.4' }}>Borra todas las órdenes y tickets. El stock de inventario regresará a cero.</div>
+                </div>
+              </label>
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: '15px', cursor: 'pointer', background: 'transparent', padding: '15px', borderRadius: '8px', border: resetOptions.catalog ? '1px solid #FF0000' : '1px solid #555' }}>
+                <input type="checkbox" checked={resetOptions.catalog} onChange={(e) => setResetOptions({...resetOptions, catalog: e.target.checked})} style={{ marginTop: '5px', transform: 'scale(1.3)' }}/>
+                <div>
+                  <div style={{ fontWeight: 'bold', color: 'white', marginBottom: '5px', fontSize: '1.05rem' }}>Catálogo y menú</div>
+                  <div style={{ fontSize: '0.85rem', color: '#9ca3af', lineHeight: '1.4' }}>Borra todos los platillos, insumos y recetas guardadas.</div>
+                </div>
+              </label>
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: '15px', cursor: 'pointer', background: 'transparent', padding: '15px', borderRadius: '8px', border: resetOptions.users ? '1px solid #FF0000' : '1px solid #555' }}>
+                <input type="checkbox" checked={resetOptions.users} onChange={(e) => setResetOptions({...resetOptions, users: e.target.checked})} style={{ marginTop: '5px', transform: 'scale(1.3)' }}/>
+                <div>
+                  <div style={{ fontWeight: 'bold', color: 'white', marginBottom: '5px', fontSize: '1.05rem' }}>Personal y usuarios</div>
+                  <div style={{ fontSize: '0.85rem', color: '#9ca3af', lineHeight: '1.4' }}>Borra a todos los empleados (se conservará al Administrador Principal).</div>
+                </div>
+              </label>
             </div>
+            
             <div style={{ display: 'flex', gap: '15px' }}>
-              <button onClick={() => setIsResetModalOpen(false)} style={{ flex: 1, padding: '14px', background: '#333', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}>Cancelar</button>
-              <button onClick={handleConfirmResetRequest} style={{ flex: 1, padding: '14px', background: '#ef4444', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}>Eliminar Datos Seleccionados</button>
+              <button onClick={() => setIsResetModalOpen(false)} style={{ flex: 1, padding: '14px', background: 'transparent', color: 'white', border: '1px solid white', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontFamily: 'inherit' }}>Cancelar</button>
+              <button onClick={handleConfirmResetRequest} style={{ flex: 1, padding: '14px', background: '#FF0000', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontFamily: 'inherit' }}>Eliminar datos</button>
             </div>
           </div>
         </div>
       )}
 
+      {/* MODAL PIN DE AUTORIZACIÓN */}
       <PinPadModal title="Autorizar Acción 🛡️" isOpen={isPinModalOpen} onClose={() => setIsPinModalOpen(false)} onVerify={executeReset} />
     </div>
   )

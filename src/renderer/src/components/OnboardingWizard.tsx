@@ -100,211 +100,299 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     }
   }
 
-  return (
-    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#111', color: 'white', fontFamily: 'sans-serif' }}>
+ return (
+    <div style={{ 
+      minHeight: '100vh', 
+      display: 'flex', 
+      flexDirection: 'column', 
+      backgroundColor: 'var(--color-bg-main, #121212)', 
+      color: 'white', 
+      fontFamily: 'var(--font-heading, monospace)' 
+    }}>
       
-      <div style={{ padding: '20px 40px', background: '#1a1a1a', borderBottom: '1px solid #333', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <h1 style={{ margin: 0, fontSize: '1.8rem', color: colorPrimary }}>Configuración Inicial</h1>
-          <p style={{ margin: '5px 0 0 0', color: '#9ca3af' }}>Paso {step} de 3</p>
-        </div>
+      {/* Header Fijo */}
+      <div style={{ 
+        padding: '20px 40px', 
+        borderBottom: '1px solid #333', 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center' 
+      }}>
+        <h1 style={{ margin: 0, fontSize: '1.8rem', fontWeight: 'bold' }}>
+          Configuración inicial
+        </h1>
         <button 
           onClick={handleSkip}
-          style={{ background: 'transparent', color: '#9ca3af', border: '1px solid #404040', padding: '8px 15px', borderRadius: '5px', cursor: 'pointer', transition: 'all 0.2s' }}
-          onMouseEnter={e => e.currentTarget.style.color = 'white'}
-          onMouseLeave={e => e.currentTarget.style.color = '#9ca3af'}
+          style={{ 
+            background: 'transparent', 
+            color: 'white', 
+            border: '1px solid white', 
+            padding: '10px 20px', 
+            borderRadius: '25px', 
+            cursor: 'pointer', 
+            fontFamily: 'inherit',
+            fontSize: '0.9rem',
+            transition: 'all 0.2s' 
+          }}
+          onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'white'; e.currentTarget.style.color = 'black'; }}
+          onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = 'white'; }}
         >
-          Omitir Configuración ⏭️
+          Omitir configuración
         </button>
       </div>
 
-      <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }}>
-        <div style={{ width: '650px', background: '#1a1a1a', borderRadius: '15px', padding: '40px', border: '1px solid #333', boxShadow: '0 10px 25px rgba(0,0,0,0.5)', maxHeight: '90vh', overflowY: 'auto' }}>
+      {/* Contenedor Principal Centrado */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: '20px' }}>
+        
+        <div style={{ 
+          width: '650px', 
+          backgroundColor: '#161616', 
+          borderRadius: '16px', 
+          padding: '40px 50px', 
+          border: '1px solid #333', 
+          boxSizing: 'border-box'
+        }}>
           
-          {/* PASO 1: Identidad de Marca */}
+          {/* ================= PASO 1: Identidad ================= */}
           {step === 1 && (
-            <div style={{ animation: 'fadeIn 0.3s' }}>
-              <h2 style={{ textAlign: 'center', marginBottom: '30px' }}>Identidad de tu Negocio</h2>
+            <div style={{ animation: 'fadeIn 0.3s', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
               
-              <div style={{ marginBottom: '25px' }}>
-                <label style={{ display: 'block', marginBottom: '10px', color: '#d1d5db' }}>Logo del Negocio</label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                  <div style={{ width: '80px', height: '80px', borderRadius: '10px', background: '#111', border: '1px dashed #404040', display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>
-                    {logoBase64 ? (
-                      <img src={logoBase64} alt="Logo" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
-                    ) : (
-                      <span style={{ fontSize: '2rem', opacity: 0.5 }}>📸</span>
-                    )}
+              <h2 style={{ margin: '0 0 15px 0', fontSize: '1.5rem', fontWeight: 'normal' }}>Nombre del negocio</h2>
+              <input 
+                type="text" 
+                value={businessName} 
+                onChange={e => setBusinessName(e.target.value)}
+                placeholder="Nombre"
+                style={{ 
+                  width: '350px', padding: '12px 15px', borderRadius: '8px', 
+                  border: '1px solid #555', background: '#111', color: 'white', 
+                  fontFamily: 'inherit', fontSize: '1rem', textAlign: 'left', marginBottom: '30px'
+                }}
+              />
+
+              <h2 style={{ margin: '0 0 15px 0', fontSize: '1.5rem', fontWeight: 'normal' }}>Logo o símbolos</h2>
+              <button 
+                onClick={handleSelectLogo} 
+                style={{ 
+                  width: '350px', padding: '15px', background: 'transparent', 
+                  color: 'white', border: '1px solid #555', borderRadius: '8px', 
+                  cursor: 'pointer', fontSize: '1.1rem', fontFamily: 'inherit',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '15px',
+                  marginBottom: '30px', transition: 'background-color 0.2s'
+                }}
+                onMouseEnter={e => e.currentTarget.style.backgroundColor = '#222'}
+                onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+              >
+                {logoBase64 ? (
+                  <img src={logoBase64} alt="Logo" style={{ maxHeight: '30px', objectFit: 'contain' }} />
+                ) : (
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="17 8 12 3 7 8"></polyline>
+                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                  </svg>
+                )}
+                <span>{logoBase64 ? 'Cambiar logo' : 'Subir logo'}</span>
+              </button>
+
+              <h2 style={{ margin: '0 0 20px 0', fontSize: '1.5rem', fontWeight: 'normal' }}>Selecciona al menos 2 colores</h2>
+              <div style={{ display: 'flex', gap: '40px', marginBottom: '40px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+                  <div style={{ width: '80px', height: '80px', borderRadius: '16px', overflow: 'hidden', border: '2px solid #555', cursor: 'pointer' }}>
+                    <input type="color" value={colorPrimary} onChange={e => setColorPrimary(e.target.value)} style={{ width: '150%', height: '150%', cursor: 'pointer', border: 'none', margin: '-25%', padding: 0 }} />
                   </div>
-                  <button onClick={handleSelectLogo} style={{ padding: '10px 15px', background: '#262626', color: 'white', border: '1px solid #404040', borderRadius: '8px', cursor: 'pointer', fontSize: '0.9rem' }}>
-                    {logoBase64 ? 'Cambiar Logo' : 'Subir Imagen (Max 2MB)'}
-                  </button>
+                  <span style={{ fontSize: '0.85rem', color: '#d1d5db' }}>Color 1</span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+                  <div style={{ width: '80px', height: '80px', borderRadius: '16px', overflow: 'hidden', border: '2px solid #555', cursor: 'pointer' }}>
+                    <input type="color" value={colorSecondary} onChange={e => setColorSecondary(e.target.value)} style={{ width: '150%', height: '150%', cursor: 'pointer', border: 'none', margin: '-25%', padding: 0 }} />
+                  </div>
+                  <span style={{ fontSize: '0.85rem', color: '#d1d5db' }}>Color 2</span>
                 </div>
               </div>
 
-              <div style={{ marginBottom: '25px' }}>
-                <label style={{ display: 'block', marginBottom: '10px', color: '#d1d5db' }}>Nombre del Restaurante / Local</label>
-                <input 
-                  type="text" value={businessName} onChange={e => setBusinessName(e.target.value)}
-                  placeholder="Ej. Pizzería La Mamma"
-                  style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #404040', background: '#111', color: 'white', fontSize: '1.1rem', boxSizing: 'border-box' }}
-                />
-              </div>
-
-              <div style={{ marginBottom: '25px' }}>
-                <label style={{ display: 'block', marginBottom: '10px', color: '#d1d5db' }}>Colores de tu Marca</label>
-                <div style={{ display: 'flex', gap: '20px' }}>
-                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
-                    <div style={{ width: '80px', height: '80px', borderRadius: '10px', overflow: 'hidden', border: '2px solid #404040' }}>
-                      <input type="color" value={colorPrimary} onChange={e => setColorPrimary(e.target.value)} style={{ width: '150%', height: '150%', cursor: 'pointer', border: 'none', margin: '-25%' }} />
-                    </div>
-                    <span style={{ fontSize: '0.85rem', color: '#9ca3af' }}>Color Principal</span>
-                  </div>
-                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
-                    <div style={{ width: '80px', height: '80px', borderRadius: '10px', overflow: 'hidden', border: '2px solid #404040' }}>
-                      <input type="color" value={colorSecondary} onChange={e => setColorSecondary(e.target.value)} style={{ width: '150%', height: '150%', cursor: 'pointer', border: 'none', margin: '-25%' }} />
-                    </div>
-                    <span style={{ fontSize: '0.85rem', color: '#9ca3af' }}>Color Secundario</span>
-                  </div>
-                </div>
-              </div>
-
-              <button onClick={() => setStep(2)} style={{ width: '100%', padding: '15px', background: colorPrimary, color: 'white', border: 'none', borderRadius: '8px', fontSize: '1.1rem', fontWeight: 'bold', cursor: 'pointer', marginTop: '10px' }}>
-                Siguiente
+              <button 
+                onClick={() => setStep(2)} 
+                style={{ 
+                  width: '200px', padding: '14px', background: 'white', color: 'black', 
+                  border: 'none', borderRadius: '8px', fontSize: '1rem', fontWeight: 'bold', 
+                  cursor: 'pointer', fontFamily: 'inherit'
+                }}
+              >
+                SIGUIENTE
               </button>
             </div>
           )}
 
-          {/* PASO 2: Operación Base y Personal */}
+          {/* ================= PASO 2: Estructura ================= */}
           {step === 2 && (
             <div style={{ animation: 'fadeIn 0.3s' }}>
-              <h2 style={{ textAlign: 'center', marginBottom: '20px' }}>Estructura Operativa</h2>
+              <h2 style={{ textAlign: 'center', margin: '0 0 30px 0', fontSize: '1.8rem', fontWeight: 'bold' }}>Estructura operativa</h2>
               
-              <div style={{ display: 'flex', gap: '20px', marginBottom: '25px' }}>
-                <div style={{ flex: 1 }}>
-                  <label style={{ display: 'block', marginBottom: '10px', color: '#d1d5db' }}>¿Cuántas mesas tiene?</label>
+              <div style={{ display: 'flex', gap: '20px', marginBottom: '30px' }}>
+                <div style={{ flex: 1, textAlign: 'left' }}>
+                  <label style={{ display: 'block', marginBottom: '10px', fontSize: '1rem' }}>Mesas</label>
                   <input 
                     type="number" min="1" value={numMesas} onChange={e => setNumMesas(parseInt(e.target.value) || 0)}
-                    style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #404040', background: '#111', color: 'white', fontSize: '1.1rem', boxSizing: 'border-box', textAlign: 'center' }}
+                    placeholder="Selecciona la cantidad de mesas"
+                    style={{ width: '100%', height: '48px', padding: '0 15px', borderRadius: '6px', border: '1px solid #555', background: 'transparent', color: 'white', fontFamily: 'inherit', boxSizing: 'border-box', outline: 'none' }}
                   />
                 </div>
-                <div style={{ flex: 1 }}>
-                  <label style={{ display: 'block', marginBottom: '10px', color: '#d1d5db' }}>PIN Admin (4 a 6 dígitos)</label>
+                <div style={{ flex: 1, textAlign: 'left' }}>
+                  <label style={{ display: 'block', marginBottom: '10px', fontSize: '1rem' }}>PIN Admin (de 1 a 6 dígitos)</label>
                   <input 
                     type="password" maxLength={6} value={adminPin} onChange={e => setAdminPin(e.target.value)}
-                    placeholder="Ej. 1234"
-                    style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #404040', background: '#111', color: 'white', fontSize: '1.5rem', boxSizing: 'border-box', textAlign: 'center', letterSpacing: '5px' }}
+                    placeholder="----"
+                    style={{ width: '100%', height: '48px', padding: '0 15px', borderRadius: '6px', border: '1px solid #555', background: 'transparent', color: 'white', fontFamily: 'inherit', boxSizing: 'border-box', textAlign: 'center', letterSpacing: '3px', outline: 'none' }}
                   />
                 </div>
               </div>
 
-              {/* SECCIÓN DE PERSONAL ADICIONAL */}
-              <div style={{ background: '#111', border: '1px solid #333', borderRadius: '10px', padding: '20px', marginBottom: '25px' }}>
-                <h3 style={{ margin: '0 0 15px 0', fontSize: '1.1rem', color: '#9ca3af' }}>Personal Adicional (Opcional)</h3>
+              <div style={{ border: '1px solid #444', borderRadius: '12px', padding: '25px', marginBottom: '40px' }}>
+                <h3 style={{ textAlign: 'center', margin: '0 0 20px 0', fontSize: '1.3rem', fontWeight: 'normal' }}>Personal adicional (opcional)</h3>
                 
-                <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '20px' }}>
                   <input 
                     type="text" placeholder="Nombre" value={empNombre} onChange={e => setEmpNombre(e.target.value)}
-                    style={{ flex: 2, padding: '10px', borderRadius: '5px', border: '1px solid #404040', background: '#1a1a1a', color: 'white' }}
+                    style={{ flex: 1.5, height: '42px', padding: '0 12px', borderRadius: '6px', border: '1px solid #555', background: 'transparent', color: 'white', fontFamily: 'inherit', boxSizing: 'border-box', outline: 'none' }}
                   />
                   <select 
                     value={empRol} onChange={e => setEmpRol(e.target.value)}
-                    style={{ flex: 1, padding: '10px', borderRadius: '5px', border: '1px solid #404040', background: '#1a1a1a', color: 'white' }}
+                    style={{ flex: 1.5, height: '42px', padding: '0 12px', borderRadius: '6px', border: '1px solid #555', background: 'transparent', color: 'white', fontFamily: 'inherit', appearance: 'none', boxSizing: 'border-box', outline: 'none' }}
                   >
-                    <option value="cajero">Mesero / Cajero</option>
-                    <option value="admin">Administrador</option>
+                    <option value="cajero" style={{ background: '#1a1a1a' }}>Mesero/Cajero</option>
+                    <option value="admin" style={{ background: '#1a1a1a' }}>Administrador</option>
                   </select>
                   <input 
                     type="password" placeholder="PIN" maxLength={6} value={empPin} onChange={e => setEmpPin(e.target.value)}
-                    style={{ flex: 1, padding: '10px', borderRadius: '5px', border: '1px solid #404040', background: '#1a1a1a', color: 'white', textAlign: 'center' }}
+                    style={{ flex: 1, height: '42px', padding: '0 12px', borderRadius: '6px', border: '1px solid #555', background: 'transparent', color: 'white', fontFamily: 'inherit', textAlign: 'center', boxSizing: 'border-box', outline: 'none' }}
                   />
-                  <button onClick={handleAddEmpleado} style={{ background: colorSecondary, color: 'white', border: 'none', borderRadius: '5px', padding: '0 15px', cursor: 'pointer', fontWeight: 'bold' }}>
-                    +
+                  <button 
+                    onClick={handleAddEmpleado} 
+                    style={{ 
+                      width: '42px', height: '42px', borderRadius: '50%', background: '#00E676', 
+                      color: 'white', border: 'none', cursor: 'pointer', display: 'flex', 
+                      alignItems: 'center', justifyContent: 'center', flexShrink: 0, padding: 0
+                    }}
+                  >
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                   </button>
                 </div>
 
-                <div style={{ maxHeight: '110px', overflowY: 'auto' }}>
-                  {empleados.length === 0 ? (
-                    <div style={{ color: '#6b7280', textAlign: 'center', fontSize: '0.85rem' }}>Puedes agregar a tu equipo de trabajo aquí o dejarlo para más tarde.</div>
-                  ) : (
-                    empleados.map((emp, i) => (
-                      <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px', borderBottom: '1px solid #262626', fontSize: '0.9rem' }}>
+                {empleados.length > 0 && (
+                  <div style={{ maxHeight: '100px', overflowY: 'auto', marginBottom: '15px' }}>
+                    {empleados.map((emp, i) => (
+                      <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #333', fontSize: '0.9rem' }}>
                         <span>{emp.nombre}</span>
                         <div style={{ display: 'flex', gap: '15px' }}>
-                          <span style={{ color: emp.rol === 'admin' ? '#f59e0b' : '#3b82f6' }}>{emp.rol.toUpperCase()}</span>
-                          <span style={{ color: '#9ca3af', fontFamily: 'monospace' }}>***{emp.pin.slice(-1)}</span>
+                          <span style={{ color: '#aaa' }}>{emp.rol}</span>
+                          <span style={{ color: '#aaa' }}>***{emp.pin.slice(-1)}</span>
                           <button onClick={() => handleRemoveEmpleado(i)} style={{ background: 'transparent', color: '#ef4444', border: 'none', cursor: 'pointer' }}>✕</button>
                         </div>
                       </div>
-                    ))
-                  )}
-                </div>
+                    ))}
+                  </div>
+                )}
+
+                <p style={{ textAlign: 'center', margin: 0, color: '#9ca3af', fontSize: '0.85rem' }}>
+                  Puedes agregar a tu equipo de trabajo aquí o dejarlo para más tarde
+                </p>
               </div>
 
-              <div style={{ display: 'flex', gap: '15px' }}>
-                <button onClick={() => setStep(1)} style={{ flex: 1, padding: '15px', background: '#262626', color: 'white', border: 'none', borderRadius: '8px', fontSize: '1rem', fontWeight: 'bold', cursor: 'pointer' }}>
+              <div style={{ display: 'flex', justifyContent: 'center', gap: '20px' }}>
+                <button 
+                  onClick={() => setStep(1)} 
+                  style={{ width: '150px', padding: '14px', background: 'transparent', color: 'white', border: '1px solid white', borderRadius: '8px', fontSize: '1rem', fontWeight: 'bold', cursor: 'pointer', fontFamily: 'inherit' }}
+                >
                   Atrás
                 </button>
-                <button onClick={() => setStep(3)} style={{ flex: 2, padding: '15px', background: colorPrimary, color: 'white', border: 'none', borderRadius: '8px', fontSize: '1.1rem', fontWeight: 'bold', cursor: 'pointer' }}>
-                  Siguiente
+                <button 
+                  onClick={() => setStep(3)} 
+                  style={{ width: '150px', padding: '14px', background: 'white', color: 'black', border: 'none', borderRadius: '8px', fontSize: '1rem', fontWeight: 'bold', cursor: 'pointer', fontFamily: 'inherit' }}
+                >
+                  SIGUIENTE
                 </button>
               </div>
             </div>
           )}
 
-          {/* PASO 3: Menú Rápido */}
+          {/* ================= PASO 3: Menú Base ================= */}
           {step === 3 && (
             <div style={{ animation: 'fadeIn 0.3s' }}>
-              <h2 style={{ textAlign: 'center', marginBottom: '20px' }}>Carga Rápida de Menú</h2>
-              <p style={{ textAlign: 'center', color: '#9ca3af', marginBottom: '25px', fontSize: '0.9rem' }}>
-                Añade tus primeros platillos. Podrás agregar recetas e insumos después desde la configuración.
-              </p>
+              <h2 style={{ textAlign: 'center', margin: '0 0 30px 0', fontSize: '1.8rem', fontWeight: 'bold' }}>Carga rápida del menú</h2>
               
-              <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+              <div style={{ display: 'flex', gap: '15px', marginBottom: '25px', justifyContent: 'center', alignItems: 'center' }}>
                 <input 
                   type="text" placeholder="Nombre" value={platilloNombre} onChange={e => setPlatilloNombre(e.target.value)}
-                  style={{ flex: 2, padding: '12px', borderRadius: '8px', border: '1px solid #404040', background: '#111', color: 'white', boxSizing: 'border-box' }}
+                  style={{ width: '200px', height: '45px', padding: '0 15px', borderRadius: '6px', border: '1px solid #555', background: 'transparent', color: 'white', fontFamily: 'inherit', boxSizing: 'border-box', outline: 'none' }}
                 />
                 <input 
                   type="number" placeholder="Precio $" value={platilloPrecio} onChange={e => setPlatilloPrecio(e.target.value)}
-                  style={{ flex: 1, padding: '12px', borderRadius: '8px', border: '1px solid #404040', background: '#111', color: 'white', boxSizing: 'border-box' }}
+                  style={{ width: '120px', height: '45px', padding: '0 15px', borderRadius: '6px', border: '1px solid #555', background: 'transparent', color: 'white', fontFamily: 'inherit', boxSizing: 'border-box', outline: 'none' }}
                 />
-                <button onClick={handleAddPlatillo} style={{ padding: '0 20px', background: colorSecondary, color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}>
+                <button 
+                  onClick={handleAddPlatillo} 
+                  style={{ height: '45px', padding: '0 20px', background: '#00E676', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', fontFamily: 'inherit', boxSizing: 'border-box', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                >
                   Agregar
                 </button>
               </div>
 
-              <div style={{ maxHeight: '180px', overflowY: 'auto', background: '#111', borderRadius: '8px', border: '1px solid #333', padding: '10px', marginBottom: '25px' }}>
+              <div style={{ 
+                minHeight: '120px', maxHeight: '180px', overflowY: 'auto', background: 'transparent', 
+                borderRadius: '8px', border: '1px solid #444', padding: '15px', marginBottom: '40px',
+                display: 'flex', flexDirection: 'column'
+              }}>
                 {platillos.length === 0 ? (
-                  <div style={{ color: '#6b7280', textAlign: 'center', padding: '20px' }}>Aún no hay platillos añadidos</div>
+                  <div style={{ color: '#d1d5db', margin: 'auto', fontSize: '0.9rem' }}>Aún no hay platillos añadidos</div>
                 ) : (
                   platillos.map((p, i) => (
-                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px', borderBottom: '1px solid #262626' }}>
+                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px', borderBottom: '1px solid #333' }}>
                       <span>{p.nombre}</span>
-                      <div style={{ display: 'flex', gap: '15px' }}>
-                        <span style={{ color: '#10b981', fontWeight: 'bold' }}>${p.precio.toFixed(2)}</span>
-                        <button onClick={() => handleRemovePlatillo(i)} style={{ background: 'transparent', color: '#ef4444', border: 'none', cursor: 'pointer' }}>✕</button>
+                      <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
+                        <span style={{ color: 'white' }}>${p.precio.toFixed(2)}</span>
+                        <button onClick={() => handleRemovePlatillo(i)} style={{ background: 'transparent', color: '#ef4444', border: 'none', cursor: 'pointer', fontSize: '1rem' }}>✕</button>
                       </div>
                     </div>
                   ))
                 )}
               </div>
 
-              <div style={{ display: 'flex', gap: '15px' }}>
-                <button onClick={() => setStep(2)} style={{ flex: 1, padding: '15px', background: '#262626', color: 'white', border: 'none', borderRadius: '8px', fontSize: '1rem', fontWeight: 'bold', cursor: 'pointer' }}>
+              <div style={{ display: 'flex', justifyContent: 'center', gap: '20px' }}>
+                <button 
+                  onClick={() => setStep(2)} 
+                  style={{ width: '160px', padding: '14px', background: 'transparent', color: 'white', border: '1px solid white', borderRadius: '8px', fontSize: '1rem', fontWeight: 'bold', cursor: 'pointer', fontFamily: 'inherit' }}
+                >
                   Atrás
                 </button>
-                <button onClick={handleFinish} style={{ flex: 2, padding: '15px', background: '#10b981', color: 'white', border: 'none', borderRadius: '8px', fontSize: '1.1rem', fontWeight: 'bold', cursor: 'pointer' }}>
-                  ¡Comenzar a Vender! 🎉
+                <button 
+                  onClick={handleFinish} 
+                  style={{ width: '220px', padding: '14px', background: 'white', color: 'black', border: 'none', borderRadius: '8px', fontSize: '1rem', fontWeight: 'bold', cursor: 'pointer', fontFamily: 'inherit' }}
+                >
+                  ¡Comienza a vender!
                 </button>
               </div>
             </div>
           )}
 
         </div>
+
+        {/* Mensaje inferior flotante solo para el Paso 3 */}
+        {step === 3 && (
+          <p style={{ marginTop: '20px', color: 'white', fontSize: '0.9rem', textAlign: 'center', animation: 'fadeIn 0.3s' }}>
+            Los insumos se pueden añadir después de la configuración incial*
+          </p>
+        )}
+
       </div>
+
       <style>{`
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        /* Ocultar flechas del input number para que se vea más limpio como en Figma */
+        input[type="number"]::-webkit-inner-spin-button, 
+        input[type="number"]::-webkit-outer-spin-button { 
+          -webkit-appearance: none; margin: 0; 
+        }
       `}</style>
     </div>
   )

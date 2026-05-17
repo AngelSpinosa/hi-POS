@@ -34,55 +34,96 @@ export function TableGrid({ tables, onSelectTable }: TableGridProps) {
   }
 
   return (
-    <div style={{ padding: '20px', height: '100%', overflowY: 'auto' }}>
-      <h2 style={{ color: 'white', marginBottom: '20px' }}>Seleccione una Mesa</h2>
+    <div style={{ 
+      padding: '40px', 
+      height: '100%', 
+      overflowY: 'auto', 
+      fontFamily: 'var(--font-heading, monospace)',
+      boxSizing: 'border-box'
+    }}>
+      <h2 style={{ 
+        color: 'white', 
+        marginBottom: '35px', 
+        fontSize: '2rem', 
+        fontWeight: 'bold' 
+      }}>
+        Selecciona una mesa
+      </h2>
       
       <div style={{ 
         display: 'grid', 
-        gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', 
-        gap: '20px' 
+        gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', 
+        gap: '25px' 
       }}>
-        {tables.map(table => (
-          <div
-            key={table.id}
-            onClick={() => onSelectTable(table.id)}
-            style={{
-              backgroundColor: '#2d2d2d',
-              border: `2px solid ${getTableColor(table.estado_orden || 'libre')}`,
-              borderRadius: '10px',
-              padding: '20px',
-              height: '120px',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'center',
-              alignItems: 'center',
-              cursor: 'pointer',
-              boxShadow: '0 4px 6px rgba(0,0,0,0.3)',
-              transition: 'transform 0.1s'
-            }}
-          >
-            <div style={{ fontSize: '2rem', fontWeight: 'bold', color: 'white' }}>
-              #{table.numero}
-            </div>
-            
-            <div style={{ 
-              marginTop: '10px', 
-              color: getTableColor(table.estado_orden || 'libre'),
-              fontWeight: 'bold',
-              fontSize: '0.9rem',
-              textAlign: 'center'
-            }}>
-              {getStatusText(table.estado_orden || 'libre')}
-            </div>
-
-            {/* Solo mostramos total si hay una orden viva */}
-            {table.total_actual && table.total_actual > 0 ? (
-              <div style={{ marginTop: '5px', color: '#fbbf24' }}>
-                ${table.total_actual.toFixed(2)}
+        {tables.map(table => {
+          const statusColor = getTableColor(table.estado_orden || 'libre');
+          
+          return (
+            <div
+              key={table.id}
+              onClick={() => onSelectTable(table.id)}
+              style={{
+                backgroundColor: '#161616',
+                border: `2px solid ${statusColor}`,
+                borderRadius: '16px',
+                padding: '30px 20px',
+                height: '160px',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                alignItems: 'center',
+                cursor: 'pointer',
+                boxShadow: '0 10px 20px rgba(0,0,0,0.3)',
+                transition: 'all 0.2s ease',
+                boxSizing: 'border-box'
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.transform = 'translateY(-5px)';
+                e.currentTarget.style.boxShadow = `0 15px 25px rgba(0,0,0,0.5), 0 0 15px ${statusColor}30`;
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 10px 20px rgba(0,0,0,0.3)';
+              }}
+            >
+              <div style={{ 
+                fontSize: '2.8rem', 
+                fontWeight: 'bold', 
+                color: 'white',
+                lineHeight: '1'
+              }}>
+                #{table.numero}
               </div>
-            ) : null}
-          </div>
-        ))}
+              
+              <div style={{ 
+                marginTop: '15px', 
+                color: statusColor,
+                fontWeight: 'bold',
+                fontSize: '0.9rem',
+                textAlign: 'center',
+                textTransform: 'uppercase',
+                letterSpacing: '1px'
+              }}>
+                {getStatusText(table.estado_orden || 'libre')}
+              </div>
+
+              {/* Muestra un pequeño indicador 'pill' con el total si hay orden activa */}
+              {table.total_actual && table.total_actual > 0 ? (
+                <div style={{ 
+                  marginTop: '12px', 
+                  backgroundColor: statusColor, 
+                  color: 'black', 
+                  padding: '4px 10px', 
+                  borderRadius: '12px', 
+                  fontSize: '0.85rem', 
+                  fontWeight: 'bold' 
+                }}>
+                  ${table.total_actual.toFixed(2)}
+                </div>
+              ) : null}
+            </div>
+          )
+        })}
       </div>
     </div>
   )

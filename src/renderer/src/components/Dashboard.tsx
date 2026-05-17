@@ -1,6 +1,15 @@
 import { useState, useEffect } from 'react'
 import type { AppConfig } from '../types/db'
 
+// Importación de Íconos SVG locales
+import IconTable from '../assets/icons/TableRestaurant.svg'
+import IconAnalytics from '../assets/icons/Analytics.svg'
+import IconPizza from '../assets/icons/Pizza.svg'
+import IconUsers from '../assets/icons/Users.svg'
+import IconSettings from '../assets/icons/Settings.svg'
+import IconLogout from '../assets/icons/Logout.svg'
+import IconClose from '../assets/icons/Close.svg'
+
 interface DashboardProps {
   onNavigate: (view: 'TABLES' | 'REPORT' | 'USERS' | 'PRODUCTS' | 'SETTINGS') => void;
   licenseInfo?: { type: string; remainingDays?: number } | null;
@@ -9,6 +18,7 @@ interface DashboardProps {
 
 export function Dashboard({ onNavigate, licenseInfo, appConfig }: DashboardProps) {
   const [time, setTime] = useState(new Date())
+  const [showDemoBanner, setShowDemoBanner] = useState(true)
 
   useEffect(() => {
     const timer = setInterval(() => setTime(new Date()), 1000)
@@ -20,11 +30,11 @@ export function Dashboard({ onNavigate, licenseInfo, appConfig }: DashboardProps
   }
 
   const formatDate = (date: Date) => {
-    return date.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })
+    return date.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' })
   }
 
   const handleInjectDemoData = async () => {
-    if (confirm('🍔 ¿Estás seguro? Esto añadirá Mesas, Usuarios (Admin PIN: 1234), Productos e Insumos preconfigurados para que pruebes el sistema. Puedes borrarlos luego desde "Ajustes".')) {
+    if (confirm('🍔 ¿Estás seguro? Esto añadirá Mesas, Usuarios (Admin PIN: 1234), Productos e Insumos preconfigurados para que pruebes el sistema.')) {
       // @ts-ignore
       const res = await window.electron.ipcRenderer.invoke('inject-demo-data')
       if (res.success) {
@@ -35,146 +45,106 @@ export function Dashboard({ onNavigate, licenseInfo, appConfig }: DashboardProps
     }
   }
 
-  const cardStyle = {
-    background: '#262626',
-    borderRadius: '15px',
-    padding: '25px 15px',
-    display: 'flex',
-    flexDirection: 'column' as const,
-    alignItems: 'center',
-    justifyContent: 'center',
-    cursor: 'pointer',
-    border: '1px solid #333',
-    transition: 'transform 0.1s, background 0.2s, box-shadow 0.2s',
-    minHeight: '160px',
-    boxShadow: '0 4px 6px rgba(0,0,0,0.3)'
+  const onSelectCategory = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    if (e.target.value === 'pizza') {
+      handleInjectDemoData();
+      e.target.value = ''; 
+    }
   }
 
-  const iconStyle = { fontSize: '3rem', marginBottom: '10px' } 
-  const titleStyle = { fontSize: '1.2rem', fontWeight: 'bold', margin: '0 0 5px 0', letterSpacing: '1px', textTransform: 'uppercase' as const }
-  const subtitleStyle = { fontSize: '0.85rem', color: '#9ca3af', margin: 0 }
+  const displayBusinessName = appConfig?.business_name ? appConfig.business_name : 'NOMBRE DEL\nNEGOCIO';
 
   return (
-    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#1a1a1a', color: 'white' }}>
+    <div className="dashboard-container">
       
-      {/* HEADER DINÁMICO CON LOGO */}
-      <div style={{ padding: '20px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #333' }}>
-        
-        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-          {/* Renderizado de logo si existe */}
-          {appConfig?.logo_path && (
-            <img 
-              src={appConfig.logo_path} 
-              alt="Logo del Negocio" 
-              style={{ width: '60px', height: '60px', objectFit: 'contain', borderRadius: '8px', background: '#fff', padding: '2px' }} 
-            />
+      {/* HEADER: Nombre y Reloj */}
+      <div className="dashboard-header">
+        <div className="header-left">
+          <h1 className="brand-title">
+            {displayBusinessName}
+          </h1>
+          
+          {licenseInfo?.type === 'DEMO' && (
+            <div className="demo-pill">
+              Modo Demo, le quedan {licenseInfo.remainingDays} días de prueba ⚠️
+            </div>
           )}
-          <div>
-            <h1 style={{ margin: 0, fontSize: '2.2rem', color: 'var(--color-primary, #f97316)' }}>
-              {appConfig?.business_name ? appConfig.business_name.toUpperCase() : 'POS PIZZERÍA'} {!appConfig?.logo_path && '🍕'}
-            </h1>
-            <p style={{ margin: '3px 0 0 0', color: '#9ca3af', fontSize: '0.9rem' }}>Sistema de Punto de Venta v1.0</p>
-            
-            {licenseInfo?.type === 'DEMO' && (
-              <div style={{ marginTop: '10px', display: 'inline-block', padding: '5px 12px', background: '#450a0a', border: '1px solid #ef4444', borderRadius: '20px', color: '#fca5a5', fontSize: '0.8rem', fontWeight: 'bold' }}>
-                ⚠️ Modo Demo, le quedan {licenseInfo.remainingDays} días de prueba
-              </div>
-            )}
-          </div>
         </div>
 
-        <div style={{ textAlign: 'right' }}>
-          <div style={{ fontSize: '1.8rem', fontWeight: 'bold', fontFamily: 'monospace' }}>
-            {formatTime(time)}
-          </div>
-          <div style={{ color: '#9ca3af', fontSize: '0.9rem', textTransform: 'capitalize' }}>
-            {formatDate(time)}
-          </div>
+        <div className="time-display">
+          <div className="time-hours">HORA : {formatTime(time)}</div>
+          <div className="time-date">{formatDate(time)}</div>
         </div>
       </div>
 
-      <div style={{ flex: 1, padding: '30px 40px', overflowY: 'auto' }}>
-        <div style={{ 
-          display: 'grid', 
-          gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', 
-          gap: '20px', 
-          maxWidth: '1200px',
-          margin: '0 auto'
-        }}>
-          
-          <div style={cardStyle} onClick={() => onNavigate('TABLES')} className="menu-card">
-            <div style={iconStyle}>🍽️</div>
-            <h2 style={titleStyle}>Mesas</h2>
-            <p style={subtitleStyle}>Ver Mapa y Órdenes</p>
+      <div className="dashboard-content">
+        {/* GRID DE MÓDULOS */}
+        <div className="cards-grid">
+          <div className="pos-card" onClick={() => onNavigate('TABLES')}>
+            <img src={IconTable} alt="Mesas" className="pos-card-icon" />
+            <h2 className="pos-card-title">Mesas</h2>
+            <p className="pos-card-subtitle">Ver mapa y órdenes</p>
           </div>
 
-          <div style={cardStyle} onClick={() => onNavigate('REPORT')} className="menu-card">
-            <div style={iconStyle}>📊</div>
-            <h2 style={titleStyle}>Reportes</h2>
-            <p style={subtitleStyle}>Cortes y Estadísticas</p>
+          <div className="pos-card" onClick={() => onNavigate('REPORT')}>
+            <img src={IconAnalytics} alt="Reportes" className="pos-card-icon" />
+            <h2 className="pos-card-title">Reportes</h2>
+            <p className="pos-card-subtitle">Cortes de caja y estadísticas</p>
           </div>
 
-          <div style={cardStyle} onClick={() => onNavigate('PRODUCTS')} className="menu-card">
-            <div style={iconStyle}>🍕</div>
-            <h2 style={titleStyle}>Productos</h2>
-            <p style={subtitleStyle}>Inventario y Precios</p>
+          <div className="pos-card" onClick={() => onNavigate('PRODUCTS')}>
+            <img src={IconPizza} alt="Productos e Insumos" className="pos-card-icon" />
+            <h2 className="pos-card-title">Productos e<br/>insumos</h2>
+            <p className="pos-card-subtitle">Inventario y recetas</p>
           </div>
 
-          <div style={cardStyle} onClick={() => onNavigate('USERS')} className="menu-card">
-            <div style={iconStyle}>👥</div>
-            <h2 style={titleStyle}>Usuarios</h2>
-            <p style={subtitleStyle}>Personal y Accesos</p>
+          <div className="pos-card" onClick={() => onNavigate('USERS')}>
+            <img src={IconUsers} alt="Usuarios" className="pos-card-icon" />
+            <h2 className="pos-card-title">Usuarios</h2>
+            <p className="pos-card-subtitle">Personal y accesos</p>
           </div>
 
-          <div style={{...cardStyle, border: '1px solid var(--color-secondary, #1e3a8a)'}} onClick={() => onNavigate('SETTINGS')} className="menu-card">
-            <div style={iconStyle}>⚙️</div>
-            <h2 style={{...titleStyle, color: 'var(--color-secondary, #60a5fa)'}}>Ajustes</h2>
-            <p style={subtitleStyle}>Sistema e Impresoras</p>
+          <div className="pos-card" onClick={() => onNavigate('SETTINGS')}>
+            <img src={IconSettings} alt="Ajustes" className="pos-card-icon" />
+            <h2 className="pos-card-title">Ajustes</h2>
+            <p className="pos-card-subtitle">Sistema y tickets</p>
           </div>
 
-          <div 
-            style={{...cardStyle, background: '#450a0a', border: '1px solid #7f1d1d'}} 
-            onClick={() => window.close()} 
-            className="menu-card-danger"
-          >
-            <div style={iconStyle}>🚪</div>
-            <h2 style={{...titleStyle, color: '#fca5a5'}}>Salir</h2>
-            <p style={{...subtitleStyle, color: '#f87171'}}>Cerrar Sistema</p>
+          <div className="pos-card pos-card-danger" onClick={() => window.close()}>
+            <img src={IconLogout} alt="Salir" className="pos-card-icon" />
+            <h2 className="pos-card-title">Salir</h2>
+            <p className="pos-card-subtitle">Cerrar App</p>
           </div>
-
         </div>
 
         {/* BANNER DE DATOS DE PRUEBA */}
-        <div style={{ maxWidth: '1200px', margin: '40px auto 0 auto', background: 'rgba(59, 130, 246, 0.05)', border: '1px dashed var(--color-secondary, #3b82f6)', borderRadius: '15px', padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <h3 style={{ margin: '0 0 5px 0', color: 'var(--color-secondary, #93c5fd)' }}>¿Es tu primera vez explorando el sistema?</h3>
-            <p style={{ margin: 0, color: '#9ca3af', fontSize: '0.9rem' }}>Carga un menú base de Pizzería, mesas y personal de prueba para que juegues con las ventas y reportes.</p>
-          </div>
-          <button 
-            onClick={handleInjectDemoData}
-            style={{ background: 'var(--color-secondary, #3b82f6)', color: 'white', border: 'none', padding: '12px 20px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 6px rgba(0,0,0,0.2)' }}
-          >
-            📥 Cargar Datos de Prueba
-          </button>
-        </div>
+        {showDemoBanner && (
+          <div className="demo-banner">
+            <button className="banner-close" onClick={() => setShowDemoBanner(false)} title="Cerrar banner">
+              <img src={IconClose} alt="Cerrar" />
+            </button>
+            
+            <div className="banner-content">
+              <h3>¿Es tu primera vez explorando el sistema?</h3>
+              <p>
+                Carga un menú base para tu tipo de negocio, para que pruebes funcionalidades como las ventas y reportes
+              </p>
+            </div>
 
+            <div className="banner-actions">
+              <select className="demo-dropdown" onChange={onSelectCategory}>
+                <option value="">Seleccionar categoría ▼</option>
+                <option value="pizza">🍕 Pizzería (Cargar Datos)</option>
+              </select>
+            </div>
+          </div>
+        )}
       </div>
 
-      <style>{`
-        .menu-card:hover {
-          transform: translateY(-5px);
-          background: #333 !important;
-          border-color: #555 !important;
-          box-shadow: 0 8px 15px rgba(0,0,0,0.4) !important;
-        }
-        .menu-card-danger:hover {
-          transform: translateY(-5px);
-          background: #7f1d1d !important;
-          border-color: #ef4444 !important;
-          box-shadow: 0 8px 15px rgba(239, 68, 68, 0.2) !important;
-        }
-      `}</style>
-
+      {/* MARCA DE AGUA INFERIOR */}
+      <div className="hipos-logo">
+        hi-POS
+      </div>
     </div>
   )
 }

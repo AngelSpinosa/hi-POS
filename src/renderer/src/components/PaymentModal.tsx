@@ -34,16 +34,6 @@ export function PaymentModal({ total, isOpen, onClose, onConfirmPayment }: Payme
   const numericReceived = parseFloat(received) || 0
   const change = numericReceived - total
 
-  // ... (Tus estilos se mantienen igual) ...
-  const overlayStyle: React.CSSProperties = {
-    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000
-  }
-  const modalStyle: React.CSSProperties = {
-    backgroundColor: '#2d2d2d', padding: '30px', borderRadius: '8px', width: '400px',
-    boxShadow: '0 4px 20px rgba(0,0,0,0.5)', border: '1px solid #404040'
-  }
-
   const handleConfirm = () => {
     if (method === 'efectivo' && numericReceived < total) return;
     const finalReceived = method === 'efectivo' ? numericReceived : total;
@@ -74,57 +64,141 @@ export function PaymentModal({ total, isOpen, onClose, onConfirmPayment }: Payme
     }
   }
 
-  return (
-    <div style={overlayStyle} onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div style={modalStyle}>
-        <h2 style={{ marginTop: 0, color: 'white' }}>Cobrar ${total.toFixed(2)}</h2>
+return (
+    <div 
+      style={{
+        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+        backgroundColor: 'rgba(0,0,0,0.8)', 
+        display: 'flex', justifyContent: 'center', alignItems: 'center', 
+        zIndex: 5000,
+        fontFamily: 'var(--font-heading, monospace)'
+      }} 
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div 
+        style={{
+          backgroundColor: '#161616', 
+          padding: '35px 40px', 
+          borderRadius: '16px', 
+          width: '450px',
+          border: '1px solid #333',
+          boxShadow: '0 20px 50px rgba(0,0,0,0.6)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '20px',
+          boxSizing: 'border-box',
+          animation: 'fadeIn 0.2s ease-out'
+        }}
+      >
+        <h2 style={{ margin: '0 0 5px 0', color: 'white', fontSize: '1.8rem', fontWeight: 'bold' }}>
+          Cobrar ${total.toFixed(2)}
+        </h2>
         
-        <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+        {/* Selector de Método de Pago */}
+        <div style={{ display: 'flex', border: '1px solid #555', borderRadius: '8px', overflow: 'hidden', marginTop: '10px' }}>
           <button 
-            style={{ flex: 1, padding: '10px', background: method === 'efectivo' ? '#e74c3c' : '#404040', color: 'white', border: 'none', cursor: 'pointer' }}
+            style={{ 
+              flex: 1, padding: '12px', 
+              background: method === 'efectivo' ? '#222' : 'transparent', 
+              color: 'white', border: 'none', borderRight: '1px solid #555', 
+              cursor: 'pointer', fontSize: '1rem', 
+              fontWeight: method === 'efectivo' ? 'bold' : 'normal',
+              fontFamily: 'inherit',
+              transition: 'background 0.2s'
+            }}
             onClick={() => { setMethod('efectivo'); inputRef.current?.focus(); }}
           >
             Efectivo
           </button>
           <button 
-             style={{ flex: 1, padding: '10px', background: method === 'tarjeta' ? '#e74c3c' : '#404040', color: 'white', border: 'none', cursor: 'pointer' }}
+             style={{ 
+               flex: 1, padding: '12px', 
+               background: method === 'tarjeta' ? '#222' : 'transparent', 
+               color: 'white', border: 'none', 
+               cursor: 'pointer', fontSize: '1rem', 
+               fontWeight: method === 'tarjeta' ? 'bold' : 'normal',
+               fontFamily: 'inherit',
+               transition: 'background 0.2s'
+             }}
              onClick={() => setMethod('tarjeta')}
           >
             Tarjeta
           </button>
         </div>
 
-        {method === 'efectivo' && (
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{ display: 'block', marginBottom: '5px', color: '#a3a3a3' }}>Monto Recibido</label>
-            <input 
-              ref={inputRef} // 3. Conectamos la referencia aquí
-              type="number" 
-              min="0"
-              value={received}
-              onKeyDown={preventInvalidChars}
-              onChange={handleInputChange}
-              style={{ width: '100%', padding: '10px', fontSize: '1.5em', background: '#1a1a1a', border: '1px solid #404040', color: 'white' }}
-            />
-            <div style={{ marginTop: '10px', fontSize: '1.2em', color: change >= 0 ? '#22c55e' : '#e74c3c' }}>
-              Cambio: ${change >= 0 ? change.toFixed(2) : '0.00'}
+        {/* Contenedor dinámico (Evita que el modal salte de tamaño) */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', minHeight: '110px' }}>
+          {method === 'efectivo' ? (
+            <>
+              <label style={{ color: '#d1d5db', fontSize: '0.9rem' }}>Monto recibido</label>
+              <input 
+                ref={inputRef}
+                type="number" 
+                min="0"
+                value={received}
+                onKeyDown={preventInvalidChars}
+                onChange={handleInputChange}
+                style={{ 
+                  width: '100%', padding: '12px 15px', fontSize: '1.2rem', 
+                  background: 'transparent', border: '1px solid #555', 
+                  color: 'white', borderRadius: '6px', boxSizing: 'border-box',
+                  outline: 'none', fontFamily: 'inherit'
+                }}
+              />
+              <div style={{ marginTop: '10px', fontSize: '1.1rem', fontWeight: 'bold', color: change >= 0 ? '#a3e635' : '#ef4444' }}>
+                Cambio: ${change >= 0 ? change.toFixed(2) : '0.00'}
+              </div>
+            </>
+          ) : (
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <p style={{ color: '#9ca3af', textAlign: 'center', margin: 0, fontSize: '0.95rem' }}>
+                Procesa el pago en tu terminal bancaria y confirma.
+              </p>
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-          <button onClick={onClose} style={{ padding: '10px 20px', background: 'transparent', border: '1px solid #666', color: 'white', cursor: 'pointer' }}>
+        {/* Botones de Acción */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px' }}>
+          <button 
+            onClick={onClose} 
+            style={{ 
+              width: '140px', padding: '12px', background: 'white', 
+              border: 'none', borderRadius: '8px', color: 'black', 
+              fontWeight: 'bold', cursor: 'pointer', fontFamily: 'inherit', fontSize: '1rem' 
+            }}
+          >
             Cancelar
           </button>
           <button 
             onClick={handleConfirm}
             disabled={method === 'efectivo' && numericReceived < total}
-            style={{ padding: '10px 20px', background: '#22c55e', border: 'none', color: 'white', fontWeight: 'bold', cursor: 'pointer', opacity: (method === 'efectivo' && numericReceived < total) ? 0.5 : 1 }}
+            style={{ 
+              width: '140px', padding: '12px', background: '#00E676', 
+              border: 'none', borderRadius: '8px', color: 'black', 
+              fontWeight: 'bold', cursor: (method === 'efectivo' && numericReceived < total) ? 'not-allowed' : 'pointer', 
+              opacity: (method === 'efectivo' && numericReceived < total) ? 0.5 : 1,
+              fontFamily: 'inherit', fontSize: '1rem',
+              transition: 'opacity 0.2s'
+            }}
           >
-            CONFIRMAR PAGO
+            Confirmar
           </button>
         </div>
       </div>
+
+      <style>{`
+        /* Animación de entrada suave para el Modal */
+        @keyframes fadeIn {
+          from { opacity: 0; transform: scale(0.95); }
+          to { opacity: 1; transform: scale(1); }
+        }
+        /* Ocultar flechas del input number nativo */
+        input[type="number"]::-webkit-inner-spin-button, 
+        input[type="number"]::-webkit-outer-spin-button { 
+          -webkit-appearance: none; margin: 0; 
+        }
+      `}</style>
     </div>
   )
 }
