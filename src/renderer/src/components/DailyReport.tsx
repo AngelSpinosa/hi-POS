@@ -1,18 +1,13 @@
 import { useState, useEffect } from 'react'
 import type { ReporteDiario, OrdenHistorial, CartItem } from '../types/db'
 import { OrderDetailModal } from './OrderDetailModal'
-//HELPER: Obtener fecha estrictamente en la ZONA HORARIA LOCAL (Evita el bug de medianoche)
+
 const getLocalDate = (d = new Date()) => {
   const tzOffset = d.getTimezoneOffset() * 60000;
   return new Date(d.getTime() - tzOffset).toISOString().split('T')[0];
 }
 
-// Añadimos la interfaz para recibir la función de volver atrás
-interface DailyReportProps {
-  onBack?: () => void;
-}
-
-export function DailyReport({ onBack }: DailyReportProps) {
+export function DailyReport() {
   const [date, setDate] = useState(getLocalDate())
   const [report, setReport] = useState<ReporteDiario | any>(null)
   const [orders, setOrders] = useState<OrdenHistorial[]>([])
@@ -24,23 +19,6 @@ export function DailyReport({ onBack }: DailyReportProps) {
   // Estado para modales
   const [selectedOrder, setSelectedOrder] = useState<{id: number, items: CartItem[]} | null>(null)
   const [isExportModalOpen, setIsExportModalOpen] = useState(false)
-
-  // Estado para el reloj de la cabecera
-  const [time, setTime] = useState(new Date())
-
-  // Reloj en tiempo real
-  useEffect(() => {
-    const timer = setInterval(() => setTime(new Date()), 1000)
-    return () => clearInterval(timer)
-  }, [])
-
-  const formatTime = (date: Date) => {
-    return date.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
-  }
-
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' })
-  }
 
   const fetchReport = async () => {
     // @ts-ignore
@@ -151,7 +129,6 @@ export function DailyReport({ onBack }: DailyReportProps) {
   const yesterdayDate = new Date();
   yesterdayDate.setDate(yesterdayDate.getDate() - 1);
   const yesterdayStr = getLocalDate(yesterdayDate);
-
  return (
     <div className="report-container" style={{ height: '100%', paddingTop: '20px' }}>
       

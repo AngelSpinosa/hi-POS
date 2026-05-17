@@ -22,16 +22,15 @@ interface MovimientoView extends movimiento_inventario {
 }
 
 export function ProductManagement({ onBack }: ProductManagementProps) {
-  // NUEVO: Añadida la pestaña 'historial'
+  // Pestañas
   const [activeTab, setActiveTab] = useState<'productos' | 'insumos' | 'historial'>('productos')
   
   const [products, setProducts] = useState<Producto[]>([])
   const [insumos, setInsumos] = useState<Insumo[]>([])
-  const [movimientos, setMovimientos] = useState<MovimientoView[]>([]) // NUEVO ESTADO
+  const [movimientos, setMovimientos] = useState<MovimientoView[]>([]) 
   const [isLoading, setIsLoading] = useState(true)
   
-  // Reloj y Búsqueda
-  const [currentTime, setCurrentTime] = useState(new Date())
+  // Búsqueda
   const [searchTerm, setSearchTerm] = useState('')
 
   // Formulario Productos
@@ -68,12 +67,6 @@ export function ProductManagement({ onBack }: ProductManagementProps) {
   const [isPinModalOpen, setIsPinModalOpen] = useState(false)
   const [pendingAction, setPendingAction] = useState<(() => Promise<void>) | null>(null)
 
-  // Reloj en tiempo real
-  useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 1000)
-    return () => clearInterval(timer)
-  }, [])
-
   const fetchData = async () => {
     setIsLoading(true)
     try {
@@ -84,7 +77,7 @@ export function ProductManagement({ onBack }: ProductManagementProps) {
         // @ts-ignore
         window.electron.ipcRenderer.invoke('get-insumos'),
         // @ts-ignore
-        window.electron.ipcRenderer.invoke('get-movimientos') // NUEVA LLAMADA
+        window.electron.ipcRenderer.invoke('get-movimientos') 
       ])
 
       if (Array.isArray(resProducts)) setProducts(resProducts)
@@ -121,10 +114,6 @@ export function ProductManagement({ onBack }: ProductManagementProps) {
     mov.codigo.toLowerCase().includes(searchTerm.toLowerCase()) ||
     mov.motivo.toLowerCase().includes(searchTerm.toLowerCase())
   )
-
-  const timeString = currentTime.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: true }).toLowerCase()
-  const dateString = currentTime.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })
-  const formattedDate = dateString.replace(/\b\w/g, l => l.toUpperCase())
 
   // Placeholder dinámico para la barra de búsqueda
   let searchPlaceholder = 'Buscar...';
@@ -285,14 +274,28 @@ export function ProductManagement({ onBack }: ProductManagementProps) {
     } else { alert('⛔ PIN Incorrecto o sin permisos.') }
   }
 
-return (
+  return (
     <div style={{ 
       height: '100%', display: 'flex', flexDirection: 'column', 
       boxSizing: 'border-box'
     }}>
 
+      {/* BOTÓN VOLVER */}
+      <div style={{ padding: '30px 40px 0 40px' }}>
+        <button 
+          onClick={onBack} 
+          style={{ 
+            background: 'transparent', color: 'white', border: 'none', 
+            cursor: 'pointer', fontSize: '1.2rem', fontWeight: 'bold', 
+            display: 'flex', alignItems: 'center', padding: 0, fontFamily: 'var(--font-heading, monospace)' 
+          }}
+        >
+          ← Menú principal
+        </button>
+      </div>
+
       {/* TABS (Botonera hueca estilo Figma) */}
-      <div style={{ margin: '30px 40px', border: '1px solid #ffffff', borderRadius: '16px', display: 'flex', padding: '10px' }}>
+      <div style={{ margin: '20px 40px 30px 40px', border: '1px solid #ffffff', borderRadius: '16px', display: 'flex', padding: '10px' }}>
         <button 
           onClick={() => { setActiveTab('productos'); setSearchTerm(''); }} 
           style={{ 

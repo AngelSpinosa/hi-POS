@@ -34,16 +34,6 @@ export function PaymentModal({ total, isOpen, onClose, onConfirmPayment }: Payme
   const numericReceived = parseFloat(received) || 0
   const change = numericReceived - total
 
-  // ... (Tus estilos se mantienen igual) ...
-  const overlayStyle: React.CSSProperties = {
-    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000
-  }
-  const modalStyle: React.CSSProperties = {
-    backgroundColor: '#2d2d2d', padding: '30px', borderRadius: '8px', width: '400px',
-    boxShadow: '0 4px 20px rgba(0,0,0,0.5)', border: '1px solid #404040'
-  }
-
   const handleConfirm = () => {
     if (method === 'efectivo' && numericReceived < total) return;
     const finalReceived = method === 'efectivo' ? numericReceived : total;

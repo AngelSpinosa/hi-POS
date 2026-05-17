@@ -6,7 +6,7 @@ interface UserManagementProps {
   onBack: () => void; // <-- 1. Asegúrate de tener esto declarado
 }
 
-export function UserManagement({ onBack }: UserManagementProps) {
+export function UserManagement({}: UserManagementProps) {
   const [users, setUsers] = useState<User[]>([])
   
   // Estado del formulario (Crear/Editar)
