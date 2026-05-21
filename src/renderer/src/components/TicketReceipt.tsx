@@ -32,6 +32,24 @@ export function TicketReceipt({ orderId, items, total, payment, onClose, onPrint
   // Protección 1: Si items llega vacío por algún error de renderizado, usamos un array vacío
   const safeItems = items || [];
 
+const handlePrintPdf = async () => {
+  // @ts-ignore
+  const res = await window.electron.ipcRenderer.invoke('generate-ticket-pdf', {
+    orderId,
+    items: safeItems,
+    total,
+    payment,
+    businessName
+  });
+  
+  if (res.success) {
+    onPrint(); // Llamamos a la función original que asumo cierra el modal o finaliza el flujo
+  } else {
+    console.error("Error al generar PDF:", res.error);
+    alert("Hubo un error al crear el PDF del ticket.");
+  }
+};
+
   return (
     <div style={{
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
@@ -133,19 +151,14 @@ export function TicketReceipt({ orderId, items, total, payment, onClose, onPrint
             Cerrar
           </button>
           <button 
-            onClick={onPrint} 
-            style={{ 
-              flex: 1, padding: '14px', background: '#00B4D8', color: 'black', 
-              border: 'none', borderRadius: '10px', fontWeight: 'bold', 
-              cursor: 'pointer', fontFamily: 'inherit', fontSize: '1rem',
-              transition: 'transform 0.15s ease'
-            }}
-            onMouseEnter={e => e.currentTarget.style.transform = 'scale(0.97)'}
-            onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
-            onMouseDown={e => e.currentTarget.style.transform = 'scale(0.92)'}
-            onMouseUp={e => e.currentTarget.style.transform = 'scale(0.97)'}
-          >
-            Imprimir
+              onClick={handlePrintPdf} // <- Reemplaza onPrint por handlePrintPdf aquí
+              style={{ 
+                flex: 1, padding: '14px', background: '#00B4D8', color: 'black', 
+                border: 'none', borderRadius: '10px', fontWeight: 'bold', 
+                cursor: 'pointer', fontFamily: 'inherit', fontSize: '1rem',
+                transition: 'transform 0.15s ease'
+              }}>
+              Imprimir (PDF)
           </button>
         </div>
 

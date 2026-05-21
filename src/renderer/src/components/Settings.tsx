@@ -146,6 +146,57 @@ export function Settings({ onBack }: SettingsProps) {
     }
   }
 
+ // ==============================================
+  // ESTADOS PARA EL HISTORIAL DE TICKETS
+  // ==============================================
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const tzOffset = new Date().getTimezoneOffset() * 60000;
+    return new Date(Date.now() - tzOffset).toISOString().split('T')[0];
+  });
+  const [ticketsHistory, setTicketsHistory] = useState<any[]>([]);
+  const [ticketsPath, setTicketsPath] = useState<string>(''); // NUEVO: Estado para guardar la ruta
+
+  // Cargar tickets y la ruta cuando cambia la fecha o se abre la pantalla
+  useEffect(() => {
+    const fetchTickets = async () => {
+      // @ts-ignore
+      const res = await window.electron.ipcRenderer.invoke('get-tickets-by-date', { date: selectedDate });
+      if (res.success) {
+        setTicketsHistory(res.tickets);
+      }
+    }
+    
+    // Obtener la ruta donde se guardan los tickets
+    const fetchTicketsPath = async () => {
+      // @ts-ignore
+      const path = await window.electron.ipcRenderer.invoke('get-tickets-path');
+      setTicketsPath(path);
+    }
+
+    fetchTickets();
+    fetchTicketsPath();
+  }, [selectedDate]);
+
+  // Función para regenerar PDF de un ticket pasado
+  const handleReprintTicket = async (ticket: any) => {
+    // @ts-ignore
+    const res = await window.electron.ipcRenderer.invoke('generate-ticket-pdf', {
+      orderId: ticket.id,
+      items: ticket.items,
+      total: ticket.total,
+      payment: {
+        metodo: ticket.metodo,
+        monto_recibido: ticket.monto_recibido,
+        cambio: ticket.cambio
+      },
+      businessName: businessName,
+      date: ticket.creado_en
+    });
+    if (!res.success) alert("Error generando ticket: " + res.error);
+  };
+  // ==============================================
+
+
   return (
     <div style={{ 
       height: '100vh', display: 'flex', flexDirection: 'column', 
@@ -160,19 +211,56 @@ export function Settings({ onBack }: SettingsProps) {
             Configuración del sistema
           </h2>
 
-          {/* SECCIÓN 1: TICKETS E IMPRESIONES */}
+      {/* SECCIÓN 1: HISTORIAL DE TICKETS (Antes Tickets e impresiones) */}
           <div style={{ marginBottom: '50px' }}>
-            <h3 style={{ color: '#FCA311', borderBottom: '1px solid #333', paddingBottom: '10px', marginBottom: '20px', fontSize: '1.2rem' }}>
-              Tickets e impresiones
-            </h3>
-            
-            <div style={{ border: '1px solid #333', borderRadius: '12px', padding: '30px', background: 'transparent' }}>
-              <div style={{ color: '#9ca3af', fontSize: '1rem', lineHeight: '1.5' }}>
-                🖨️ Configuraciones de impresora térmica, logo del negocio y mensaje al pie del ticket se agregarán aquí en la versión Post-MVP.
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid #333', paddingBottom: '15px', marginBottom: '20px' }}>
+              <div>
+                <h3 style={{ color: '#FCA311', margin: '0 0 8px 0', fontSize: '1.2rem' }}>
+                  Historial y reimpresión de tickets
+                </h3>
+                {ticketsPath && (
+                  <div style={{ fontSize: '0.85rem', color: '#9ca3af' }}>
+                    Tus tickets se guardan en: <code style={{ color: '#00B4D8', background: '#1a1a1a', padding: '3px 6px', borderRadius: '4px' }}>{ticketsPath}</code>
+                  </div>
+                )}
               </div>
+              <input 
+                type="date" 
+                value={selectedDate} 
+                onChange={(e) => setSelectedDate(e.target.value)}
+                style={{ padding: '8px 12px', borderRadius: '8px', background: '#1a1a1a', border: '1px solid #555', color: 'white', fontFamily: 'inherit', outline: 'none' }}
+              />
+            </div>
+            
+            <div style={{ border: '1px solid #333', borderRadius: '12px', padding: '20px', background: 'transparent', maxHeight: '300px', overflowY: 'auto' }}>
+              {ticketsHistory.length === 0 ? (
+                <div style={{ color: '#9ca3af', textAlign: 'center', padding: '20px' }}>
+                  No hay tickets registrados para la fecha seleccionada.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {ticketsHistory.map(ticket => (
+                    <div key={ticket.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#1a1a1a', padding: '15px', borderRadius: '8px', border: '1px solid #444' }}>
+                      <div>
+                        <div style={{ fontWeight: 'bold', fontSize: '1.1rem', color: 'white' }}>Ticket #{ticket.id}</div>
+                        <div style={{ fontSize: '0.9rem', color: ticket.estatus === 'pagada' ? '#00E676' : '#FF0000', textTransform: 'capitalize' }}>
+                          {ticket.estatus} • ${ticket.total.toFixed(2)}
+                        </div>
+                      </div>
+                      <button 
+                        onClick={() => handleReprintTicket(ticket)}
+                        style={{ background: '#00B4D8', color: 'black', border: 'none', borderRadius: '6px', padding: '10px 15px', cursor: 'pointer', fontWeight: 'bold', fontFamily: 'inherit' }}
+                      >
+                        Generar PDF
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
+          
           {/* SECCIÓN 2: BASE DE DATOS */}
           <div style={{ marginBottom: '50px' }}>
             <h3 style={{ color: '#FCA311', borderBottom: '1px solid #333', paddingBottom: '10px', marginBottom: '20px', fontSize: '1.2rem' }}>

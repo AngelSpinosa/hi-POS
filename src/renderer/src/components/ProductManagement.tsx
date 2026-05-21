@@ -280,19 +280,7 @@ export function ProductManagement({ onBack }: ProductManagementProps) {
       boxSizing: 'border-box'
     }}>
 
-      {/* BOTÓN VOLVER */}
-      <div style={{ padding: '30px 40px 0 40px' }}>
-        <button 
-          onClick={onBack} 
-          style={{ 
-            background: 'transparent', color: 'white', border: 'none', 
-            cursor: 'pointer', fontSize: '1.2rem', fontWeight: 'bold', 
-            display: 'flex', alignItems: 'center', padding: 0, fontFamily: 'var(--font-heading, monospace)' 
-          }}
-        >
-          ← Menú principal
-        </button>
-      </div>
+      
 
       {/* TABS (Botonera hueca estilo Figma) */}
       <div style={{ margin: '20px 40px 30px 40px', border: '1px solid #ffffff', borderRadius: '16px', display: 'flex', padding: '10px' }}>
