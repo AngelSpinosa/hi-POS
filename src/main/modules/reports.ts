@@ -21,10 +21,11 @@ export function registerReportHandlers() {
       // 2. Buscamos las órdenes enlazadas EXACTAMENTE a este reporte
       // ¡Esto arregla el bug visual! Ya no dependemos de zonas horarias, sino del ID directo.
       const orders = db.prepare(`
-        SELECT o.id, o.creado_en, o.total, p.metodo, m.numero as mesa
+        SELECT o.id, o.creado_en, o.total, p.metodo, m.numero as mesa, u.nombre as cajero
         FROM orden o
         LEFT JOIN pago p ON o.id = p.orden_id
         LEFT JOIN mesa m ON o.mesa_id = m.id
+        LEFT JOIN user u ON o.user_id = u.id
         WHERE o.id_reporte_diario = ? AND o.estatus != 'cancelada'
       `).all(report.id);
 

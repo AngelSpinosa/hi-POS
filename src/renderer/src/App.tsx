@@ -289,7 +289,7 @@ function App() {
           </div>
         </div>
         <div style={{ flex: 1, overflow: 'hidden' }}>
-          <ProductManagement onBack={handleBackToDashboard} />
+          <ProductManagement/>
         </div>
       </div>
     )

@@ -74,7 +74,7 @@ export function registerConfigHandlers() {
         const maxActive = db.prepare('SELECT id, numero FROM mesa WHERE activa = 1 ORDER BY numero DESC LIMIT 1').get() as any;
         if (!maxActive) return { success: false, error: 'No hay mesas activas.' };
 
-        // 🛡️ SEGURIDAD: Verificamos que esa mesa no tenga una orden viva
+        // SEGURIDAD: Verificamos que esa mesa no tenga una orden viva
         const activeOrder = db.prepare(`SELECT id FROM orden WHERE mesa_id = ? AND estatus IN ('abierta', 'enviada_cocina', 'cuenta_solicitada')`).get(maxActive.id);
         if (activeOrder) {
             return { success: false, error: `La mesa ${maxActive.numero} tiene una orden abierta. Cóbrela o cancélela primero para poder eliminarla.` };

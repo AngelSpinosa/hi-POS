@@ -18,7 +18,11 @@ interface DashboardProps {
 
 export function Dashboard({ onNavigate, licenseInfo, appConfig }: DashboardProps) {
   const [time, setTime] = useState(new Date())
-  const [showDemoBanner, setShowDemoBanner] = useState(true)
+  
+  // VERIFICAR ESTADO GUARDADO EN LOCALSTORAGE PARA OCULTAR EL BANNER
+  const [showDemoBanner, setShowDemoBanner] = useState(() => {
+    return localStorage.getItem('hideDemoBanner') !== 'true'
+  })
 
   useEffect(() => {
     const timer = setInterval(() => setTime(new Date()), 1000)
@@ -33,22 +37,33 @@ export function Dashboard({ onNavigate, licenseInfo, appConfig }: DashboardProps
     return date.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' })
   }
 
-  const handleInjectDemoData = async () => {
-    if (confirm('🍔 ¿Estás seguro? Esto añadirá Mesas, Usuarios (Admin PIN: 1234), Productos e Insumos preconfigurados para que pruebes el sistema.')) {
+  // FUNCIÓN PARA CERRAR EL BANNER PERMANENTEMENTE
+  const handleDismissBanner = () => {
+    localStorage.setItem('hideDemoBanner', 'true')
+    setShowDemoBanner(false)
+  }
+
+  // NUEVO: Recibe la categoría y el nombre para hacerlo dinámico
+  const handleInjectDemoData = async (category: string, categoryName: string) => {
+    if (confirm(`📦 ¿Estás seguro? Esto añadirá un menú base de ${categoryName}, junto con su inventario y recetas para que pruebes el sistema. (PIN de Admin: 1234)`)) {
       // @ts-ignore
-      const res = await window.electron.ipcRenderer.invoke('inject-demo-data')
+      const res = await window.electron.ipcRenderer.invoke('inject-demo-data', { category })
       if (res.success) {
-        alert('✅ ¡Datos de prueba cargados con éxito! Explora las diferentes secciones.')
+        alert('✅ ¡Datos de prueba cargados con éxito! Ve al módulo de Productos e Insumos para ver la magia.')
+        handleDismissBanner() // Lo ocultamos automáticamente tras inyectar con éxito
       } else {
         alert('❌ Error al cargar datos: ' + res.error)
       }
     }
   }
 
+  // NUEVO: Extrae el valor dinámicamente sin limitarlo solo a "pizza"
   const onSelectCategory = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    if (e.target.value === 'pizza') {
-      handleInjectDemoData();
-      e.target.value = ''; 
+    const value = e.target.value;
+    const text = e.target.options[e.target.selectedIndex].text;
+    if (value !== '') {
+      handleInjectDemoData(value, text);
+      e.target.value = ''; // Resetear el select
     }
   }
 
@@ -120,7 +135,7 @@ export function Dashboard({ onNavigate, licenseInfo, appConfig }: DashboardProps
         {/* BANNER DE DATOS DE PRUEBA */}
         {showDemoBanner && (
           <div className="demo-banner">
-            <button className="banner-close" onClick={() => setShowDemoBanner(false)} title="Cerrar banner">
+            <button className="banner-close" onClick={handleDismissBanner} title="Ocultar para siempre">
               <img src={IconClose} alt="Cerrar" />
             </button>
             
@@ -134,7 +149,10 @@ export function Dashboard({ onNavigate, licenseInfo, appConfig }: DashboardProps
             <div className="banner-actions">
               <select className="demo-dropdown" onChange={onSelectCategory}>
                 <option value="">Seleccionar categoría ▼</option>
-                <option value="pizza">🍕 Pizzería (Cargar Datos)</option>
+                {/* AQUI ESTÁN LAS NUEVAS OPCIONES DE CATEGORÍA */}
+                <option value="pizza"> Pizzería</option>
+                <option value="restaurante"> Restaurante / Fast Food</option>
+                <option value="cafe"> Cafetería</option>
               </select>
             </div>
           </div>
@@ -143,7 +161,7 @@ export function Dashboard({ onNavigate, licenseInfo, appConfig }: DashboardProps
 
       {/* MARCA DE AGUA INFERIOR */}
       <div className="hipos-logo">
-        hi-POS
+        Hi-POS
       </div>
     </div>
   )

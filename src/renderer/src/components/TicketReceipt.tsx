@@ -9,11 +9,12 @@ interface TicketReceiptProps {
     amount: number;
     change: number;
   };
+  cajero?: string;
   onClose: () => void;
   onPrint: () => void;
 }
 
-export function TicketReceipt({ orderId, items, total, payment, onClose, onPrint }: TicketReceiptProps) {
+export function TicketReceipt({ orderId, items, total, payment, cajero, onClose, onPrint }: TicketReceiptProps) {
   // Estado para guardar el nombre real del negocio
   const [businessName, setBusinessName] = useState('POS PIZZERÍA');
 
@@ -39,6 +40,7 @@ const handlePrintPdf = async () => {
     items: safeItems,
     total,
     payment,
+    cajero,
     businessName
   });
   
@@ -72,14 +74,17 @@ const handlePrintPdf = async () => {
       }} onClick={e => e.stopPropagation()}>
         
         {/* Encabezado del Ticket */}
-        <div style={{ textAlign: 'center', marginBottom: '10px' }}>
-          <div style={{ fontSize: '1.3rem', fontWeight: 'bold', marginBottom: '5px', textTransform: 'uppercase' }}>
+        <div style={{ textAlign: 'center', margin: '0 0 15px 0' }}>
+          <div style={{ fontSize: '1.3rem', fontWeight: 'bold', marginBottom: '8px', textTransform: 'uppercase' }}>
             {businessName}
           </div>
-          <div style={{ fontSize: '0.95rem', fontWeight: 'bold' }}>
+          <div style={{ fontSize: '0.95rem', fontWeight: 'bold', margin: '3px 0' }}>
             Ticket #{orderId}
           </div>
-          <div style={{ fontSize: '0.95rem', fontWeight: 'bold' }}>
+          <div style={{ fontSize: '0.95rem', fontWeight: 'bold', margin: '3px 0' }}>
+            Mesero: {cajero || 'N/A'}
+          </div>
+          <div style={{ fontSize: '0.95rem', fontWeight: 'bold', margin: '3px 0' }}>
             {new Date().toLocaleString('es-MX')}
           </div>
         </div>

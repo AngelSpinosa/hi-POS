@@ -16,7 +16,7 @@ export function runMigrations() {
     fs.mkdirSync(dbDir, { recursive: true })
   }
 
-  console.log('🔄 Iniciando verificación del esquema de la base de datos...')
+  console.log(' Iniciando verificación del esquema de la base de datos...')
 
   let db;
 
@@ -30,13 +30,13 @@ export function runMigrations() {
     `).get()
 
     if (checkTable) {
-      console.log('✅ Base de datos detectada y operativa (Tablas existentes).')
+      console.log(' Base de datos detectada y operativa (Tablas existentes).')
       db.close()
       return // Salimos, no es necesario recrear
     }
 
     // 4. Si llegamos aquí, la BD está vacía o es nueva.
-    console.log('⚠️ Base de datos vacía. Inyectando esquema inicial...')
+    console.log(' Base de datos vacía. Inyectando esquema inicial...')
     
     // Validar que el string de schema.ts realmente haya llegado
     if (!INIT_SCHEMA || INIT_SCHEMA.trim() === '') {
@@ -52,12 +52,11 @@ export function runMigrations() {
       throw new Error('La ejecución terminó, pero la tabla "licencia" no se creó. Revisa tu SQL.')
     }
 
-    console.log('🎉 Esquema inicializado correctamente con todas sus tablas.')
+    console.log(' Esquema inicializado correctamente con todas sus tablas.')
 
   } catch (error: any) {
-    console.error('❌ Error crítico al inicializar la base de datos:', error)
+    console.error(' Error crítico al inicializar la base de datos:', error)
     
-    // 🔥 ESTO ES LO MÁS IMPORTANTE 🔥
     // Si algo falla en producción, te forzará una ventana emergente mostrándote el error exacto.
     dialog.showErrorBox(
       'Error Crítico de Base de Datos',

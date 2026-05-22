@@ -162,6 +162,7 @@ export function POSView({ tableId, userId, onBack }: POSViewProps) {
           items={order.ticketData.items}
           total={order.ticketData.total}
           payment={order.ticketData.payment as any}
+          cajero={order.ticketData.cajero}
           onClose={handleTicketClose}
           onPrint={handleTicketClose}
         />

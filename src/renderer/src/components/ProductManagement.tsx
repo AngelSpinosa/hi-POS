@@ -2,9 +2,6 @@ import { useState, useEffect } from 'react'
 import type { Producto, Insumo, movimiento_inventario } from '../types/db'
 import { PinPadModal } from './PinPadModal'
 
-interface ProductManagementProps {
-  onBack: () => void;
-}
 
 // Tipo local para el UI de la receta
 interface RecipeItem {
@@ -21,8 +18,7 @@ interface MovimientoView extends movimiento_inventario {
   unidad_medida: string;
 }
 
-export function ProductManagement({ onBack }: ProductManagementProps) {
-  // Pestañas
+export function ProductManagement() {
   const [activeTab, setActiveTab] = useState<'productos' | 'insumos' | 'historial'>('productos')
   
   const [products, setProducts] = useState<Producto[]>([])
