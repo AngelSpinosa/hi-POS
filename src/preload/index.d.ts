@@ -1,3 +1,4 @@
+//src/preload/index.d.ts
 import { ElectronAPI } from '@electron-toolkit/preload'
 import { Producto, Insumo } from '../renderer/src/types/db'
 

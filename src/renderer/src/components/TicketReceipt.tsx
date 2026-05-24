@@ -9,11 +9,12 @@ interface TicketReceiptProps {
     amount: number;
     change: number;
   };
+  cajero?: string;
   onClose: () => void;
   onPrint: () => void;
 }
 
-export function TicketReceipt({ orderId, items, total, payment, onClose, onPrint }: TicketReceiptProps) {
+export function TicketReceipt({ orderId, items, total, payment, cajero, onClose, onPrint }: TicketReceiptProps) {
   // Estado para guardar el nombre real del negocio
   const [businessName, setBusinessName] = useState('POS PIZZERÍA');
 
@@ -31,6 +32,25 @@ export function TicketReceipt({ orderId, items, total, payment, onClose, onPrint
 
   // Protección 1: Si items llega vacío por algún error de renderizado, usamos un array vacío
   const safeItems = items || [];
+
+const handlePrintPdf = async () => {
+  // @ts-ignore
+  const res = await window.electron.ipcRenderer.invoke('generate-ticket-pdf', {
+    orderId,
+    items: safeItems,
+    total,
+    payment,
+    cajero,
+    businessName
+  });
+  
+  if (res.success) {
+    onPrint(); // Llamamos a la función original que asumo cierra el modal o finaliza el flujo
+  } else {
+    console.error("Error al generar PDF:", res.error);
+    alert("Hubo un error al crear el PDF del ticket.");
+  }
+};
 
   return (
     <div style={{
@@ -54,14 +74,17 @@ export function TicketReceipt({ orderId, items, total, payment, onClose, onPrint
       }} onClick={e => e.stopPropagation()}>
         
         {/* Encabezado del Ticket */}
-        <div style={{ textAlign: 'center', marginBottom: '10px' }}>
-          <div style={{ fontSize: '1.3rem', fontWeight: 'bold', marginBottom: '5px', textTransform: 'uppercase' }}>
+        <div style={{ textAlign: 'center', margin: '0 0 15px 0' }}>
+          <div style={{ fontSize: '1.3rem', fontWeight: 'bold', marginBottom: '8px', textTransform: 'uppercase' }}>
             {businessName}
           </div>
-          <div style={{ fontSize: '0.95rem', fontWeight: 'bold' }}>
+          <div style={{ fontSize: '0.95rem', fontWeight: 'bold', margin: '3px 0' }}>
             Ticket #{orderId}
           </div>
-          <div style={{ fontSize: '0.95rem', fontWeight: 'bold' }}>
+          <div style={{ fontSize: '0.95rem', fontWeight: 'bold', margin: '3px 0' }}>
+            Mesero: {cajero || 'N/A'}
+          </div>
+          <div style={{ fontSize: '0.95rem', fontWeight: 'bold', margin: '3px 0' }}>
             {new Date().toLocaleString('es-MX')}
           </div>
         </div>
@@ -133,19 +156,14 @@ export function TicketReceipt({ orderId, items, total, payment, onClose, onPrint
             Cerrar
           </button>
           <button 
-            onClick={onPrint} 
-            style={{ 
-              flex: 1, padding: '14px', background: '#00B4D8', color: 'black', 
-              border: 'none', borderRadius: '10px', fontWeight: 'bold', 
-              cursor: 'pointer', fontFamily: 'inherit', fontSize: '1rem',
-              transition: 'transform 0.15s ease'
-            }}
-            onMouseEnter={e => e.currentTarget.style.transform = 'scale(0.97)'}
-            onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
-            onMouseDown={e => e.currentTarget.style.transform = 'scale(0.92)'}
-            onMouseUp={e => e.currentTarget.style.transform = 'scale(0.97)'}
-          >
-            Imprimir
+              onClick={handlePrintPdf} // <- Reemplaza onPrint por handlePrintPdf aquí
+              style={{ 
+                flex: 1, padding: '14px', background: '#00B4D8', color: 'black', 
+                border: 'none', borderRadius: '10px', fontWeight: 'bold', 
+                cursor: 'pointer', fontFamily: 'inherit', fontSize: '1rem',
+                transition: 'transform 0.15s ease'
+              }}>
+              Imprimir (PDF)
           </button>
         </div>
 

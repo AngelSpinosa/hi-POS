@@ -100,7 +100,7 @@ export interface AppConfig {
 
 
 // ==========================================
-// 💻 TIPOS AUXILIARES DE LA UI (NO SON TABLAS)
+//  TIPOS AUXILIARES DE LA UI (NO SON TABLAS)
 // ==========================================
 
 // Extensión de OrdenItem para uso en el Frontend
@@ -118,6 +118,7 @@ export interface TicketData {
     amount: number;
     change: number;
   };
+  cajero?: string;
 }
 
 // Tipo para el historial visual (proyección de datos)
@@ -127,4 +128,5 @@ export interface OrdenHistorial {
   creado_en: string;
   metodo: string;
   mesa: number;
+  cajero?: string;
 }

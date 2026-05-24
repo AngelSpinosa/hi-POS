@@ -200,7 +200,10 @@ export function DailyReport() {
                   {orders.map(order => (
                     <tr key={order.id}>
                       <td>{new Date(order.creado_en).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</td>
-                      <td>#{order.mesa}</td>
+                      <td>
+                        <div>#{order.mesa}</div>
+                        <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '3px' }}>Mesero: {order.cajero || 'N/A'}</div>
+                      </td>
                       <td>${order.total.toFixed(2)}</td>
                       <td style={{ textTransform: 'capitalize' }}>{order.metodo}</td>
                       <td style={{ textAlign: 'right' }}>

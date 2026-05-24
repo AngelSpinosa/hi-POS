@@ -2,9 +2,6 @@ import { useState, useEffect } from 'react'
 import type { Producto, Insumo, movimiento_inventario } from '../types/db'
 import { PinPadModal } from './PinPadModal'
 
-interface ProductManagementProps {
-  onBack: () => void;
-}
 
 // Tipo local para el UI de la receta
 interface RecipeItem {
@@ -21,8 +18,7 @@ interface MovimientoView extends movimiento_inventario {
   unidad_medida: string;
 }
 
-export function ProductManagement({ onBack }: ProductManagementProps) {
-  // Pestañas
+export function ProductManagement() {
   const [activeTab, setActiveTab] = useState<'productos' | 'insumos' | 'historial'>('productos')
   
   const [products, setProducts] = useState<Producto[]>([])
@@ -280,19 +276,7 @@ export function ProductManagement({ onBack }: ProductManagementProps) {
       boxSizing: 'border-box'
     }}>
 
-      {/* BOTÓN VOLVER */}
-      <div style={{ padding: '30px 40px 0 40px' }}>
-        <button 
-          onClick={onBack} 
-          style={{ 
-            background: 'transparent', color: 'white', border: 'none', 
-            cursor: 'pointer', fontSize: '1.2rem', fontWeight: 'bold', 
-            display: 'flex', alignItems: 'center', padding: 0, fontFamily: 'var(--font-heading, monospace)' 
-          }}
-        >
-          ← Menú principal
-        </button>
-      </div>
+      
 
       {/* TABS (Botonera hueca estilo Figma) */}
       <div style={{ margin: '20px 40px 30px 40px', border: '1px solid #ffffff', borderRadius: '16px', display: 'flex', padding: '10px' }}>

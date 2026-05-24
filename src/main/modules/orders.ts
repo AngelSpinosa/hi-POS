@@ -1,4 +1,6 @@
-import { ipcMain } from 'electron'
+import { ipcMain, app, BrowserWindow, shell } from 'electron'
+import path from 'path'
+import fs from 'fs'
 import { db } from '../database'
 // IMPORTAMOS LA FUNCIÓN DESDE EL CONTROLADOR DE INVENTARIO
 import { descontarInventarioPorVenta } from './inventory'
@@ -191,14 +193,18 @@ export function registerOrderHandlers() {
         const montoTarjeta = payment.method === 'tarjeta' ? total : 0
         db.prepare(`UPDATE reporte_diario SET total_ventas = total_ventas + ?, total_pedidos = total_pedidos + 1, total_efectivo = total_efectivo + ?, total_tarjeta = total_tarjeta + ? WHERE id = ?`).run(total, montoEfectivo, montoTarjeta, reporte.id)
 
-        // 4. Registrar el pago
-        db.prepare(`INSERT INTO pago (orden_id, metodo, monto_recibido) VALUES (?, ?, ?)`).run(orderId, payment.method, payment.received)
+        // 4. Registrar el pago CON CÁLCULO DE CAMBIO
+        const cambio = payment.method === 'efectivo' ? Math.max(0, payment.received - total) : 0;
+        db.prepare(`INSERT INTO pago (orden_id, metodo, monto_recibido, cambio) VALUES (?, ?, ?, ?)`).run(orderId, payment.method, payment.received, cambio)
         
-        // 5. LLAMADA AL MÓDULO DE INVENTARIO CENTRALIZADO (Limpio y Seguro)
+        // 5. LLAMADA AL MÓDULO DE INVENTARIO CENTRALIZADO
         const items = db.prepare('SELECT producto_id, cantidad FROM orden_item WHERE orden_id = ?').all(orderId) as any[]
         descontarInventarioPorVenta(items)
         
-        return { success: true }
+        // 6. EXTRAER NOMBRE DEL MESERO/CAJERO
+        const userRow = db.prepare('SELECT u.nombre FROM orden o JOIN user u ON o.user_id = u.id WHERE o.id = ?').get(orderId) as any;
+        
+        return { success: true, cajero: userRow?.nombre }
       })
       return tx()
     } catch (e: any) { 
@@ -220,6 +226,152 @@ export function registerOrderHandlers() {
       return { success: true }
     } catch (error: any) {
       return { success: false, error: error.message }
+    }
+  })
+
+  // ==========================================
+  // HANDLERS PARA HISTORIAL Y PDF (POST-MVP)
+  // ==========================================
+
+  // Devolver la ruta de la carpeta de tickets al Frontend
+  ipcMain.handle('get-tickets-path', () => {
+    return path.join(app.getPath('documents'), 'hi-POS_Tickets');
+  });
+
+  // 1. Obtener tickets por fecha CON NOMBRE DE MESERO
+  ipcMain.handle('get-tickets-by-date', (_, { date }) => {
+    if (!db) return { success: false, error: 'DB no conectada' }
+    try {
+      const orders = db.prepare(`
+        SELECT o.id, o.total, o.estatus, o.creado_en, p.metodo, p.monto_recibido, p.cambio, u.nombre as cajero
+        FROM orden o
+        LEFT JOIN pago p ON o.id = p.orden_id
+        LEFT JOIN user u ON o.user_id = u.id
+        WHERE date(o.creado_en) = ? AND o.estatus IN ('pagada', 'cancelada')
+        ORDER BY o.id DESC
+      `).all(date) as any[]
+
+      const tickets = orders.map(order => {
+        const items = db.prepare('SELECT nombre, cantidad, precio FROM orden_item WHERE orden_id = ?').all(order.id)
+        return { ...order, items }
+      })
+
+      return { success: true, tickets }
+    } catch (error: any) {
+      console.error("❌ Error al obtener historial:", error)
+      return { success: false, error: error.message }
+    }
+  })
+
+  // 2. Generar Ticket en PDF
+  ipcMain.handle('generate-ticket-pdf', async (_, { orderId, items, total, payment, businessName, date, cajero }) => {
+    try {
+      // 1. Crear carpeta dedicada en Documentos
+      const ticketsDir = path.join(app.getPath('documents'), 'hi-POS_Tickets');
+      if (!fs.existsSync(ticketsDir)) {
+        fs.mkdirSync(ticketsDir, { recursive: true });
+      }
+
+      // 2. Rutas para nuestros archivos
+      const pdfPath = path.join(ticketsDir, `Ticket_${orderId}.pdf`);
+      const tempHtmlPath = path.join(app.getPath('temp'), `temp_ticket_${orderId}.html`);
+      
+      // Creamos una ventana oculta
+      const win = new BrowserWindow({ 
+        show: false, 
+        width: 400, 
+        height: 600,
+        backgroundColor: '#ffffff', // Fondo forzado blanco
+        webPreferences: { nodeIntegration: false }
+      })
+      
+      const itemsHtml = items.map(item => `
+        <div style="display: flex; justify-content: space-between; font-size: 14px; font-weight: bold; margin-bottom: 5px;">
+          <div style="display: flex; gap: 8px;">
+            <span>${item.cantidad}x</span> 
+            <span>${item.nombre}</span>
+          </div>
+          <span>$${(item.precio * item.cantidad).toFixed(2)}</span>
+        </div>
+      `).join('')
+
+      const paymentHtml = payment && payment.monto_recibido !== undefined && payment.monto_recibido !== null ? `
+        <div style="display: flex; justify-content: space-between;"><span>Método:</span> <span style="text-transform: capitalize;">${payment.metodo}</span></div>
+        <div style="display: flex; justify-content: space-between;"><span>Recibido:</span> <span>$${Number(payment.monto_recibido).toFixed(2)}</span></div>
+        <div style="display: flex; justify-content: space-between;"><span>Cambio:</span> <span>$${Number(payment.cambio || 0).toFixed(2)}</span></div>
+      ` : '';
+
+      // EL SECRETO: @page { margin: 0; } forza a Chromium a no robarse el ancho
+      const html = `
+        <!DOCTYPE html>
+        <html lang="es">
+        <head>
+          <meta charset="UTF-8">
+          <style>
+            @page { margin: 0; size: 80mm 200mm; }
+            body { 
+              font-family: 'Courier New', Courier, monospace; 
+              color: black; 
+              background: white; 
+              margin: 0;
+              padding: 15px; 
+              width: 80mm;
+              box-sizing: border-box;
+            }
+            .ticket-wrapper {
+              width: 260px; /* Encaja perfectamente en los 80mm restando padding */
+              margin: 0 auto;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="ticket-wrapper">
+            <div style="text-align: center; margin-bottom: 15px;">
+              <h2 style="margin: 0; text-transform: uppercase; font-size: 18px;">${businessName || 'POS PIZZERÍA'}</h2>
+              <p style="margin: 5px 0; font-size: 14px;">Ticket #${orderId}</p>
+              <p style="margin: 5px 0; font-size: 14px;">Mesero: ${cajero || 'N/A'}</p>
+              <p style="margin: 5px 0; font-size: 14px;">${date || new Date().toLocaleString('es-MX')}</p>
+            </div>
+            <hr style="border-top: 1px dashed black; margin: 15px 0;">
+            ${itemsHtml}
+            <hr style="border-top: 1px dashed black; margin: 15px 0;">
+            <div style="text-align: right; font-size: 16px; font-weight: bold; margin-bottom: 15px;">
+              TOTAL: $${Number(total).toFixed(2)}
+            </div>
+            <div style="font-size: 14px; font-weight: bold;">
+              ${paymentHtml}
+            </div>
+            <hr style="border-top: 1px dashed black; margin: 15px 0;">
+            <div style="text-align: center; font-size: 12px;">¡Gracias por su preferencia!</div>
+          </div>
+        </body>
+        </html>
+      `
+
+      // 3. Escribimos y cargamos
+      fs.writeFileSync(tempHtmlPath, html, 'utf-8');
+      await win.loadFile(tempHtmlPath);
+      
+      // 4. Pausa de seguridad (1 segundo) para que Chromium pinte la tinta
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // 5. Imprimir PDF con forzado de no márgenes para evitar recortes
+      const pdfData = await win.webContents.printToPDF({
+        printBackground: true,
+        pageSize: { width: 80000, height: 200000 }, // 80mm x 200mm
+        margins: { marginType: 'none' }
+      })
+
+      fs.writeFileSync(pdfPath, pdfData)
+      fs.unlinkSync(tempHtmlPath) // Limpiar archivo temporal
+      win.destroy()
+
+      shell.openPath(pdfPath)
+
+      return { success: true, path: pdfPath }
+    } catch (e: any) {
+      console.error("❌ Error generando PDF:", e)
+      return { success: false, error: e.message }
     }
   })
 }
