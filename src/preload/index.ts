@@ -1,4 +1,3 @@
-//src/preload/index.ts
 import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 
@@ -6,7 +5,9 @@ import { electronAPI } from '@electron-toolkit/preload'
 const api = {
   getInsumos: () => ipcRenderer.invoke('get-insumos'),
   getProductosPOS: () => ipcRenderer.invoke('get-productos-pos'),
-  checkoutOrder: (orderId: number) => ipcRenderer.invoke('checkout-order', orderId)
+  checkoutOrder: (orderId: number) => ipcRenderer.invoke('checkout-order', orderId),
+  // NUEVO: Handler dedicado para pagos (soporta pagos parciales)
+  payOrder: (payload: any) => ipcRenderer.invoke('pay-order', payload)
 }
 
 if (process.contextIsolated) {

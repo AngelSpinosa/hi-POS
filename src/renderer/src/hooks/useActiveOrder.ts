@@ -1,10 +1,13 @@
 import { useState, useCallback, useEffect } from 'react'
 import type { Producto, CartItem, TicketData } from '../types/db'
+// Importamos la interfaz PaymentData para que coincida con el Modal y el POSView
+import type { PaymentData } from '../components/PaymentModal'
 
 export function useActiveOrder(tableId: number, userId?: number) {
   const [activeOrderId, setActiveOrderId] = useState<number | null>(null)
   const [cart, setCart] = useState<CartItem[]>([])
   const [orderStatus, setOrderStatus] = useState<string>('abierta')
+  const [totalPagado, setTotalPagado] = useState<number>(0) // <-- NUEVO ESTADO
   
   // Modales locales
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false)
@@ -15,7 +18,6 @@ export function useActiveOrder(tableId: number, userId?: number) {
   const fetchOrder = useCallback(async () => {
     if (!tableId) return
     try {
-      // CORRECCIÓN: Mandamos la variable como tableId para que el backend la reconozca
       // @ts-ignore
       const result = await window.electron.ipcRenderer.invoke('open-table-order', { 
         tableId: tableId, 
@@ -26,6 +28,7 @@ export function useActiveOrder(tableId: number, userId?: number) {
         setActiveOrderId(result.order.id)
         setCart(result.items || [])
         setOrderStatus(result.order.estatus)
+        setTotalPagado(result.order.totalPagado || 0) // <-- GUARDAMOS EL TOTAL PAGADO
       } else {
         setActiveOrderId(null)
       }
@@ -98,27 +101,55 @@ export function useActiveOrder(tableId: number, userId?: number) {
     await fetchOrder()
   }
 
-  const processPayment = async (method: string, received: number, total: number) => {
+  // NUEVA LÓGICA DE PAGO (Soporta pagos parciales y múltiples SIN CERRAR EL MODAL)
+  const processPayment = async (paymentData: PaymentData) => {
     if (!activeOrderId) return false
     try {
       // @ts-ignore
       const result = await window.electron.ipcRenderer.invoke('pay-order', {
-        orderId: activeOrderId, payment: { method, received }, total
+        orderId: activeOrderId, 
+        payment: paymentData 
       })
 
       if (result && result.success) {
-        setTicketData({
-          orderId: activeOrderId, items: [...cart], total,
-          date: new Date().toLocaleString(),
-          payment: { method, amount: received, change: received - total },
-          cajero: result.cajero // <---- ¡AQUÍ ES DONDE ATRAPAMOS AL MESERO!
-        })
-        setIsPaymentModalOpen(false)
-        return true
+        if (result.isFullyPaid) {
+          // Si se completó el pago de toda la mesa, preparamos el Ticket y CERRAMOS el modal
+          const totalCart = cart.reduce((sum, item) => sum + item.precio * item.cantidad, 0)
+          
+          setTicketData({
+            orderId: activeOrderId, 
+            items: [...cart], 
+            total: totalCart,
+            date: new Date().toLocaleString(),
+            pagos: [{ 
+              metodo: paymentData.method, 
+              monto: paymentData.received, 
+              cambio: paymentData.method === 'efectivo' ? paymentData.received - paymentData.amountToPay : 0 
+            }],
+            cajero: result.cajero 
+          } as any) // <--- AÑADIDO: 'as any' para ignorar el tipado estricto de TicketData por ahora
+          
+          setIsPaymentModalOpen(false) // Solo se cierra al liquidar todo
+          return true
+        } else {
+          // ES UN PAGO PARCIAL: ¡Mantenemos el modal abierto!
+          // Refrescamos la orden. Esto actualizará 'totalPagado' y automáticamente 
+          // el Modal verá el nuevo 'totalRestante', limpiando el input de cobro.
+          await fetchOrder()
+          
+          // Mostramos la alerta para que el cajero sepa que el pago pasó
+          alert(`✅ Pago parcial de $${paymentData.amountToPay.toFixed(2)} registrado con éxito.\nRestan: $${result.remaining.toFixed(2)} por cobrar.`)
+          
+          return true
+        }
       }
+      
       alert(result?.error || 'Error al procesar pago')
       return false
-    } catch (error) { return false }
+    } catch (error) { 
+      console.error(error)
+      return false 
+    }
   }
 
   const cancelOrder = async (pin: string) => {
@@ -138,7 +169,7 @@ export function useActiveOrder(tableId: number, userId?: number) {
   }
 
   return {
-    activeOrderId, cart, orderStatus,
+    activeOrderId, cart, orderStatus, totalPagado,
     isPaymentModalOpen, setIsPaymentModalOpen,
     ticketData, setTicketData,
     kitchenData, setKitchenData,

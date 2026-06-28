@@ -2,7 +2,6 @@ import { ipcMain, app, BrowserWindow, shell } from 'electron'
 import path from 'path'
 import fs from 'fs'
 import { db } from '../database'
-// IMPORTAMOS LA FUNCIÓN DESDE EL CONTROLADOR DE INVENTARIO
 import { descontarInventarioPorVenta } from './inventory'
 
 export function registerOrderHandlers() {
@@ -11,7 +10,6 @@ export function registerOrderHandlers() {
   // HANDLERS PARA POS
   // ==========================================
   
-  // Esta query verifica el stock cruzando producto -> receta_producto -> insumo
   ipcMain.handle('get-productos-pos', () => {
     if (!db) return []
     try {
@@ -94,6 +92,11 @@ export function registerOrderHandlers() {
       }
 
       const items = db.prepare('SELECT * FROM orden_item WHERE orden_id = ?').all(order.id)
+      
+      // Calcular cuánto se ha pagado hasta ahora en esta orden
+      const pagosStmt = db.prepare('SELECT SUM(monto_recibido - cambio) as pagado FROM pago WHERE orden_id = ?').get(order.id) as any
+      order.totalPagado = pagosStmt?.pagado || 0
+
       return { success: true, order, items }
     } catch (error: any) {
       console.error("❌ Error al abrir mesa:", error)
@@ -170,41 +173,83 @@ export function registerOrderHandlers() {
     } catch (e: any) { return { success: false } }
   })
 
-  ipcMain.handle('pay-order', (_, { orderId, payment, total }) => {
+  // ==========================================
+  // PAGO PARCIAL O TOTAL
+  // ==========================================
+  ipcMain.handle('pay-order', (_, { orderId, payment }) => {
     if (!db) return { success: false }
     try {
       const tx = db.transaction(() => {
-        
-        // 1. Obtener o crear el reporte diario actual
-        const tzOffset = new Date().getTimezoneOffset() * 60000;
-        const today = new Date(Date.now() - tzOffset).toISOString().split('T')[0];
+        // 1. Obtener información de la orden y pagos previos
+        const order = db.prepare('SELECT total, estatus FROM orden WHERE id = ?').get(orderId) as any;
+        if (!order) throw new Error('Orden no encontrada');
 
-        let reporte = db.prepare('SELECT id FROM reporte_diario WHERE date(fecha) = ?').get(today) as any
-        if (!reporte) {
-          const info = db.prepare('INSERT INTO reporte_diario (fecha) VALUES (?)').run(today)
-          reporte = { id: info.lastInsertRowid }
+        const pagosStmt = db.prepare('SELECT SUM(monto_recibido - cambio) as pagado FROM pago WHERE orden_id = ?').get(orderId) as any;
+        const totalPagadoPreviamente = pagosStmt?.pagado || 0;
+        const remainingBalance = order.total - totalPagadoPreviamente;
+
+        // 2. Definir cuánto se está aplicando en este pago
+        const targetAmountToPay = payment.amountToPay || remainingBalance;
+        let cambio = 0;
+        let appliedAmount = targetAmountToPay;
+
+        if (payment.method === 'efectivo') {
+          cambio = Math.max(0, payment.received - targetAmountToPay);
+          appliedAmount = payment.received - cambio; 
+        } else {
+          appliedAmount = targetAmountToPay; // Tarjeta es exacto
         }
 
-        // 2. ACTUALIZACIÓN CRÍTICA: Cambiamos a pagada Y vinculamos la orden con el ID del reporte
-        db.prepare("UPDATE orden SET estatus = 'pagada', ticket_impreso = 0, id_reporte_diario = ? WHERE id = ?").run(reporte.id, orderId)
+        // 3. Registrar este pago en la BD
+        db.prepare(`INSERT INTO pago (orden_id, metodo, monto_recibido, cambio) VALUES (?, ?, ?, ?)`).run(
+          orderId, payment.method, payment.received, cambio
+        );
 
-        // 3. Sumar datos al reporte diario
-        const montoEfectivo = payment.method === 'efectivo' ? total : 0
-        const montoTarjeta = payment.method === 'tarjeta' ? total : 0
-        db.prepare(`UPDATE reporte_diario SET total_ventas = total_ventas + ?, total_pedidos = total_pedidos + 1, total_efectivo = total_efectivo + ?, total_tarjeta = total_tarjeta + ? WHERE id = ?`).run(total, montoEfectivo, montoTarjeta, reporte.id)
+        // 4. Obtener/Crear Reporte Diario para ir sumando los ingresos parciales
+        const tzOffset = new Date().getTimezoneOffset() * 60000;
+        const today = new Date(Date.now() - tzOffset).toISOString().split('T')[0];
+        let reporte = db.prepare('SELECT id FROM reporte_diario WHERE date(fecha) = ?').get(today) as any;
+        
+        if (!reporte) {
+          const info = db.prepare('INSERT INTO reporte_diario (fecha) VALUES (?)').run(today);
+          reporte = { id: info.lastInsertRowid };
+        }
 
-        // 4. Registrar el pago CON CÁLCULO DE CAMBIO
-        const cambio = payment.method === 'efectivo' ? Math.max(0, payment.received - total) : 0;
-        db.prepare(`INSERT INTO pago (orden_id, metodo, monto_recibido, cambio) VALUES (?, ?, ?, ?)`).run(orderId, payment.method, payment.received, cambio)
+        const montoEfectivo = payment.method === 'efectivo' ? appliedAmount : 0;
+        const montoTarjeta = payment.method === 'tarjeta' ? appliedAmount : 0;
         
-        // 5. LLAMADA AL MÓDULO DE INVENTARIO CENTRALIZADO
-        const items = db.prepare('SELECT producto_id, cantidad FROM orden_item WHERE orden_id = ?').all(orderId) as any[]
-        descontarInventarioPorVenta(items)
+        // Sumamos dinero al reporte diario inmediatamente
+        db.prepare(`
+          UPDATE reporte_diario 
+          SET total_ventas = total_ventas + ?, total_efectivo = total_efectivo + ?, total_tarjeta = total_tarjeta + ? 
+          WHERE id = ?
+        `).run(appliedAmount, montoEfectivo, montoTarjeta, reporte.id);
+
+        // 5. Verificar si la cuenta ya se liquidó por completo
+        const newTotalPagado = totalPagadoPreviamente + appliedAmount;
+        const isFullyPaid = newTotalPagado >= (order.total - 0.01); // Tolerancia para floats
         
-        // 6. EXTRAER NOMBRE DEL MESERO/CAJERO
-        const userRow = db.prepare('SELECT u.nombre FROM orden o JOIN user u ON o.user_id = u.id WHERE o.id = ?').get(orderId) as any;
-        
-        return { success: true, cajero: userRow?.nombre }
+        let cajeroName = null;
+
+        if (isFullyPaid) {
+          // Si ya se pagó todo, cerramos la orden, vinculamos reporte e incrementamos 'total_pedidos'
+          db.prepare("UPDATE orden SET estatus = 'pagada', ticket_impreso = 0, id_reporte_diario = ? WHERE id = ?").run(reporte.id, orderId);
+          db.prepare("UPDATE reporte_diario SET total_pedidos = total_pedidos + 1 WHERE id = ?").run(reporte.id);
+
+          // Descontar Inventario solo 1 vez al cerrar la cuenta completa
+          const items = db.prepare('SELECT producto_id, cantidad FROM orden_item WHERE orden_id = ?').all(orderId) as any[];
+          descontarInventarioPorVenta(items);
+
+          const userRow = db.prepare('SELECT u.nombre FROM orden o JOIN user u ON o.user_id = u.id WHERE o.id = ?').get(orderId) as any;
+          cajeroName = userRow?.nombre;
+        }
+
+        return { 
+          success: true, 
+          isFullyPaid, 
+          remaining: Math.max(0, order.total - newTotalPagado),
+          cajero: cajeroName
+        }
       })
       return tx()
     } catch (e: any) { 
@@ -230,22 +275,19 @@ export function registerOrderHandlers() {
   })
 
   // ==========================================
-  // HANDLERS PARA HISTORIAL Y PDF (POST-MVP)
+  // HANDLERS PARA HISTORIAL Y PDF
   // ==========================================
 
-  // Devolver la ruta de la carpeta de tickets al Frontend
   ipcMain.handle('get-tickets-path', () => {
     return path.join(app.getPath('documents'), 'hi-POS_Tickets');
   });
 
-  // 1. Obtener tickets por fecha CON NOMBRE DE MESERO
   ipcMain.handle('get-tickets-by-date', (_, { date }) => {
     if (!db) return { success: false, error: 'DB no conectada' }
     try {
       const orders = db.prepare(`
-        SELECT o.id, o.total, o.estatus, o.creado_en, p.metodo, p.monto_recibido, p.cambio, u.nombre as cajero
+        SELECT o.id, o.total, o.estatus, o.creado_en, u.nombre as cajero
         FROM orden o
-        LEFT JOIN pago p ON o.id = p.orden_id
         LEFT JOIN user u ON o.user_id = u.id
         WHERE date(o.creado_en) = ? AND o.estatus IN ('pagada', 'cancelada')
         ORDER BY o.id DESC
@@ -253,7 +295,9 @@ export function registerOrderHandlers() {
 
       const tickets = orders.map(order => {
         const items = db.prepare('SELECT nombre, cantidad, precio FROM orden_item WHERE orden_id = ?').all(order.id)
-        return { ...order, items }
+        // Anidamos los pagos como un arreglo dentro del ticket
+        const pagos = db.prepare('SELECT metodo, monto_recibido, cambio FROM pago WHERE orden_id = ?').all(order.id)
+        return { ...order, items, pagos }
       })
 
       return { success: true, tickets }
@@ -263,25 +307,21 @@ export function registerOrderHandlers() {
     }
   })
 
-  // 2. Generar Ticket en PDF
   ipcMain.handle('generate-ticket-pdf', async (_, { orderId, items, total, payment, businessName, date, cajero }) => {
     try {
-      // 1. Crear carpeta dedicada en Documentos
       const ticketsDir = path.join(app.getPath('documents'), 'hi-POS_Tickets');
       if (!fs.existsSync(ticketsDir)) {
         fs.mkdirSync(ticketsDir, { recursive: true });
       }
 
-      // 2. Rutas para nuestros archivos
       const pdfPath = path.join(ticketsDir, `Ticket_${orderId}.pdf`);
       const tempHtmlPath = path.join(app.getPath('temp'), `temp_ticket_${orderId}.html`);
       
-      // Creamos una ventana oculta
       const win = new BrowserWindow({ 
         show: false, 
         width: 400, 
         height: 600,
-        backgroundColor: '#ffffff', // Fondo forzado blanco
+        backgroundColor: '#ffffff',
         webPreferences: { nodeIntegration: false }
       })
       
@@ -301,7 +341,6 @@ export function registerOrderHandlers() {
         <div style="display: flex; justify-content: space-between;"><span>Cambio:</span> <span>$${Number(payment.cambio || 0).toFixed(2)}</span></div>
       ` : '';
 
-      // EL SECRETO: @page { margin: 0; } forza a Chromium a no robarse el ancho
       const html = `
         <!DOCTYPE html>
         <html lang="es">
@@ -319,7 +358,7 @@ export function registerOrderHandlers() {
               box-sizing: border-box;
             }
             .ticket-wrapper {
-              width: 260px; /* Encaja perfectamente en los 80mm restando padding */
+              width: 260px;
               margin: 0 auto;
             }
           </style>
@@ -348,22 +387,18 @@ export function registerOrderHandlers() {
         </html>
       `
 
-      // 3. Escribimos y cargamos
       fs.writeFileSync(tempHtmlPath, html, 'utf-8');
       await win.loadFile(tempHtmlPath);
-      
-      // 4. Pausa de seguridad (1 segundo) para que Chromium pinte la tinta
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      // 5. Imprimir PDF con forzado de no márgenes para evitar recortes
       const pdfData = await win.webContents.printToPDF({
         printBackground: true,
-        pageSize: { width: 80000, height: 200000 }, // 80mm x 200mm
+        pageSize: { width: 80000, height: 200000 },
         margins: { marginType: 'none' }
       })
 
       fs.writeFileSync(pdfPath, pdfData)
-      fs.unlinkSync(tempHtmlPath) // Limpiar archivo temporal
+      fs.unlinkSync(tempHtmlPath)
       win.destroy()
 
       shell.openPath(pdfPath)
@@ -376,6 +411,7 @@ export function registerOrderHandlers() {
   })
 }
 
+// Función auxiliar fuera de los handlers
 function recalculateOrderTotal(ordenId: number) {
   const result = db.prepare('SELECT SUM(precio * cantidad) as total FROM orden_item WHERE orden_id = ?').get(ordenId) as any
   const total = result?.total || 0

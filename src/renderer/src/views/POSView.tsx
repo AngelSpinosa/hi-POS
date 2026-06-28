@@ -2,10 +2,10 @@ import { useEffect, useState } from 'react'
 // Importamos ProductoPOS que ahora contiene la propiedad 'disponible'
 import type { Producto } from '../types/db'
 import { OrderCart } from '../components/OrderCart'
-import { PaymentModal } from '../components/PaymentModal'
+import { PaymentModal, type PaymentData } from '../components/PaymentModal'
 import { TicketReceipt } from '../components/TicketReceipt'
 import { PinPadModal } from '../components/PinPadModal'
-import { useActiveOrder } from '../hooks/useActiveOrder'
+import { useActiveOrder } from '../hooks/useActiveOrder' // <-- ¡Aquí está el import que faltaba!
 
 // Componente KitchenCommand local
 // eslint-disable-next-line react/prop-types
@@ -50,9 +50,11 @@ export function POSView({ tableId, userId, onBack }: POSViewProps) {
   }, [])
 
   const total = order.cart.reduce((sum, item) => sum + item.precio * item.cantidad, 0)
+  const totalRestante = Math.max(0, total - order.totalPagado)
 
-  const handlePaymentConfirm = async (method: 'efectivo' | 'tarjeta', received: number) => {
-    await order.processPayment(method, received, total)
+  // NUEVA FIRMA: Recibe el objeto PaymentData completo y se lo pasa al hook
+  const handlePaymentConfirm = async (paymentData: PaymentData) => {
+    await order.processPayment(paymentData)
   }
 
   // Activa el modal del PIN al dar clic en cancelar en el carrito
@@ -147,7 +149,9 @@ export function POSView({ tableId, userId, onBack }: POSViewProps) {
       {/* MODALES */}
       <PaymentModal 
         isOpen={order.isPaymentModalOpen} 
-        total={total}
+        totalOriginal={total} 
+        totalRestante={totalRestante} 
+        cart={order.cart} // <--- NUEVO: Pasamos el carrito para el CU-33
         onClose={() => order.setIsPaymentModalOpen(false)} 
         onConfirmPayment={handlePaymentConfirm}
       />
@@ -161,7 +165,7 @@ export function POSView({ tableId, userId, onBack }: POSViewProps) {
           orderId={order.ticketData.orderId}
           items={order.ticketData.items}
           total={order.ticketData.total}
-          payment={order.ticketData.payment as any}
+          pagos={order.ticketData.pagos} // <-- Pasamos el array de pagos directamente
           cajero={order.ticketData.cajero}
           onClose={handleTicketClose}
           onPrint={handleTicketClose}

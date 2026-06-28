@@ -1,9 +1,6 @@
-//src/preload/index.d.ts
 import { ElectronAPI } from '@electron-toolkit/preload'
 import { Producto, Insumo } from '../renderer/src/types/db'
 
-// Extendemos Producto para incluir la propiedad dinámica 'disponible'
-// Esto nos sirve para el frontend al evaluar si hay stock suficiente
 export interface ProductoPOS extends Producto {
   disponible?: boolean;
 }
@@ -11,6 +8,11 @@ export interface ProductoPOS extends Producto {
 declare global {
   interface Window {
     electron: ElectronAPI
-    api: unknown
+    api: {
+      getInsumos: () => Promise<any>
+      getProductosPOS: () => Promise<any>
+      checkoutOrder: (orderId: number) => Promise<any>
+      payOrder: (payload: { orderId: number, payment: { method: string, received: number, amountToPay: number } }) => Promise<any>
+    }
   }
 }
