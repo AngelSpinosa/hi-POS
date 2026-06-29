@@ -17,7 +17,7 @@ export function DailyReport() {
   const [isSaving, setIsSaving] = useState(false)
   
   // Estado para modales
-  const [selectedOrder, setSelectedOrder] = useState<{id: number, items: CartItem[]} | null>(null)
+  const [selectedOrder, setSelectedOrder] = useState<{id: number, items: CartItem[], pagos?: any[]} | null>(null)
   const [isExportModalOpen, setIsExportModalOpen] = useState(false)
 
   const fetchReport = async () => {
@@ -44,7 +44,7 @@ export function DailyReport() {
     // @ts-ignore
     const res = await window.electron.ipcRenderer.invoke('get-order-details', { orderId })
     if (res.success) {
-      setSelectedOrder({ id: orderId, items: res.items })
+      setSelectedOrder({ id: orderId, items: res.items, pagos: res.pagos })
     }
   }
 
@@ -66,8 +66,9 @@ export function DailyReport() {
 
   const totalVentas = orders.reduce((sum, order) => sum + order.total, 0);
   const totalPedidos = orders.length;
-  const expectedCash = orders.filter(o => o.metodo === 'efectivo').reduce((sum, o) => sum + o.total, 0);
-  const totalTarjeta = orders.filter(o => o.metodo === 'tarjeta').reduce((sum, o) => sum + o.total, 0);
+  
+  const expectedCash = orders.filter((o: any) => o.metodo === 'efectivo' || o.metodo === 'Mixto').reduce((sum, o) => sum + o.total, 0); 
+  const totalTarjeta = orders.filter((o: any) => o.metodo === 'tarjeta').reduce((sum, o) => sum + o.total, 0);
 
   const realCash = parseFloat(cashInDrawer) || 0
   const difference = realCash - expectedCash
@@ -129,6 +130,7 @@ export function DailyReport() {
   const yesterdayDate = new Date();
   yesterdayDate.setDate(yesterdayDate.getDate() - 1);
   const yesterdayStr = getLocalDate(yesterdayDate);
+
  return (
     <div className="report-container" style={{ height: '100%', paddingTop: '20px' }}>
       
@@ -201,11 +203,11 @@ export function DailyReport() {
                     <tr key={order.id}>
                       <td>{new Date(order.creado_en).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</td>
                       <td>
-                        <div>#{order.mesa}</div>
+                        <div>#{order.mesa || 'N/A'}</div>
                         <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '3px' }}>Mesero: {order.cajero || 'N/A'}</div>
                       </td>
                       <td>${order.total.toFixed(2)}</td>
-                      <td style={{ textTransform: 'capitalize' }}>{order.metodo}</td>
+                      <td style={{ textTransform: 'capitalize' }}>{(order as any).metodo}</td>
                       <td style={{ textAlign: 'right' }}>
                         <button className="btn-ver" onClick={() => handleOpenDetail(order.id)}>
                           Ver
@@ -273,11 +275,12 @@ export function DailyReport() {
         hi-POS
       </div>
 
-      {/* MODALES */}
+      {/* MODALES: ¡Ya sin el error de TS! */}
       {selectedOrder && (
         <OrderDetailModal 
           orderId={selectedOrder.id} 
           items={selectedOrder.items} 
+          pagos={selectedOrder.pagos} 
           onClose={() => setSelectedOrder(null)} 
         />
       )}

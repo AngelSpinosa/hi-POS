@@ -3,83 +3,66 @@ import type { CartItem } from '../types/db'
 interface OrderDetailModalProps {
   orderId: number;
   items: CartItem[];
+  pagos?: { metodo: string; monto_recibido: number; cambio: number }[];
   onClose: () => void;
 }
 
-export function OrderDetailModal({ orderId, items, onClose }: OrderDetailModalProps) {
-  const total = items.reduce((sum, i) => sum + i.precio * i.cantidad, 0)
+export function OrderDetailModal({ orderId, items, pagos, onClose }: OrderDetailModalProps) {
+  const total = items.reduce((sum, item) => sum + (item.precio * item.cantidad), 0);
 
   return (
-    <div style={{
-      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-      backgroundColor: 'rgba(0,0,0,0.85)', zIndex: 5000,
-      display: 'flex', justifyContent: 'center', alignItems: 'center',
-      backdropFilter: 'blur(5px)',
-      fontFamily: 'var(--font-heading, monospace)'
-    }} onClick={onClose}>
-      
-      <div style={{ 
-        backgroundColor: '#111111', width: '450px', borderRadius: '16px', 
-        padding: '30px', border: '1px solid #ffffff', color: 'white',
-        boxShadow: '0 20px 50px rgba(0,0,0,0.8)',
-        display: 'flex', flexDirection: 'column',
-        animation: 'fadeIn 0.2s ease-out', position: 'relative'
-      }} onClick={e => e.stopPropagation()}>
+    <div 
+      style={{
+        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+        backgroundColor: 'rgba(0,0,0,0.8)', zIndex: 6000,
+        display: 'flex', justifyContent: 'center', alignItems: 'center',
+        fontFamily: 'monospace'
+      }}
+      onClick={onClose}
+    >
+      <div 
+        style={{
+          backgroundColor: '#111', color: 'white', padding: '30px', 
+          borderRadius: '12px', width: '350px', border: '1px solid #333',
+          boxShadow: '0 20px 50px rgba(0,0,0,0.8)'
+        }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+          <h2 style={{ margin: 0, fontSize: '1.4rem' }}>Detalle Orden #{orderId}</h2>
+          <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: '#ef4444', fontSize: '1.5rem', cursor: 'pointer', lineHeight: 1 }}>&times;</button>
+        </div>
         
-        {/* Botón de Cerrar (Rojo en esquina superior derecha) */}
-        <button 
-          onClick={onClose} 
-          style={{ 
-            position: 'absolute', top: '20px', right: '20px',
-            background: '#ff0000', color: 'white', border: 'none', 
-            borderRadius: '50%', width: '28px', height: '28px', 
-            cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center',
-            boxShadow: '0 2px 8px rgba(255, 0, 0, 0.4)', transition: 'transform 0.15s ease'
-          }}
-          onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.15)'}
-          onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-        </button>
-
-        {/* Header y Línea Separadora */}
-        <h2 style={{ margin: '0 0 20px 0', fontSize: '1.8rem', fontWeight: 'bold' }}>
-          Detalle Orden #{orderId}
-        </h2>
-        <div style={{ width: '100%', height: '2px', backgroundColor: 'white', marginBottom: '15px' }}></div>
-
-        {/* Lista de Productos */}
-        <div style={{ maxHeight: '350px', overflowY: 'auto', paddingRight: '5px' }}>
+        <div style={{ borderTop: '2px dashed #444', borderBottom: '2px dashed #444', padding: '15px 0', margin: '15px 0' }}>
           {items.map((item, idx) => (
-            <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0' }}>
-              <div style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>
-                X {item.cantidad} {item.nombre}
+            <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '1rem' }}>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <span style={{ fontWeight: 'bold' }}>{item.cantidad}x</span>
+                <span>{item.nombre}</span>
               </div>
-              <div style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>
-                ${(item.precio * item.cantidad).toFixed(2)}
-              </div>
+              <span>${(item.precio * item.cantidad).toFixed(2)}</span>
             </div>
           ))}
         </div>
-
-        {/* Footer y Línea Separadora (Total) */}
-        <div style={{ width: '100%', height: '2px', backgroundColor: 'white', margin: '15px 0' }}></div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '5px' }}>
-          <span style={{ fontSize: '1.5rem', fontWeight: 'bold', textTransform: 'uppercase' }}>Total</span>
-          <span style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#00E676' }}>
-            ${total.toFixed(2)}
-          </span>
+        
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.2rem', fontWeight: 'bold', color: '#00E676', marginBottom: '20px' }}>
+          <span>TOTAL</span>
+          <span>${total.toFixed(2)}</span>
         </div>
 
+        {/* SECCIÓN DE PAGOS QUE DESGLOSA LA DIVISIÓN */}
+        {pagos && pagos.length > 0 && (
+          <div style={{ background: '#1a1a1a', padding: '15px', borderRadius: '8px', border: '1px solid #333' }}>
+            <h4 style={{ margin: '0 0 10px 0', color: '#9ca3af', fontSize: '0.9rem', textTransform: 'uppercase' }}>Pagos Registrados:</h4>
+            {pagos.map((p, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.95rem' }}>
+                <span style={{ textTransform: 'capitalize' }}>✅ {p.metodo}</span>
+                <span>${p.monto_recibido.toFixed(2)}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
-
-      {/* Animación de entrada */}
-      <style>{`
-        @keyframes fadeIn {
-          from { opacity: 0; transform: scale(0.95) translateY(10px); }
-          to { opacity: 1; transform: scale(1) translateY(0); }
-        }
-      `}</style>
     </div>
   )
 }

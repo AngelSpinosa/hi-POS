@@ -7,47 +7,43 @@ export function registerReportHandlers() {
   // ==========================================
   // OBTENER REPORTE DIARIO (Corregido)
   // ==========================================
-  ipcMain.handle('get-daily-report', (_, { date }) => {
-    if (!db) return { success: false, error: 'DB no conectada' };
+    ipcMain.handle('get-daily-report', (_, { date }) => {
+    if (!db) return { success: false }
     try {
-      // 1. Buscamos si existe el reporte para la fecha solicitada
-      const report = db.prepare('SELECT * FROM reporte_diario WHERE date(fecha) = ?').get(date) as any;
-      
-      // Si no hay reporte, devolvemos los datos en cero
-      if (!report) {
-        return { success: true, report: null, orders: [] };
-      }
+      const report = db.prepare('SELECT * FROM reporte_diario WHERE date(fecha) = ?').get(date)
 
-      // 2. Buscamos las órdenes enlazadas EXACTAMENTE a este reporte
-      // ¡Esto arregla el bug visual! Ya no dependemos de zonas horarias, sino del ID directo.
+      // SIN LEFT JOIN EN PAGO: Así evitamos filas duplicadas en el historial.
       const orders = db.prepare(`
-        SELECT o.id, o.creado_en, o.total, p.metodo, m.numero as mesa, u.nombre as cajero
+        SELECT o.id, o.total, o.estatus, o.creado_en, u.nombre as cajero, o.mesa_id as mesa
         FROM orden o
-        LEFT JOIN pago p ON o.id = p.orden_id
-        LEFT JOIN mesa m ON o.mesa_id = m.id
         LEFT JOIN user u ON o.user_id = u.id
-        WHERE o.id_reporte_diario = ? AND o.estatus != 'cancelada'
-      `).all(report.id);
+        WHERE date(o.creado_en) = ? AND o.estatus IN ('pagada', 'cancelada')
+        ORDER BY o.id DESC
+      `).all(date) as any[]
 
-      return { success: true, report, orders };
-    } catch (error: any) {
-      console.error('❌ Error get-daily-report:', error);
-      return { success: false, error: error.message };
-    }
-  });
+      const ordersWithDetails = orders.map(order => {
+        const items = db.prepare('SELECT nombre, cantidad, precio FROM orden_item WHERE orden_id = ?').all(order.id)
+        const pagos = db.prepare('SELECT metodo, monto_recibido, cambio FROM pago WHERE orden_id = ?').all(order.id) as any[]
+        const metodoPrincipal = pagos.length > 1 ? 'Mixto' : (pagos[0]?.metodo || 'N/A')
+        return { ...order, items, pagos, metodo: metodoPrincipal }
+      })
+
+      return { success: true, report, orders: ordersWithDetails }
+    } catch (error: any) { return { success: false, error: error.message } }
+  })
 
   // ==========================================
   // OBTENER DETALLE DE UNA ORDEN PARA EL MODAL
   // ==========================================
   ipcMain.handle('get-order-details', (_, { orderId }) => {
-    if (!db) return { success: false, error: 'DB no conectada' };
+    if (!db) return { success: false }
     try {
-      const items = db.prepare('SELECT nombre, cantidad, precio FROM orden_item WHERE orden_id = ?').all(orderId);
-      return { success: true, items };
-    } catch (error: any) {
-      return { success: false, error: error.message };
-    }
-  });
+      const items = db.prepare('SELECT nombre, cantidad, precio FROM orden_item WHERE orden_id = ?').all(orderId)
+      // ESTA ES LA LÍNEA QUE FALTABA: Mandamos el arreglo de pagos al frontend para que el modal los dibuje
+      const pagos = db.prepare('SELECT metodo, monto_recibido, cambio FROM pago WHERE orden_id = ?').all(orderId)
+      return { success: true, items, pagos }
+    } catch (error: any) { return { success: false, error: error.message } }
+  })
 
   // ==========================================
   // GUARDAR CORTE DE CAJA MVP
