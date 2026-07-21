@@ -1,19 +1,19 @@
 import { useEffect, useState } from 'react'
-// Importamos ProductoPOS que ahora contiene la propiedad 'disponible'
 import type { Producto } from '../types/db'
 import { OrderCart } from '../components/OrderCart'
 import { PaymentModal, type PaymentData } from '../components/PaymentModal'
 import { TicketReceipt } from '../components/TicketReceipt'
 import { PinPadModal } from '../components/PinPadModal'
-import { useActiveOrder } from '../hooks/useActiveOrder' // <-- ¡Aquí está el import que faltaba!
+import { ShippingInfoModal } from '../components/ShippingInfoModal'
+import { useDeliveryOrder } from '../hooks/useDeliveryOrder'
 
-// Componente KitchenCommand local
+// Igual que en POSView.tsx: modal simple para mostrar lo que se manda a cocina
 // eslint-disable-next-line react/prop-types
-function KitchenCommand({ items, tableNum, onClose }: any) {
+function KitchenCommand({ items, onClose }: any) {
   return (
     <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.8)', zIndex: 3000, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
       <div style={{ backgroundColor: '#fff', color: '#000', padding: '20px', width: '250px', fontFamily: 'monospace' }}>
-        <h3 style={{ textAlign: 'center', borderBottom: '2px dashed #000' }}>COCINA - MESA {tableNum}</h3>
+        <h3 style={{ textAlign: 'center', borderBottom: '2px dashed #000' }}>COCINA - DOMICILIO</h3>
         {/* eslint-disable-next-line react/prop-types */}
         {items.map((item: any, idx: number) => (
           <div key={idx} style={{ fontSize: '1.2rem', margin: '10px 0' }}>[ ] {item.cantidad} x {item.nombre}</div>
@@ -24,102 +24,84 @@ function KitchenCommand({ items, tableNum, onClose }: any) {
   )
 }
 
-interface POSViewProps {
-  tableId: number;
+interface DeliveryPOSViewProps {
   userId?: number;
   onBack: () => void;
 }
 
-export function POSView({ tableId, userId, onBack }: POSViewProps) {
-  const order = useActiveOrder(tableId, userId)
+export function DeliveryPOSView({ userId, onBack }: DeliveryPOSViewProps) {
+  const order = useDeliveryOrder(userId)
   const [products, setProducts] = useState<Producto[]>([])
-  
-  // Estado para cancelar
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false)
 
   useEffect(() => {
-    // LLamamos al endpoint que cruza productos con recetas e insumos
+    // Mismo endpoint que POSView.tsx: cruza productos con recetas e insumos
     // @ts-ignore
     window.electron.ipcRenderer.invoke('get-productos-pos').then((res) => {
       if (Array.isArray(res)) {
-        // Utilizamos == en lugar de === para atrapar tanto el booleano true como el numero 1
         // @ts-ignore
         setProducts(res.filter(p => p.active == 1 || p.active === true))
       }
     })
   }, [])
 
-
-const totalRestante = Math.max(0, order.totalCalculado - order.totalPagado)
-
-  // NUEVA FIRMA: Recibe el objeto PaymentData completo y se lo pasa al hook
-  const handlePaymentConfirm = async (paymentData: PaymentData) => {
-    await order.processPayment(paymentData)
-  }
-
-  // Activa el modal del PIN al dar clic en cancelar en el carrito
   const requestCancel = () => setIsCancelModalOpen(true)
 
-  // Recibe el PIN y ejecuta la cancelación
   const handleCancelConfirm = async (pin: string) => {
     const success = await order.cancelOrder(pin)
     if (success) {
       setIsCancelModalOpen(false)
-      onBack() 
+      onBack()
     }
   }
 
-  // Declaramos la función para limpiar el ticket y regresar al mapa
   const handleTicketClose = () => {
     order.setTicketData(null)
-    onBack() 
+    onBack()
   }
 
   return (
     <div style={{ display: 'flex', height: '100vh', backgroundColor: '#111', color: 'white' }}>
-      
-      {/* SECCIÓN IZQUIERDA: Menú de Productos */}
+
+      {/* SECCIÓN IZQUIERDA: Menú de Productos (idéntico a POSView.tsx) */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
         <div style={{ padding: '20px', backgroundColor: '#1a1a1a', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #333' }}>
           <button onClick={onBack} style={{ background: 'transparent', color: '#9ca3af', border: 'none', cursor: 'pointer', fontSize: '1.2rem', fontWeight: 'bold' }}>
-            ← Volver al Mapa
+            ← Menú principal
           </button>
-          <h2 style={{ margin: 0, color: '#f97316' }}>Mesa {tableId}</h2>
+          <h2 style={{ margin: 0, color: '#f97316' }}>Envío #{order.activeOrderId ? order.activeOrderId.toString().padStart(4, '0') : '...'}</h2>
           <div style={{ width: '100px' }}></div>
         </div>
 
         <div style={{ flex: 1, padding: '30px', overflowY: 'auto' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '20px' }}>
             {products.map((product) => {
-              // Verificamos si hay stock (el backend lo precalculó en product.disponible)
               // @ts-ignore
               const isAvailable = product.disponible !== false;
 
               return (
-                <div 
-                  key={product.id} 
+                <div
+                  key={product.id}
                   onClick={() => isAvailable && order.addToCart(product)}
-                  style={{ 
+                  style={{
                     position: 'relative',
-                    background: isAvailable ? '#262626' : '#2a0c0c', 
-                    padding: '20px', 
-                    borderRadius: '15px', 
-                    cursor: isAvailable ? 'pointer' : 'not-allowed', 
-                    border: isAvailable ? '1px solid #404040' : '1px solid #7f1d1d', 
-                    textAlign: 'center', 
+                    background: isAvailable ? '#262626' : '#2a0c0c',
+                    padding: '20px',
+                    borderRadius: '15px',
+                    cursor: isAvailable ? 'pointer' : 'not-allowed',
+                    border: isAvailable ? '1px solid #404040' : '1px solid #7f1d1d',
+                    textAlign: 'center',
                     transition: 'transform 0.1s',
                     opacity: isAvailable ? 1 : 0.5
                   }}
                   onMouseDown={e => isAvailable && (e.currentTarget.style.transform = 'scale(0.95)')}
                   onMouseUp={e => isAvailable && (e.currentTarget.style.transform = 'scale(1)')}
                 >
-                  {/* Etiqueta de agotado */}
                   {!isAvailable && (
                     <div style={{ position: 'absolute', top: '-10px', right: '-10px', background: '#dc2626', color: 'white', padding: '5px 10px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 'bold', boxShadow: '0 4px 6px rgba(0,0,0,0.5)' }}>
                       AGOTADO
                     </div>
                   )}
-
                   <h3 style={{ margin: '0 0 15px 0', fontSize: '1.1rem', color: isAvailable ? '#f3f4f6' : '#9ca3af' }}>{product.nombre}</h3>
                   <div style={{ color: isAvailable ? '#22c55e' : '#7f1d1d', fontWeight: 'bold', fontSize: '1.4rem' }}>${product.precio.toFixed(2)}</div>
                 </div>
@@ -129,47 +111,53 @@ const totalRestante = Math.max(0, order.totalCalculado - order.totalPagado)
         </div>
       </div>
 
-      {/* SECCIÓN DERECHA: Carrito de Compras */}
+      {/* SECCIÓN DERECHA: Carrito (mismo componente OrderCart que mesas) */}
       <div style={{ width: '380px', backgroundColor: '#1a1a1a', borderLeft: '1px solid #333', padding: '20px' }}>
-        <OrderCart 
-          cart={order.cart} 
-          total={order.totalCalculado} 
+        <OrderCart
+          cart={order.cart}
+          total={order.orderTotal}
+          subtotal={order.orderTotal + order.descuentoTotal}
+          descuento={order.descuentoTotal}
           orderId={order.activeOrderId}
-          onPay={() => {}} 
-          onRemove={order.removeFromCart} 
+          onPay={() => {}}
+          onRemove={order.removeFromCart}
           onUpdateQuantity={order.updateQuantity}
-          onGenerateCommand={() => order.generateCommand(tableId)} 
-          onRequestBill={order.requestBill}
-          onFinalizePayment={() => order.setIsPaymentModalOpen(true)}
-          onCancelOrder={requestCancel} 
-          orderStatus={order.orderStatus}
+          onGenerateCommand={order.generateCommand}
+          onRequestBill={() => {}}
+          onFinalizePayment={() => {}}
+          onCancelOrder={requestCancel}
+          // No hay flujo de "cuenta_solicitada" en domicilio: en cuanto hay items,
+          // el único botón relevante es "Generar comanda" (dispara todo el flujo de envío + cobro)
+          orderStatus="abierta"
         />
       </div>
 
       {/* MODALES */}
-      <PaymentModal 
-        isOpen={order.isPaymentModalOpen} 
-        totalOriginal={order.totalCalculado} 
-        totalRestante={totalRestante} 
-        cart={order.cart} // <--- NUEVO: Pasamos el carrito para el CU-33
-        onClose={() => order.setIsPaymentModalOpen(false)} 
-        onConfirmPayment={handlePaymentConfirm}
-      />
-
       {order.kitchenData && (
-        <KitchenCommand items={order.kitchenData.items} tableNum={order.kitchenData.tableNum} onClose={() => order.setKitchenData(null)} />
+        <KitchenCommand items={order.kitchenData.items} onClose={() => order.setKitchenData(null)} />
       )}
 
+      <ShippingInfoModal
+        isOpen={order.isShippingModalOpen}
+        onClose={() => order.setIsShippingModalOpen(false)}
+        onConfirm={order.confirmShipping}
+      />
+
+      <PaymentModal
+        isOpen={order.isPaymentModalOpen}
+        totalOriginal={order.totalConEnvio}
+        totalRestante={order.totalConEnvio}
+        cart={order.cart}
+        onClose={() => order.setIsPaymentModalOpen(false)}
+        onConfirmPayment={(paymentData: PaymentData) => order.confirmPaymentAndCreate(paymentData)}
+      />
+
       {order.ticketData && (
-        <TicketReceipt 
+        <TicketReceipt
           orderId={order.ticketData.orderId}
           items={order.ticketData.items}
-          total={order.ticketData.total} // Ojo, ahora total puede ser 0 si fue cortesía
-          subtotal={order.subtotal}      // <--- Añadir esto
-          descuento={order.descuentoTotal} // <--- Añadir esto
-          promos={order.promosAplicadas}   // <--- Añadir esto
+          total={order.ticketData.total}
           pagos={order.ticketData.pagos}
-          cajero={order.ticketData.cajero}
           onClose={handleTicketClose}
           onPrint={handleTicketClose}
         />

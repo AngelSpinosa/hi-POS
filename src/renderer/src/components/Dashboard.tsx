@@ -7,11 +7,14 @@ import IconAnalytics from '../assets/icons/Analytics.svg'
 import IconPizza from '../assets/icons/Pizza.svg'
 import IconUsers from '../assets/icons/Users.svg'
 import IconSettings from '../assets/icons/Settings.svg'
+import IconDelivery from '../assets/icons/bike.svg' // Añadido para Envíos
+import IconDiscount from '../assets/icons/Discount.svg' // Añadido para Descuentos
 import IconLogout from '../assets/icons/Logout.svg'
 import IconClose from '../assets/icons/Close.svg'
 
 interface DashboardProps {
-  onNavigate: (view: 'TABLES' | 'REPORT' | 'USERS' | 'PRODUCTS' | 'SETTINGS') => void;
+  // Actualizado para incluir las nuevas vistas (DELIVERY y PROMOS)
+  onNavigate: (view: 'TABLES' | 'REPORT' | 'USERS' | 'PRODUCTS' | 'SETTINGS' | 'DELIVERY' | 'PROMOS') => void;
   licenseInfo?: { type: string; remainingDays?: number } | null;
   appConfig?: AppConfig | null;
 }
@@ -45,14 +48,14 @@ export function Dashboard({ onNavigate, licenseInfo, appConfig }: DashboardProps
 
   // NUEVO: Recibe la categoría y el nombre para hacerlo dinámico
   const handleInjectDemoData = async (category: string, categoryName: string) => {
-    if (confirm(`📦 ¿Estás seguro? Esto añadirá un menú base de ${categoryName}, junto con su inventario y recetas para que pruebes el sistema. (PIN de Admin: 1234)`)) {
+    if (confirm(`¿Estás seguro? Esto añadirá un menú base de ${categoryName}, junto con su inventario y recetas para que pruebes el sistema. (PIN de Admin: 1234)`)) {
       // @ts-ignore
       const res = await window.electron.ipcRenderer.invoke('inject-demo-data', { category })
       if (res.success) {
-        alert('✅ ¡Datos de prueba cargados con éxito! Ve al módulo de Productos e Insumos para ver la magia.')
+        alert('¡Datos de prueba cargados con éxito! Ve al módulo de Productos e Insumos para ver la magia.')
         handleDismissBanner() // Lo ocultamos automáticamente tras inyectar con éxito
       } else {
-        alert('❌ Error al cargar datos: ' + res.error)
+        alert('Error al cargar datos: ' + res.error)
       }
     }
   }
@@ -81,7 +84,7 @@ export function Dashboard({ onNavigate, licenseInfo, appConfig }: DashboardProps
           
           {licenseInfo?.type === 'DEMO' && (
             <div className="demo-pill">
-              Modo Demo, le quedan {licenseInfo.remainingDays} días de prueba ⚠️
+              Modo Demo, le quedan {licenseInfo.remainingDays} días de prueba
             </div>
           )}
         </div>
@@ -95,36 +98,57 @@ export function Dashboard({ onNavigate, licenseInfo, appConfig }: DashboardProps
       <div className="dashboard-content">
         {/* GRID DE MÓDULOS */}
         <div className="cards-grid">
+          
+          {/* BOTÓN MESAS */}
           <div className="pos-card" onClick={() => onNavigate('TABLES')}>
             <img src={IconTable} alt="Mesas" className="pos-card-icon" />
             <h2 className="pos-card-title">Mesas</h2>
             <p className="pos-card-subtitle">Ver mapa y órdenes</p>
           </div>
 
+          {/* NUEVO BOTÓN ENVÍOS */}
+          <div className="pos-card" onClick={() => onNavigate('DELIVERY')}>
+            <img src={IconDelivery} alt="Envíos" className="pos-card-icon" />
+            <h2 className="pos-card-title">Envíos</h2>
+            <p className="pos-card-subtitle">Pedidos a domicilio</p>
+          </div>
+
+          {/* BOTÓN REPORTES */}
           <div className="pos-card" onClick={() => onNavigate('REPORT')}>
             <img src={IconAnalytics} alt="Reportes" className="pos-card-icon" />
             <h2 className="pos-card-title">Reportes</h2>
             <p className="pos-card-subtitle">Cortes de caja y estadísticas</p>
           </div>
 
+          {/* BOTÓN PRODUCTOS */}
           <div className="pos-card" onClick={() => onNavigate('PRODUCTS')}>
             <img src={IconPizza} alt="Productos e Insumos" className="pos-card-icon" />
             <h2 className="pos-card-title">Productos e<br/>insumos</h2>
             <p className="pos-card-subtitle">Inventario y recetas</p>
           </div>
 
+          {/* BOTÓN USUARIOS */}
           <div className="pos-card" onClick={() => onNavigate('USERS')}>
             <img src={IconUsers} alt="Usuarios" className="pos-card-icon" />
             <h2 className="pos-card-title">Usuarios</h2>
             <p className="pos-card-subtitle">Personal y accesos</p>
           </div>
 
+          {/* BOTÓN AJUSTES */}
           <div className="pos-card" onClick={() => onNavigate('SETTINGS')}>
             <img src={IconSettings} alt="Ajustes" className="pos-card-icon" />
             <h2 className="pos-card-title">Ajustes</h2>
             <p className="pos-card-subtitle">Sistema y tickets</p>
           </div>
 
+          {/* NUEVO BOTÓN DESCUENTOS */}
+          <div className="pos-card" onClick={() => onNavigate('PROMOS')}>
+            <img src={IconDiscount} alt="Descuentos" className="pos-card-icon" />
+            <h2 className="pos-card-title">Descuentos</h2>
+            <p className="pos-card-subtitle">Gestionar promociones</p>
+          </div>
+
+          {/* BOTÓN SALIR */}
           <div className="pos-card pos-card-danger" onClick={() => window.close()}>
             <img src={IconLogout} alt="Salir" className="pos-card-icon" />
             <h2 className="pos-card-title">Salir</h2>

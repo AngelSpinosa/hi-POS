@@ -4,7 +4,8 @@ import type { CartItem } from '../types/db'
 export interface PaymentData {
   method: 'efectivo' | 'tarjeta';
   received: number;
-  amountToPay: number; 
+  amountToPay: number;
+  isCourtesy?: boolean; // <-- Nuevo: le dice al backend que cierre la orden en $0 sin importar el total real
 }
 
 interface PaymentModalProps {
@@ -34,6 +35,10 @@ export function PaymentModal({ totalOriginal, totalRestante, cart, isOpen, onClo
   const [splitDropdownOpen, setSplitDropdownOpen] = useState(false)
   const [splitMode, setSplitMode] = useState<'none' | 'equal' | 'separate'>('none')
   const [numPeople, setNumPeople] = useState<string>('')
+
+  // Estados de Descuento (Cortesía)
+  const [discountDropdownOpen, setDiscountDropdownOpen] = useState(false)
+  const [isCourtesy, setIsCourtesy] = useState(false)
 
   // Estados Cuentas Separadas (CU-33)
   const [separateAccounts, setSeparateAccounts] = useState<SeparateAccount[]>([])
@@ -80,6 +85,13 @@ export function PaymentModal({ totalOriginal, totalRestante, cart, isOpen, onClo
   const parsedPeople = parseInt(numPeople) || 1;
   let amountToPay = totalRestante;
 
+  if (isCourtesy) {
+    amountToPay = 0;
+  } else if (splitMode === 'equal' && parsedPeople > 1) {
+    const porcionPorPersona = Number((totalOriginal / parsedPeople).toFixed(2));
+    amountToPay = (totalRestante - porcionPorPersona < 0.1) ? totalRestante : porcionPorPersona;
+  }
+
   if (splitMode === 'equal' && parsedPeople > 1) {
     const porcionPorPersona = Number((totalOriginal / parsedPeople).toFixed(2));
     amountToPay = (totalRestante - porcionPorPersona < 0.1) ? totalRestante : porcionPorPersona;
@@ -89,6 +101,11 @@ export function PaymentModal({ totalOriginal, totalRestante, cart, isOpen, onClo
   const change = method === 'efectivo' ? numericReceived - amountToPay : 0;
 
   const handleGlobalConfirm = () => {
+    if (isCourtesy) {
+      // No hay nada que cobrar: se confirma directo con monto recibido en $0.
+      onConfirmPayment({ method: 'efectivo', received: 0, amountToPay: 0, isCourtesy: true });
+      return;
+    }
     if (method === 'efectivo' && numericReceived < amountToPay) return;
     const finalReceived = method === 'efectivo' ? numericReceived : amountToPay;
     
@@ -219,7 +236,32 @@ export function PaymentModal({ totalOriginal, totalRestante, cart, isOpen, onClo
               </div>
             )}
           </div>
-          <button style={btnStyle(false, true)}>Descuentos ▼</button>
+          {/* Botón y Dropdown de Descuentos / Cortesía */}
+          <div style={{ position: 'relative' }}>
+            <button 
+              onClick={() => setDiscountDropdownOpen(!discountDropdownOpen)} 
+              style={btnStyle(isCourtesy, true)}
+            >
+              {isCourtesy ? 'Cortesía Activa' : 'Descuentos ▼'}
+            </button>
+            
+            {discountDropdownOpen && (
+              <div style={{
+                position: 'absolute', top: 'calc(100% + 5px)', left: 0, width: '100%',
+                background: '#1a1a1a', border: '1px solid #444', borderRadius: '8px', zIndex: 10, overflow: 'hidden'
+              }}>
+                {!isCourtesy ? (
+                  <div className="dropdown-item" onClick={() => { setIsCourtesy(true); setDiscountDropdownOpen(false); }}>
+                    Cortesía (Orden completa)
+                  </div>
+                ) : (
+                  <div className="dropdown-item" style={{ color: '#ef4444' }} onClick={() => { setIsCourtesy(false); setDiscountDropdownOpen(false); }}>
+                    Quitar Cortesía
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* ========================================== */}
@@ -371,7 +413,11 @@ export function PaymentModal({ totalOriginal, totalRestante, cart, isOpen, onClo
               </div>
             )}
 
-            {method === 'efectivo' ? (
+            {isCourtesy ? (
+              <div style={{ animation: 'fadeIn 0.2s', textAlign: 'center', color: '#00E676', fontWeight: 'bold', padding: '15px', background: '#00e67622', borderRadius: '8px' }}>
+                Esta orden se cerrará como Cortesía ($0.00). No se necesita monto recibido.
+              </div>
+            ) : method === 'efectivo' ? (
               <div style={{ animation: 'fadeIn 0.2s' }}>
                 <label style={{ color: '#d1d5db', fontSize: '0.9rem', display: 'block', marginBottom: '5px' }}>Monto recibido</label>
                 <input ref={inputRef} type="number" min="0" value={received} onChange={(e) => {
@@ -401,11 +447,11 @@ export function PaymentModal({ totalOriginal, totalRestante, cart, isOpen, onClo
           {splitMode !== 'separate' && (
             <button 
               onClick={handleGlobalConfirm}
-              disabled={method === 'efectivo' && numericReceived < amountToPay}
+              disabled={!isCourtesy && method === 'efectivo' && numericReceived < amountToPay}
               style={{
                 ...actionBtnStyle('#00E676', 'black'),
-                opacity: (method === 'efectivo' && numericReceived < amountToPay) ? 0.5 : 1,
-                cursor: (method === 'efectivo' && numericReceived < amountToPay) ? 'not-allowed' : 'pointer'
+                opacity: (!isCourtesy && method === 'efectivo' && numericReceived < amountToPay) ? 0.5 : 1,
+                cursor: (!isCourtesy && method === 'efectivo' && numericReceived < amountToPay) ? 'not-allowed' : 'pointer'
               }}
             >
               Confirmar

@@ -3,6 +3,9 @@ import type { CartItem } from '../types/db'
 interface OrderCartProps {
   cart: CartItem[];
   total: number;
+  subtotal?: number; // <-- Nueva
+  descuento?: number; // <-- Nueva
+  promos?: string[]; // <-- Nueva
   orderId: number | null;
   onPay: () => void; 
   onRemove: (id: number) => void;
@@ -15,7 +18,7 @@ interface OrderCartProps {
 }
 
 export function OrderCart({ 
-  cart, total, orderId, 
+  cart, total, subtotal, descuento, promos, orderId, // <--- AÑADE ESTAS TRES AQUÍ
   onRemove, onUpdateQuantity, 
   onGenerateCommand, onRequestBill, onFinalizePayment, onCancelOrder,
   orderStatus
@@ -100,7 +103,28 @@ return (
                   
                   {/* Detalles Platillo */}
                   <div style={{ flex: 1, fontSize: '1rem', color: 'white', lineHeight: '1.2' }}>{item.nombre}</div>
-                  <div style={{ fontWeight: 'bold', fontSize: '1rem', color: 'white' }}>${(item.precio * item.cantidad).toFixed(2)}</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', lineHeight: '1.2' }}>
+                  {/* Antes se leía item.descuento (nunca existía). El campo real que llena el backend
+                      en cada recálculo (orders.ts) es descuento_aplicado. */}
+                  {item.descuento_aplicado > 0 ? (
+                    <>
+                      <span style={{ textDecoration: 'line-through', color: '#ef4444', fontSize: '0.85rem' }}>
+                        ${(item.precio * item.cantidad).toFixed(2)}
+                      </span>
+                      <span style={{ fontWeight: 'bold', fontSize: '1rem', color: '#00E676' }}>
+                        ${((item.precio * item.cantidad) - item.descuento_aplicado).toFixed(2)}
+                      </span>
+                      {/* Confirmación visual para el cajero: de qué promo viene el descuento y cuánto es en pesos */}
+                      <span style={{ fontSize: '0.7rem', color: '#facc15', marginTop: '2px' }}>
+                        {item.promocion_nombre || 'Promoción'} · -${item.descuento_aplicado.toFixed(2)}
+                      </span>
+                    </>
+                  ) : (
+                    <div style={{ fontWeight: 'bold', fontSize: '1rem', color: 'white' }}>
+                      ${(item.precio * item.cantidad).toFixed(2)}
+                    </div>
+                  )}
+                </div>
                 </div>
               ))}
             </div>
@@ -111,9 +135,27 @@ return (
           )}
         </div>
 
-        {/* Footer (Total y Botones) */}
+{/* Footer (Total y Botones) */}
         <div style={{ padding: '25px', borderTop: '1px solid #444', background: '#111111' }}>
           
+          {/* Desglose de Descuentos (Solo si aplica) */}
+          {descuento !== undefined && descuento > 0 && (
+            <div style={{ marginBottom: '15px', paddingBottom: '15px', borderBottom: '1px dashed #333' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#9ca3af', marginBottom: '8px', fontSize: '1rem' }}>
+                <span>Subtotal:</span>
+                <span>${subtotal?.toFixed(2)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#facc15', fontSize: '1rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span>Descuento:</span>
+                  <span style={{ fontSize: '0.8rem' }}>{promos?.join(', ')}</span>
+                </div>
+                <span>-${descuento.toFixed(2)}</span>
+              </div>
+            </div>
+          )}
+
+          {/* ESTE ES EL BLOQUE QUE FALTABA DEL TOTAL */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
             <span style={{ fontSize: '1.6rem', fontWeight: 'bold', color: 'white' }}>Total:</span>
             <span style={{ fontSize: '1.6rem', fontWeight: 'bold', color: '#00E676' }}>${total.toFixed(2)}</span>

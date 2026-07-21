@@ -10,8 +10,9 @@ import { ProductManagement } from './components/ProductManagement'
 import { LicenseScreen } from './components/LicenseScreen'
 import { Settings } from './components/Settings'
 import { OnboardingWizard } from './components/OnboardingWizard' // NUEVO COMPONENTE
+import { PromotionsManagement } from './components/PromotionsManagement' // IMPORT DE PROMOCIONES
 
-type ViewState = 'DASHBOARD' | 'TABLES' | 'ORDER' | 'REPORT' | 'USERS' | 'PRODUCTS' | 'LICENSE_ERROR' | 'SETTINGS' | 'ONBOARDING';
+type ViewState = 'DASHBOARD' | 'TABLES' | 'ORDER' | 'REPORT' | 'USERS' | 'PRODUCTS' | 'LICENSE_ERROR' | 'SETTINGS' | 'ONBOARDING' | 'PROMOS' | 'DELIVERY';
 
 interface CurrentUser {
   id: number;
@@ -139,7 +140,7 @@ function App() {
              setView('TABLES')
           }
         }
-        else if (['REPORT', 'USERS', 'PRODUCTS', 'SETTINGS'].includes(pendingView || '')) {
+        else if (['REPORT', 'USERS', 'PRODUCTS', 'SETTINGS', 'PROMOS', 'DELIVERY'].includes(pendingView || '')) {
           if (user.rol === 'admin') {
             if (pendingView) setView(pendingView)
           } else {
@@ -212,7 +213,7 @@ function App() {
   if (view === 'DASHBOARD') {
     return (
       <>
-        <PinPadModal title={pinTitle} isOpen={isPinModalOpen} onClose={() => { setIsPinModalOpen(false); setPendingView(null); }} onVerify={handlePinVerify} />
+       <PinPadModal title={pinTitle} isOpen={isPinModalOpen} onClose={() => { setIsPinModalOpen(false); setPendingView(null); }} onVerify={handlePinVerify} />
         <Dashboard 
           licenseInfo={licenseInfo}
           appConfig={appConfig} // Pasamos la config para que use su nombre y colores
@@ -222,7 +223,9 @@ function App() {
               'REPORT': 'Acceso a Reportes',
               'USERS': 'Gestión de Usuarios',
               'PRODUCTS': 'Gestión de Productos',
-              'SETTINGS': 'Configuración del Sistema'
+              'SETTINGS': 'Configuración del Sistema',
+              'PROMOS': 'Gestión de Descuentos',
+              'DELIVERY': 'Pedidos a Domicilio'
             }
             requestViewChange(v as ViewState, titles[v])
           }}
@@ -346,6 +349,26 @@ function App() {
           setView('TABLES')
         }} 
       />
+    )
+  }
+
+  if (view === 'PROMOS') {
+    return (
+      <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--color-bg-main, #121212)', color: 'white', fontFamily: 'var(--font-heading, monospace)' }}>
+        <div style={{ padding: '25px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #333' }}>
+          <button onClick={handleBackToDashboard} style={{ background: 'transparent', color: 'white', border: 'none', cursor: 'pointer', fontSize: '1.2rem', fontWeight: 'bold', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span>←</span> Menú principal
+          </button>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'white', textTransform: 'uppercase' }}>
+              GESTIÓN DE DESCUENTOS
+            </div>
+          </div>
+        </div>
+        <div style={{ flex: 1, overflow: 'hidden' }}>
+          <PromotionsManagement/>
+        </div>
+      </div>
     )
   }
 

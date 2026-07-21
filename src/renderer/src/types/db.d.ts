@@ -1,5 +1,5 @@
 // ==========================================
-// 📦 ENTIDADES DE BASE DE DATOS (TABLAS SQL)
+// ENTIDADES DE BASE DE DATOS (TABLAS SQL)
 // ==========================================
 
 export interface User {
@@ -14,7 +14,9 @@ export interface Producto {
   id: number;
   nombre: string;
   precio: number;
-  active: number;
+  active: boolean;
+  categoria_id?: number | null;
+  categoria_nombre?: string | null; // Lo obtenemos del LEFT JOIN
 }
 
 export interface Mesa {
@@ -50,6 +52,7 @@ export interface OrdenItem {
   comanda_impresa: number;
   descuento_aplicado: number;
   promocion_id?: number | null;
+  promocion_nombre?: string | null; // Viene del JOIN con promocion, solo para mostrar al cajero
 }
 
 export interface Pago {
@@ -87,7 +90,7 @@ export interface Insumo {
   unidad_medida: string;
   stock_actual: number;
   stock_minimo: number;
-  active: number;
+  active: boolean;
 }
 
 export interface receta_producto {
@@ -100,7 +103,7 @@ export interface receta_producto {
 export interface movimiento_inventario {
   id: number;
   insumo_id: number;
-  tipo: 'ENTRADA' | 'SALIDA' | 'MERMA' | string;
+  tipo: 'ENTRADA' | 'SALIDA' | 'MERMA';
   cantidad: number;
   motivo: string;
   fecha: string;
@@ -116,7 +119,7 @@ export interface AppConfig {
 }
 
 // ==========================================
-// 📦 NUEVAS ENTIDADES: DELIVERY
+//  NUEVAS ENTIDADES: DELIVERY
 // ==========================================
 
 export interface CanalDelivery {
@@ -142,9 +145,19 @@ export interface OrdenDomicilio {
   canal_delivery_id: number;
   codigo_plataforma?: string | null;
   costo_envio: number;
+  estado_envio: 'en_cocina' | 'en_camino' | 'entregado'; // <-- Nuevo: para el tablero de Pedidos
   notas_entrega?: string | null;
   monto_comision: number;
   ingreso_neto: number;
+}
+
+// Fila combinada que devuelve get-delivery-orders (JOIN de orden_domicilio + cliente + orden)
+export interface PedidoDomicilio extends OrdenDomicilio {
+  cliente_nombre: string;
+  cliente_telefono: string;
+  cliente_direccion: string | null; // <-- Viene de cliente.direccion_defecto
+  orden_estatus: Orden['estatus'];
+  orden_total: number;
 }
 
 // ==========================================
@@ -154,12 +167,24 @@ export interface OrdenDomicilio {
 export interface Promocion {
   id: number;
   nombre: string;
-  tipo: 'porcentaje' | 'monto_fijo' | '2x1' | string;
-  valor: number;
-  dias_activa: string;
-  hora_inicio?: string | null;
-  hora_fin?: string | null;
-  activa: number;
+  tipo: '2x1' | '% TOTAL' | '% de producto' | 'Precio Fijo';
+  valor: number | null;
+  valor_pago: number | null;   // <-- Nuevo: para '2x1' generalizado ("X productos por el precio de Y")
+  dias_activa: string | null;  // <--- Añadido según tu BD
+  hora_inicio: string | null;  // <--- Corregido
+  hora_fin: string | null;     // <--- Corregido
+  activa: boolean;
+}
+
+export interface PromocionCategoria {
+  promocion_id: number;
+  categoria_id: number;
+}
+
+export interface Categoria {
+  id: number;
+  nombre: string;
+  activa: boolean;
 }
 
 export interface PromocionProducto {
@@ -198,4 +223,17 @@ export interface OrdenHistorial {
   tipo_orden: Orden['tipo_orden'];
   mesa?: number | null;
   cajero?: string;
+}
+
+
+export interface CrearPromocionPayload {
+  nombre: string;
+  tipo: '2x1' | '% TOTAL' | '% de producto' | 'Precio Fijo';
+  valor: number | null;
+  valor_pago?: number | null;  // <-- Nuevo: solo aplica para '2x1' ("X productos por el precio de Y")
+  dias_activa: string;         // <--- Añadir esta línea
+  hora_inicio: string | null;
+  hora_fin: string | null;
+  aplica_a: 'Categorias' | 'Productos';
+  referencia_ids: number[]; 
 }

@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
-import type { Producto, Insumo, movimiento_inventario } from '../types/db'
+import type { Producto, Insumo, movimiento_inventario, Categoria } from '../types/db'
 import { PinPadModal } from './PinPadModal'
-
 
 // Tipo local para el UI de la receta
 interface RecipeItem {
@@ -19,11 +18,13 @@ interface MovimientoView extends movimiento_inventario {
 }
 
 export function ProductManagement() {
-  const [activeTab, setActiveTab] = useState<'productos' | 'insumos' | 'historial'>('productos')
+  // NUEVO: Añadimos 'categorias' al tipo de activeTab
+  const [activeTab, setActiveTab] = useState<'productos' | 'categorias' | 'insumos' | 'historial'>('productos')
   
   const [products, setProducts] = useState<Producto[]>([])
   const [insumos, setInsumos] = useState<Insumo[]>([])
   const [movimientos, setMovimientos] = useState<MovimientoView[]>([]) 
+  const [categories, setCategories] = useState<Categoria[]>([])
   const [isLoading, setIsLoading] = useState(true)
   
   // Búsqueda
@@ -34,6 +35,12 @@ export function ProductManagement() {
   const [editingId, setEditingId] = useState<number | null>(null)
   const [formName, setFormName] = useState('')
   const [formPrice, setFormPrice] = useState('')
+  const [formCategoryId, setFormCategoryId] = useState<number | ''>('')
+
+  // NUEVO: Formulario Categorías
+  const [isEditingCategory, setIsEditingCategory] = useState(false)
+  const [editingCategoryId, setEditingCategoryId] = useState<number | null>(null)
+  const [formCategoryName, setFormCategoryName] = useState('')
 
   // Formulario Insumos
   const [isEditingInsumo, setIsEditingInsumo] = useState(false)
@@ -67,13 +74,15 @@ export function ProductManagement() {
     setIsLoading(true)
     try {
       // @ts-ignore
-      const [resProducts, resInsumos, resMovimientos] = await Promise.all([
+      const [resProducts, resInsumos, resMovimientos, resCategories] = await Promise.all([
         // @ts-ignore
         window.electron.ipcRenderer.invoke('get-products'),
         // @ts-ignore
         window.electron.ipcRenderer.invoke('get-insumos'),
         // @ts-ignore
-        window.electron.ipcRenderer.invoke('get-movimientos') 
+        window.electron.ipcRenderer.invoke('get-movimientos'),
+        // @ts-ignore
+        window.electron.ipcRenderer.invoke('get-categories')
       ])
 
       if (Array.isArray(resProducts)) setProducts(resProducts)
@@ -84,6 +93,9 @@ export function ProductManagement() {
 
       if (resMovimientos && resMovimientos.success) setMovimientos(resMovimientos.data)
       else setMovimientos([])
+
+      if (Array.isArray(resCategories)) setCategories(resCategories)
+      else setCategories([])
 
     } catch (e) { 
       console.error(e) 
@@ -96,7 +108,8 @@ export function ProductManagement() {
 
   // Filtrados dinámicos
   const filteredProducts = products.filter(product =>
-    product.nombre.toLowerCase().includes(searchTerm.toLowerCase())
+    product.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (product.categoria_nombre && product.categoria_nombre.toLowerCase().includes(searchTerm.toLowerCase()))
   )
 
   const filteredInsumos = insumos.filter(insumo =>
@@ -104,27 +117,31 @@ export function ProductManagement() {
     insumo.codigo.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
-  // Búsqueda en el historial
   const filteredMovimientos = movimientos.filter(mov =>
     mov.insumo_nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
     mov.codigo.toLowerCase().includes(searchTerm.toLowerCase()) ||
     mov.motivo.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
+  // NUEVO: Filtro para categorías
+  const filteredCategories = categories.filter(cat =>
+    cat.nombre.toLowerCase().includes(searchTerm.toLowerCase())
+  )
+
   // Placeholder dinámico para la barra de búsqueda
   let searchPlaceholder = 'Buscar...';
   if (activeTab === 'productos') searchPlaceholder = 'Buscar platillo o producto...';
+  if (activeTab === 'categorias') searchPlaceholder = 'Buscar categoría...';
   if (activeTab === 'insumos') searchPlaceholder = 'Buscar insumo por nombre o código...';
   if (activeTab === 'historial') searchPlaceholder = 'Buscar en historial por insumo o motivo...';
 
   // --- MÉTODOS DEL FORMULARIO (Productos) ---
-
   const handleOpenCreate = () => {
-    setEditingId(null); setFormName(''); setFormPrice(''); setIsEditing(true);
+    setEditingId(null); setFormName(''); setFormPrice(''); setFormCategoryId(''); setIsEditing(true);
   }
 
   const handleOpenEdit = (prod: Producto) => {
-    setEditingId(prod.id); setFormName(prod.nombre); setFormPrice(prod.precio?.toString() || '0'); setIsEditing(true);
+    setEditingId(prod.id); setFormName(prod.nombre); setFormPrice(prod.precio?.toString() || '0'); setFormCategoryId(prod.categoria_id || ''); setIsEditing(true);
   }
 
   const handleSaveClick = () => {
@@ -133,7 +150,13 @@ export function ProductManagement() {
     
     const actionToExecute = async () => {
       const channel = editingId ? 'update-product' : 'create-product'
-      const payload = editingId ? { id: editingId, nombre: formName, precio: Number(formPrice) } : { nombre: formName, precio: Number(formPrice) }
+      const payload = {
+        id: editingId,
+        nombre: formName,
+        precio: Number(formPrice),
+        categoria_id: formCategoryId === '' ? null : Number(formCategoryId)
+      }
+      
       // @ts-ignore
       const res = await window.electron.ipcRenderer.invoke(channel, payload)
       if (res.success) { setIsEditing(false); await fetchData(); alert('✅ Guardado.'); } 
@@ -142,7 +165,7 @@ export function ProductManagement() {
     setPendingAction(() => actionToExecute); setIsPinModalOpen(true);
   }
 
-  const handleToggleStatusRequest = (id: number, currentStatus: number) => {
+  const handleToggleStatusRequest = (id: number, currentStatus: boolean) => {
     const action = async () => {
       // @ts-ignore
       const res = await window.electron.ipcRenderer.invoke('toggle-product-status', { id, active: currentStatus ? 0 : 1 })
@@ -151,8 +174,57 @@ export function ProductManagement() {
     setPendingAction(() => action); setIsPinModalOpen(true);
   }
 
-  // --- MÉTODOS DEL FORMULARIO (Insumos) ---
+  // --- NUEVO: MÉTODOS DEL FORMULARIO (Categorías) ---
+  const handleOpenCreateCategory = () => {
+    setEditingCategoryId(null);
+    setFormCategoryName('');
+    setIsEditingCategory(true);
+  }
 
+  const handleOpenEditCategory = (cat: Categoria) => {
+    setEditingCategoryId(cat.id);
+    setFormCategoryName(cat.nombre);
+    setIsEditingCategory(true);
+  }
+
+const handleSaveCategoryClick = () => {
+    if (!formCategoryName.trim()) { alert('⚠️ Por favor ingresa un nombre para la categoría.'); return; }
+    
+    const actionToExecute = async () => {
+      // 1. Ya NO hay alert de "Próximamente" aquí
+      const channel = editingCategoryId ? 'update-category' : 'create-category'
+      const payload = { id: editingCategoryId, nombre: formCategoryName }
+      
+      // 2. Ejecutamos el IPC real hacia el backend (descomentado)
+      // @ts-ignore
+      const res = await window.electron.ipcRenderer.invoke(channel, payload)
+      
+      if (res.success) { 
+        setIsEditingCategory(false); 
+        await fetchData(); 
+        alert('✅ Categoría guardada.');
+      } else { 
+        alert('❌ Error: ' + res.error); 
+      }
+    }
+    setPendingAction(() => actionToExecute); setIsPinModalOpen(true);
+  }
+
+  const handleToggleCategoryStatusRequest = (id: number, currentStatus: boolean) => {
+    const action = async () => {
+      // Ejecutamos el IPC real hacia el backend (descomentado)
+      // @ts-ignore
+      const res = await window.electron.ipcRenderer.invoke('toggle-category-status', { id, activa: currentStatus ? 0 : 1 })
+      
+      if (res.success) { 
+        await fetchData(); 
+        alert(currentStatus ? '🔴 Categoría desactivada' : '🟢 Categoría activada');
+      }
+    }
+    setPendingAction(() => action); setIsPinModalOpen(true);
+  }
+
+  // --- MÉTODOS DEL FORMULARIO (Insumos) ---
   const handleOpenCreateInsumo = () => {
     setEditingInsumoId(null); setFormInsumoCodigo(''); setFormInsumoNombre(''); setFormInsumoUnidad('KG'); setFormInsumoStock('0'); setFormInsumoStockMinimo('0'); setIsEditingInsumo(true);
   }
@@ -183,7 +255,6 @@ export function ProductManagement() {
   }
 
   // --- MÉTODOS DE RECETA (CU-44) ---
-  
   const handleOpenRecipe = async (prod: Producto) => {
     setRecipeProductId(prod.id); setRecipeProductName(prod.nombre); setSelectedInsumoId(''); setRecipeCantidad(''); setIsRecipeModalOpen(true);
     try {
@@ -215,48 +286,21 @@ export function ProductManagement() {
   }
 
   // --- MÉTODOS DE MOVIMIENTOS (CU-45 y CU-46) ---
-  
   const handleOpenMovement = (insumo: Insumo, type: 'ENTRADA' | 'MERMA') => {
-    setMovementInsumo(insumo);
-    setMovementType(type);
-    setMovementCantidad('');
-    setMovementMotivo(type === 'ENTRADA' ? 'Compra a proveedor' : 'Producto dañado/caducado');
-    setIsMovementModalOpen(true);
+    setMovementInsumo(insumo); setMovementType(type); setMovementCantidad(''); setMovementMotivo(type === 'ENTRADA' ? 'Compra a proveedor' : 'Producto dañado/caducado'); setIsMovementModalOpen(true);
   }
 
   const handleSaveMovement = () => {
-    if (!movementCantidad || Number(movementCantidad) <= 0 || !movementMotivo.trim()) {
-      alert('⚠️ Por favor ingresa una cantidad válida y un motivo.');
-      return;
-    }
-    
-    if (movementType === 'MERMA' && movementInsumo && Number(movementCantidad) > movementInsumo.stock_actual) {
-      alert('⚠️ No puedes mermar más del stock actual.');
-      return;
-    }
+    if (!movementCantidad || Number(movementCantidad) <= 0 || !movementMotivo.trim()) { alert('⚠️ Por favor ingresa una cantidad válida y un motivo.'); return; }
+    if (movementType === 'MERMA' && movementInsumo && Number(movementCantidad) > movementInsumo.stock_actual) { alert('⚠️ No puedes mermar más del stock actual.'); return; }
 
     const actionToExecute = async () => {
-      const payload = {
-        insumo_id: movementInsumo?.id,
-        tipo: movementType,
-        cantidad: Number(movementCantidad),
-        motivo: movementMotivo
-      };
-      
+      const payload = { insumo_id: movementInsumo?.id, tipo: movementType, cantidad: Number(movementCantidad), motivo: movementMotivo };
       // @ts-ignore
       const res = await window.electron.ipcRenderer.invoke('register-movement', payload);
-      
-      if (res.success) {
-        setIsMovementModalOpen(false);
-        await fetchData(); // Al recargar la data, se refrescará el historial también
-        alert(`✅ ${movementType === 'ENTRADA' ? 'Reabasto' : 'Merma'} registrado correctamente.`);
-      } else {
-        alert('❌ Error al registrar movimiento: ' + res.error);
-      }
+      if (res.success) { setIsMovementModalOpen(false); await fetchData(); alert(`✅ ${movementType === 'ENTRADA' ? 'Reabasto' : 'Merma'} registrado correctamente.`); } else { alert('❌ Error al registrar movimiento: ' + res.error); }
     }
-    
-    setPendingAction(() => actionToExecute);
-    setIsPinModalOpen(true); 
+    setPendingAction(() => actionToExecute); setIsPinModalOpen(true); 
   }
 
   // --- CONFIRMACIÓN PIN ---
@@ -271,48 +315,32 @@ export function ProductManagement() {
   }
 
   return (
-    <div style={{ 
-      height: '100%', display: 'flex', flexDirection: 'column', 
-      boxSizing: 'border-box'
-    }}>
-
-      
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', boxSizing: 'border-box' }}>
 
       {/* TABS (Botonera hueca estilo Figma) */}
       <div style={{ margin: '20px 40px 30px 40px', border: '1px solid #ffffff', borderRadius: '16px', display: 'flex', padding: '10px' }}>
         <button 
           onClick={() => { setActiveTab('productos'); setSearchTerm(''); }} 
-          style={{ 
-            flex: 1, padding: '14px', background: 'transparent', 
-            color: activeTab === 'productos' ? '#00E676' : 'white', 
-            border: activeTab === 'productos' ? '1px solid #00E676' : '1px solid transparent', 
-            borderRadius: '30px', cursor: 'pointer', fontSize: '1.1rem', fontWeight: 'bold', 
-            transition: 'all 0.2s', fontFamily: 'inherit' 
-          }}
+          style={{ flex: 1, padding: '14px', background: 'transparent', color: activeTab === 'productos' ? '#00E676' : 'white', border: activeTab === 'productos' ? '1px solid #00E676' : '1px solid transparent', borderRadius: '30px', cursor: 'pointer', fontSize: '1.1rem', fontWeight: 'bold', transition: 'all 0.2s', fontFamily: 'inherit' }}
         >
           Platillos/Productos
         </button>
+        {/* NUEVA PESTAÑA CATEGORÍAS */}
+        <button 
+          onClick={() => { setActiveTab('categorias'); setSearchTerm(''); }} 
+          style={{ flex: 1, padding: '14px', background: 'transparent', color: activeTab === 'categorias' ? '#00E676' : 'white', border: activeTab === 'categorias' ? '1px solid #00E676' : '1px solid transparent', borderRadius: '30px', cursor: 'pointer', fontSize: '1.1rem', fontWeight: 'bold', transition: 'all 0.2s', fontFamily: 'inherit' }}
+        >
+          Categorías
+        </button>
         <button 
           onClick={() => { setActiveTab('insumos'); setSearchTerm(''); }} 
-          style={{ 
-            flex: 1, padding: '14px', background: 'transparent', 
-            color: activeTab === 'insumos' ? '#00E676' : 'white', 
-            border: activeTab === 'insumos' ? '1px solid #00E676' : '1px solid transparent', 
-            borderRadius: '30px', cursor: 'pointer', fontSize: '1.1rem', fontWeight: 'bold', 
-            transition: 'all 0.2s', fontFamily: 'inherit' 
-          }}
+          style={{ flex: 1, padding: '14px', background: 'transparent', color: activeTab === 'insumos' ? '#00E676' : 'white', border: activeTab === 'insumos' ? '1px solid #00E676' : '1px solid transparent', borderRadius: '30px', cursor: 'pointer', fontSize: '1.1rem', fontWeight: 'bold', transition: 'all 0.2s', fontFamily: 'inherit' }}
         >
           Inventario/Insumos
         </button>
         <button 
           onClick={() => { setActiveTab('historial'); setSearchTerm(''); }} 
-          style={{ 
-            flex: 1, padding: '14px', background: 'transparent', 
-            color: activeTab === 'historial' ? '#00E676' : 'white', 
-            border: activeTab === 'historial' ? '1px solid #00E676' : '1px solid transparent', 
-            borderRadius: '30px', cursor: 'pointer', fontSize: '1.1rem', fontWeight: 'bold', 
-            transition: 'all 0.2s', fontFamily: 'inherit' 
-          }}
+          style={{ flex: 1, padding: '14px', background: 'transparent', color: activeTab === 'historial' ? '#00E676' : 'white', border: activeTab === 'historial' ? '1px solid #00E676' : '1px solid transparent', borderRadius: '30px', cursor: 'pointer', fontSize: '1.1rem', fontWeight: 'bold', transition: 'all 0.2s', fontFamily: 'inherit' }}
         >
           Historial de movimientos
         </button>
@@ -320,7 +348,7 @@ export function ProductManagement() {
 
       {/* BÚSQUEDA Y ACCIONES */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px', padding: '0 40px' }}>
-        <div style={{ width: '200px' }}>{/* Spacer visual */}</div>
+        <div style={{ width: '200px' }}></div>
         
         <div style={{ position: 'relative', width: '450px' }}>
           <svg style={{ position: 'absolute', left: '15px', top: '50%', transform: 'translateY(-50%)' }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
@@ -329,27 +357,19 @@ export function ProductManagement() {
             placeholder={searchPlaceholder} 
             value={searchTerm} 
             onChange={(e) => setSearchTerm(e.target.value)} 
-            style={{ 
-              width: '100%', padding: '12px 20px 12px 45px', borderRadius: '30px', 
-              background: 'transparent', border: '1px solid #555', color: 'white', 
-              fontSize: '0.95rem', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' 
-            }} 
+            style={{ width: '100%', padding: '12px 20px 12px 45px', borderRadius: '30px', background: 'transparent', border: '1px solid #555', color: 'white', fontSize: '0.95rem', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }} 
           />
         </div>
         
         <div style={{ width: '200px', display: 'flex', justifyContent: 'flex-end' }}>
           {activeTab === 'productos' && (
-            <button onClick={handleOpenCreate} style={{ padding: '12px 20px', background: '#00E676', color: 'black', border: 'none', borderRadius: '30px', fontWeight: 'bold', fontSize: '0.9rem', cursor: 'pointer', fontFamily: 'inherit' }}>
-              + Nuevo producto
-            </button>
+            <button onClick={handleOpenCreate} style={{ padding: '12px 20px', background: '#00E676', color: 'black', border: 'none', borderRadius: '30px', fontWeight: 'bold', fontSize: '0.9rem', cursor: 'pointer', fontFamily: 'inherit' }}>+ Nuevo producto</button>
+          )}
+          {activeTab === 'categorias' && (
+            <button onClick={handleOpenCreateCategory} style={{ padding: '12px 20px', background: '#00E676', color: 'black', border: 'none', borderRadius: '30px', fontWeight: 'bold', fontSize: '0.9rem', cursor: 'pointer', fontFamily: 'inherit' }}>+ Nueva categoría</button>
           )}
           {activeTab === 'insumos' && (
-            <button onClick={handleOpenCreateInsumo} style={{ padding: '12px 20px', background: '#00E676', color: 'black', border: 'none', borderRadius: '30px', fontWeight: 'bold', fontSize: '0.9rem', cursor: 'pointer', fontFamily: 'inherit' }}>
-              + Nuevo insumo
-            </button>
-          )}
-          {activeTab === 'historial' && (
-             <div style={{ width: '100%' }}></div> /* Empty spacer */
+            <button onClick={handleOpenCreateInsumo} style={{ padding: '12px 20px', background: '#00E676', color: 'black', border: 'none', borderRadius: '30px', fontWeight: 'bold', fontSize: '0.9rem', cursor: 'pointer', fontFamily: 'inherit' }}>+ Nuevo insumo</button>
           )}
         </div>
       </div>
@@ -360,8 +380,7 @@ export function ProductManagement() {
         {isLoading ? (
           <div style={{ textAlign: 'center', color: '#9ca3af', marginTop: '50px' }}>Cargando datos...</div>
         ) : activeTab === 'productos' ? (
-          
-          /* PESTAÑA 1: PLATILLOS (GRID 2 COLUMNAS) */
+          /* PESTAÑA 1: PLATILLOS */
           <>
             {filteredProducts.length === 0 ? (
               <div style={{ textAlign: 'center', color: '#6b7280', marginTop: '50px' }}>No hay productos.</div>
@@ -371,130 +390,140 @@ export function ProductManagement() {
                   <div key={prod.id} style={{ border: '1px solid #555', borderRadius: '16px', padding: '25px', background: '#161616', display: 'flex', justifyContent: 'space-between', transition: 'transform 0.2s' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                       <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'white' }}>{prod.nombre}</div>
-                      <div style={{ color: prod.active ? '#00E676' : '#ef4444', fontSize: '0.95rem' }}>
-                        {prod.active ? 'Disponible' : 'No disponible'}
-                      </div>
-                      <div style={{ color: 'white', fontSize: '0.95rem', marginBottom: '15px' }}>
-                        Cantidades disponibles
-                      </div>
-                      
+                      <div style={{ color: prod.active ? '#00E676' : '#ef4444', fontSize: '0.95rem' }}>{prod.active ? 'Disponible' : 'No disponible'}</div>
+                      <div style={{ color: 'white', fontSize: '0.95rem', marginBottom: '15px' }}>Cantidades disponibles</div>
                       <div style={{ display: 'flex', gap: '10px' }}>
-                        <button onClick={() => handleOpenEdit(prod)} style={{ padding: '8px 25px', background: '#00B4D8', color: 'white', border: 'none', borderRadius: '20px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem', fontFamily: 'inherit' }}>
-                          Editar
-                        </button>
-                        <button onClick={() => handleToggleStatusRequest(prod.id, prod.active)} style={{ padding: '8px 25px', background: prod.active ? '#FF0000' : '#555', color: 'white', border: 'none', borderRadius: '20px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem', fontFamily: 'inherit' }}>
-                          {prod.active ? 'Desactivar' : 'Activar'}
-                        </button>
-                        <button onClick={() => handleOpenRecipe(prod)} style={{ padding: '8px 20px', background: 'transparent', color: 'white', border: '1px solid white', borderRadius: '20px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem', fontFamily: 'inherit' }}>
-                          Receta
-                        </button>
+                        <button onClick={() => handleOpenEdit(prod)} style={{ padding: '8px 25px', background: '#00B4D8', color: 'white', border: 'none', borderRadius: '20px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem', fontFamily: 'inherit' }}>Editar</button>
+                        <button onClick={() => handleToggleStatusRequest(prod.id, prod.active)} style={{ padding: '8px 25px', background: prod.active ? '#FF0000' : '#555', color: 'white', border: 'none', borderRadius: '20px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem', fontFamily: 'inherit' }}>{prod.active ? 'Desactivar' : 'Activar'}</button>
+                        <button onClick={() => handleOpenRecipe(prod)} style={{ padding: '8px 20px', background: 'transparent', color: 'white', border: '1px solid white', borderRadius: '20px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem', fontFamily: 'inherit' }}>Receta</button>
                       </div>
                     </div>
-                    <div>
-                      <div style={{ background: '#FCA311', color: 'white', padding: '6px 15px', borderRadius: '8px', fontWeight: 'bold', fontSize: '1.2rem' }}>
-                        ${Number(prod.precio).toFixed(2)}
-                      </div>
-                    </div>
+                    <div><div style={{ background: '#FCA311', color: 'white', padding: '6px 15px', borderRadius: '8px', fontWeight: 'bold', fontSize: '1.2rem' }}>${Number(prod.precio).toFixed(2)}</div></div>
                   </div>
                 ))}
               </div>
             )}
           </>
 
-        ) : activeTab === 'insumos' ? (
+        ) : activeTab === 'categorias' ? (
           
-          /* PESTAÑA 2: INSUMOS (TABLA) */
+          /* PESTAÑA 2 (NUEVA): CATEGORÍAS */
           <div style={{ border: '1px solid #ffffff', borderRadius: '16px', overflow: 'hidden', background: 'transparent' }}>
             <table className="custom-table">
               <thead>
                 <tr>
-                  <th>Código</th>
-                  <th>Nombre del insumo</th>
-                  <th>Unidad</th>
-                  <th>Stock actual</th>
-                  <th>Stock minimo</th>
+                  <th>Nombre</th>
+                  <th>Estado</th>
+                  <th>Tiene platillos</th>
                   <th>Acciones</th>
                 </tr>
               </thead>
               <tbody>
+                {filteredCategories.map(cat => {
+                  // Lógica para comprobar si la categoría está en uso por algún producto
+                  const hasProducts = products.some(p => p.categoria_id === cat.id);
+                  
+                  return (
+                    <tr key={cat.id}>
+                      <td style={{ fontWeight: 'bold' }}>{cat.nombre}</td>
+                      <td style={{ color: cat.activa ? '#00E676' : '#FF0000' }}>
+                        {cat.activa ? 'Activa' : 'Desactivada'}
+                      </td>
+                      <td style={{ color: hasProducts ? 'white' : '#888' }}>
+                        {hasProducts ? 'Sí' : 'No'}
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                          <button onClick={() => handleOpenEditCategory(cat)} style={{ background: '#00B4D8', color: 'white', border: 'none', padding: '6px 15px', borderRadius: '20px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem', fontFamily: 'inherit' }}>
+                            Editar
+                          </button>
+                          <button onClick={() => handleToggleCategoryStatusRequest(cat.id, cat.activa)} style={{ background: cat.activa ? '#FF0000' : '#555', color: 'white', border: 'none', padding: '6px 15px', borderRadius: '20px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem', fontFamily: 'inherit' }}>
+                            {cat.activa ? 'Desactivar' : 'Activar'}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+                {filteredCategories.length === 0 && (
+                  <tr><td colSpan={4} style={{ padding: '40px' }}>No hay categorías.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+        ) : activeTab === 'insumos' ? (
+          
+          /* PESTAÑA 3: INSUMOS */
+          <div style={{ border: '1px solid #ffffff', borderRadius: '16px', overflow: 'hidden', background: 'transparent' }}>
+            <table className="custom-table">
+              <thead>
+                <tr><th>Código</th><th>Nombre del insumo</th><th>Unidad</th><th>Stock actual</th><th>Stock minimo</th><th>Acciones</th></tr>
+              </thead>
+              <tbody>
                 {filteredInsumos.map(insumo => (
                   <tr key={insumo.id}>
-                    <td>{insumo.codigo}</td>
-                    <td>{insumo.nombre}</td>
-                    <td>{insumo.unidad_medida}</td>
-                    <td style={{ color: insumo.stock_actual <= insumo.stock_minimo ? '#ff0000' : 'white' }}>
-                      {insumo.stock_actual}
-                    </td>
+                    <td>{insumo.codigo}</td><td>{insumo.nombre}</td><td>{insumo.unidad_medida}</td>
+                    <td style={{ color: insumo.stock_actual <= insumo.stock_minimo ? '#ff0000' : 'white' }}>{insumo.stock_actual}</td>
                     <td>{insumo.stock_minimo}</td>
                     <td>
                       <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', flexWrap: 'wrap' }}>
-                        <button onClick={() => handleOpenMovement(insumo, 'ENTRADA')} style={{ background: '#00E676', color: 'black', border: 'none', padding: '6px 12px', borderRadius: '20px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem', fontFamily: 'inherit' }}>
-                          + Stock
-                        </button>
-                        <button onClick={() => handleOpenMovement(insumo, 'MERMA')} style={{ background: '#FF0000', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '20px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem', fontFamily: 'inherit' }}>
-                          - Merma
-                        </button>
-                        <button onClick={() => handleOpenEditInsumo(insumo)} style={{ background: '#00B4D8', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '20px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem', fontFamily: 'inherit' }}>
-                          Editar
-                        </button>
-                        <button onClick={() => handleDeleteInsumoRequest(insumo.id)} style={{ background: '#FF0000', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '20px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem', fontFamily: 'inherit' }}>
-                          Eliminar
-                        </button>
+                        <button onClick={() => handleOpenMovement(insumo, 'ENTRADA')} style={{ background: '#00E676', color: 'black', border: 'none', padding: '6px 12px', borderRadius: '20px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem', fontFamily: 'inherit' }}>+ Stock</button>
+                        <button onClick={() => handleOpenMovement(insumo, 'MERMA')} style={{ background: '#FF0000', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '20px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem', fontFamily: 'inherit' }}>- Merma</button>
+                        <button onClick={() => handleOpenEditInsumo(insumo)} style={{ background: '#00B4D8', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '20px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem', fontFamily: 'inherit' }}>Editar</button>
+                        <button onClick={() => handleDeleteInsumoRequest(insumo.id)} style={{ background: '#FF0000', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '20px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem', fontFamily: 'inherit' }}>Eliminar</button>
                       </div>
                     </td>
                   </tr>
                 ))}
-                {filteredInsumos.length === 0 && (
-                  <tr><td colSpan={6} style={{ padding: '40px' }}>No hay insumos.</td></tr>
-                )}
               </tbody>
             </table>
           </div>
 
         ) : (
           
-          /* PESTAÑA 3: HISTORIAL (TABLA) */
+          /* PESTAÑA 4: HISTORIAL */
           <div style={{ border: '1px solid #ffffff', borderRadius: '16px', overflow: 'hidden', background: 'transparent' }}>
             <table className="custom-table">
               <thead>
-                <tr>
-                  <th>Fecha y hora</th>
-                  <th>Insumo</th>
-                  <th>Tipo</th>
-                  <th>Cantidad</th>
-                  <th>Motivo/Justificación</th>
-                </tr>
+                <tr><th>Fecha y hora</th><th>Insumo</th><th>Tipo</th><th>Cantidad</th><th>Motivo/Justificación</th></tr>
               </thead>
               <tbody>
                 {filteredMovimientos.map(mov => {
-                  const fechaMov = new Date(mov.fecha).toLocaleString('es-MX', {
-                    day: '2-digit', month: '2-digit', year: 'numeric',
-                    hour: '2-digit', minute: '2-digit', hour12: false
-                  });
+                  const fechaMov = new Date(mov.fecha).toLocaleString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
                   return (
                     <tr key={mov.id}>
-                      <td>{fechaMov}</td>
-                      <td>{mov.insumo_nombre}</td>
-                      <td>{mov.tipo}</td>
-                      <td style={{ color: mov.tipo === 'ENTRADA' ? '#00E676' : mov.tipo === 'MERMA' ? '#FF0000' : '#00B4D8' }}>
-                        {mov.tipo === 'ENTRADA' ? '+' : '-'}{mov.cantidad}
-                      </td>
+                      <td>{fechaMov}</td><td>{mov.insumo_nombre}</td><td>{mov.tipo}</td>
+                      <td style={{ color: mov.tipo === 'ENTRADA' ? '#00E676' : mov.tipo === 'MERMA' ? '#FF0000' : '#00B4D8' }}>{mov.tipo === 'ENTRADA' ? '+' : '-'}{mov.cantidad}</td>
                       <td>{mov.motivo}</td>
                     </tr>
                   )
                 })}
-                {filteredMovimientos.length === 0 && (
-                  <tr><td colSpan={5} style={{ padding: '40px' }}>No hay historial.</td></tr>
-                )}
               </tbody>
             </table>
           </div>
-
         )}
       </div>
 
       {/* ================= MODALES REDISEÑADOS ================= */}
       
+      {/* MODAL CATEGORÍA (NUEVO) */}
+      {isEditingCategory && (
+        <div className="modal-overlay" onClick={() => setIsEditingCategory(false)}>
+          <div style={{ background: '#161616', padding: '35px', borderRadius: '16px', width: '420px', border: '1px solid #333', display: 'flex', flexDirection: 'column', gap: '20px' }} onClick={e => e.stopPropagation()}>
+            <h2 style={{ margin: 0, fontSize: '1.5rem', color: 'white' }}>{editingCategoryId ? 'Editar Categoría' : 'Nueva Categoría'}</h2>
+            <div>
+              <label style={{ display: 'block', marginBottom: '8px', color: '#ccc' }}>Nombre de la categoría</label>
+              <input value={formCategoryName} onChange={e => setFormCategoryName(e.target.value)} style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #555', background: 'transparent', color: 'white', boxSizing: 'border-box', fontFamily: 'inherit' }} autoFocus placeholder="Ej. Bebidas, Pizzas..." />
+            </div>
+            <div style={{ display: 'flex', gap: '15px', marginTop: '10px' }}>
+              <button onClick={() => setIsEditingCategory(false)} style={{ flex: 1, padding: '12px', background: 'transparent', color: 'white', border: '1px solid white', borderRadius: '8px', cursor: 'pointer', fontFamily: 'inherit' }}>Cancelar</button>
+              <button onClick={handleSaveCategoryClick} style={{ flex: 1, padding: '12px', background: '#00E676', color: 'black', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontFamily: 'inherit' }}>Confirmar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* MODAL MOVIMIENTO */}
       {isMovementModalOpen && movementInsumo && (
         <div className="modal-overlay" onClick={() => setIsMovementModalOpen(false)}>
@@ -561,19 +590,37 @@ export function ProductManagement() {
         </div>
       )}
 
-      {/* MODAL NUEVO/EDITAR PRODUCTO */}
+ {/* MODAL NUEVO/EDITAR PRODUCTO CON CATEGORÍA */}
       {isEditing && (
         <div className="modal-overlay" onClick={() => setIsEditing(false)}>
           <div style={{ background: '#161616', padding: '35px', borderRadius: '16px', width: '420px', border: '1px solid #333', display: 'flex', flexDirection: 'column', gap: '20px' }} onClick={e => e.stopPropagation()}>
             <h2 style={{ margin: 0, fontSize: '1.5rem', color: 'white' }}>{editingId ? 'Editar Platillo' : 'Nuevo Platillo'}</h2>
+            
             <div>
               <label style={{ display: 'block', marginBottom: '8px', color: '#ccc' }}>Nombre</label>
               <input value={formName} onChange={e => setFormName(e.target.value)} style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #555', background: 'transparent', color: 'white', boxSizing: 'border-box', fontFamily: 'inherit' }} autoFocus />
             </div>
+            
             <div>
               <label style={{ display: 'block', marginBottom: '8px', color: '#ccc' }}>Precio ($)</label>
               <input type="number" min="0" value={formPrice} onChange={e => setFormPrice(e.target.value)} style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #555', background: 'transparent', color: 'white', boxSizing: 'border-box', fontFamily: 'inherit' }} />
             </div>
+
+            {/* Selector de Categoría */}
+            <div>
+              <label style={{ display: 'block', marginBottom: '8px', color: '#ccc' }}>Seleccionar categoría</label>
+              <select 
+                value={formCategoryId} 
+                onChange={e => setFormCategoryId(e.target.value ? Number(e.target.value) : '')} 
+                style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #555', background: '#111', color: 'white', boxSizing: 'border-box', fontFamily: 'inherit', appearance: 'none' }}
+              >
+                <option value="">Sin categoría (o crear una nueva después)</option>
+                {categories.map(cat => (
+                  <option key={cat.id} value={cat.id}>{cat.nombre}</option>
+                ))}
+              </select>
+            </div>
+
             <div style={{ display: 'flex', gap: '15px', marginTop: '10px' }}>
               <button onClick={() => setIsEditing(false)} style={{ flex: 1, padding: '12px', background: 'transparent', color: 'white', border: '1px solid white', borderRadius: '8px', cursor: 'pointer', fontFamily: 'inherit' }}>Cancelar</button>
               <button onClick={handleSaveClick} style={{ flex: 1, padding: '12px', background: '#00E676', color: 'black', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontFamily: 'inherit' }}>Confirmar</button>
@@ -621,9 +668,11 @@ export function ProductManagement() {
         </div>
       )}
 
+
+      {/* (EL RESTO DE TUS MODALES SIGUEN IGUAL AQUÍ, SE OMITEN EN EL RESUMEN POR ESPACIO PERO DEBEN IR EN TU ARCHIVO) */}
+      
       <PinPadModal title="Autorización 🛡️" isOpen={isPinModalOpen} onClose={() => setIsPinModalOpen(false)} onVerify={handlePinVerified} />
 
-      {/* ESTILOS INTERNOS PARA EVITAR DOBLES BORDES EN LA TABLA HUECA */}
       <style>{`
         .custom-table { width: 100%; border-collapse: collapse; text-align: center; }
         .custom-table th, .custom-table td { border: 1px solid #ffffff; padding: 15px; }
@@ -631,9 +680,7 @@ export function ProductManagement() {
         .custom-table tr:last-child td { border-bottom: none; }
         .custom-table tr th:first-child, .custom-table tr td:first-child { border-left: none; }
         .custom-table tr th:last-child, .custom-table tr td:last-child { border-right: none; }
-        input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
       `}</style>
-
     </div>
   )
 }

@@ -70,7 +70,26 @@ export function registerOrderHandlers() {
         order = { id: info.lastInsertRowid, estatus: 'abierta', total: 0, mesa_id: targetTableId }
       }
 
-      const items = db.prepare('SELECT * FROM orden_item WHERE orden_id = ?').all(order.id)
+      // Recalculamos descuentos/promociones vigentes cada vez que se abre/recarga la orden,
+      // así se autocorrige si una promo se creó, editó o venció mientras la mesa ya estaba abierta.
+      recalculateOrderTotal(order.id)
+
+      // Releemos el total ya actualizado por recalculateOrderTotal
+      const ordenActualizada = db.prepare('SELECT total, descuento_total FROM orden WHERE id = ?').get(order.id) as any
+      order.total = ordenActualizada?.total ?? order.total
+      order.descuento_total = ordenActualizada?.descuento_total ?? 0
+
+      // Antes: SELECT * FROM orden_item (sin categoria_id).
+      // Sin ese dato, las promociones aplicadas por categoría (ej. 2x1 en "Bebidas")
+      // nunca podían coincidir en el motor matemático del carrito.
+      // Ahora también se trae promocion_nombre para mostrarle al cajero de dónde viene el descuento.
+      const items = db.prepare(`
+        SELECT oi.*, p.categoria_id, pr.nombre AS promocion_nombre
+        FROM orden_item oi
+        LEFT JOIN producto p ON oi.producto_id = p.id
+        LEFT JOIN promocion pr ON oi.promocion_id = pr.id
+        WHERE oi.orden_id = ?
+      `).all(order.id)
       
       const pagosStmt = db.prepare('SELECT SUM(monto_recibido - cambio) as pagado FROM pago WHERE orden_id = ?').get(order.id) as any
       order.totalPagado = pagosStmt?.pagado || 0
@@ -156,13 +175,21 @@ export function registerOrderHandlers() {
         
         let cambio = 0;
         let appliedAmount = payment.amountToPay;
+        let montoRecibidoRegistrado = payment.received;
 
-        if (payment.method === 'efectivo') {
+        if (payment.isCourtesy) {
+          // Cortesía: se cierra la cuenta en $0 sin importar el total real de la orden.
+          // Antes esto se comparaba contra order.total (el total real) y por eso
+          // siempre salía como "pago parcial" en vez de cerrar la mesa.
+          cambio = 0;
+          appliedAmount = 0;
+          montoRecibidoRegistrado = 0;
+        } else if (payment.method === 'efectivo') {
           cambio = Math.max(0, payment.received - payment.amountToPay);
           appliedAmount = payment.received - cambio; 
         }
 
-        db.prepare(`INSERT INTO pago (orden_id, metodo, monto_recibido, cambio) VALUES (?, ?, ?, ?)`).run(orderId, payment.method, payment.received, cambio);
+        db.prepare(`INSERT INTO pago (orden_id, metodo, monto_recibido, cambio) VALUES (?, ?, ?, ?)`).run(orderId, payment.method, montoRecibidoRegistrado, cambio);
 
         const tzOffset = new Date().getTimezoneOffset() * 60000;
         const today = new Date(Date.now() - tzOffset).toISOString().split('T')[0];
@@ -172,12 +199,12 @@ export function registerOrderHandlers() {
           reporte = { id: info.lastInsertRowid };
         }
 
-        const montoEfectivo = payment.method === 'efectivo' ? appliedAmount : 0;
-        const montoTarjeta = payment.method === 'tarjeta' ? appliedAmount : 0;
+        const montoEfectivo = (!payment.isCourtesy && payment.method === 'efectivo') ? appliedAmount : 0;
+        const montoTarjeta = (!payment.isCourtesy && payment.method === 'tarjeta') ? appliedAmount : 0;
         db.prepare(`UPDATE reporte_diario SET total_ventas = total_ventas + ?, total_efectivo = total_efectivo + ?, total_tarjeta = total_tarjeta + ? WHERE id = ?`).run(appliedAmount, montoEfectivo, montoTarjeta, reporte.id);
 
         const newTotalPagado = totalPagadoPreviamente + appliedAmount;
-        const isFullyPaid = newTotalPagado >= (order.total - 0.01);
+        const isFullyPaid = payment.isCourtesy ? true : newTotalPagado >= (order.total - 0.01);
         let cajeroName = null;
 
         if (isFullyPaid) {
@@ -189,7 +216,7 @@ export function registerOrderHandlers() {
           cajeroName = userRow?.nombre;
         }
 
-        return { success: true, isFullyPaid, remaining: Math.max(0, order.total - newTotalPagado), cajero: cajeroName }
+        return { success: true, isFullyPaid, remaining: payment.isCourtesy ? 0 : Math.max(0, order.total - newTotalPagado), cajero: cajeroName }
       })
       return tx()
     } catch (e: any) { return { success: false, error: e.message } }
@@ -199,11 +226,136 @@ export function registerOrderHandlers() {
   // REPORTES Y DETALLES (¡CORREGIDOS!)
   // ==========================================
 
+  // Handler que faltaba por completo — useActiveOrder.ts ya lo invocaba, pero nunca
+  // se había registrado en el backend (por eso el error "No handler registered").
+  ipcMain.handle('cancel-order', (_, { orderId, pin }) => {
+    if (!db) return { success: false, error: 'Sin conexión BD' }
+    try {
+      if (!orderId || !pin) return { success: false, error: 'Faltan datos para cancelar' }
+
+      const admin = db.prepare(`SELECT id FROM user WHERE pin = ? AND rol = 'admin' AND active = 1`).get(pin) as any
+      if (!admin) return { success: false, error: 'PIN incorrecto o sin permisos de administrador' }
+
+      const order = db.prepare('SELECT id FROM orden WHERE id = ?').get(orderId) as any
+      if (!order) return { success: false, error: 'La orden ya no existe' }
+
+      const tx = db.transaction(() => {
+        // Si la orden tenía pagos parciales registrados, se borran también (decisión de negocio).
+        // NOTA: esto NO revierte los montos que ya se sumaron a reporte_diario cuando se
+        // registró ese pago (total_ventas, total_efectivo, etc.). Si se necesita que el
+        // reporte diario también se corrija al cancelar, es un cambio aparte.
+        db.prepare('DELETE FROM pago WHERE orden_id = ?').run(orderId)
+        db.prepare('DELETE FROM orden_item WHERE orden_id = ?').run(orderId)
+        db.prepare('DELETE FROM orden WHERE id = ?').run(orderId)
+      })
+      tx()
+
+      return { success: true }
+    } catch (e: any) {
+      console.error('Error cancelando orden:', e)
+      return { success: false, error: e.message }
+    }
+  })
+
   ipcMain.handle('get-tickets-path', () => { return path.join(app.getPath('documents'), 'hi-POS_Tickets'); });
 }
 
 function recalculateOrderTotal(ordenId: number) {
-  const result = db.prepare('SELECT SUM(precio * cantidad) as total FROM orden_item WHERE orden_id = ?').get(ordenId) as any
-  const total = result?.total || 0
-  db.prepare('UPDATE orden SET total = ? WHERE id = ?').run(total, ordenId)
+  // ==========================================
+  // MOTOR MATEMÁTICO DE PROMOCIONES (lado backend)
+  // Antes esta función solo sumaba precio * cantidad, sin aplicar
+  // descuentos. Eso hacía que orden.total (BD) y reporte_diario nunca
+  // coincidieran con lo que el frontend mostraba en pantalla.
+  // Ahora replica las mismas reglas que useActiveOrder.ts:
+  //  - "% de producto", "2x1" y "Precio Fijo" se calculan por item,
+  //    sobre precio original, y se guardan en orden_item.
+  //  - "% TOTAL" se calcula sobre el subtotal original completo
+  //    (no se apila sobre los descuentos ya aplicados).
+  // ==========================================
+
+  // 1. Apagar promociones vencidas antes de calcular (misma regla que products.ts)
+  db.prepare(`
+    UPDATE promocion 
+    SET activa = 0 
+    WHERE activa = 1 
+      AND hora_fin IS NOT NULL 
+      AND date('now', 'localtime') > date(hora_fin)
+  `).run()
+
+  // 2. Cargar promociones activas con sus reglas de categoría/producto
+  const promos = db.prepare('SELECT * FROM promocion WHERE activa = 1').all() as any[]
+  const getCategorias = db.prepare('SELECT categoria_id FROM promocion_categoria WHERE promocion_id = ?')
+  const getProductos = db.prepare('SELECT producto_id FROM promocion_producto WHERE promocion_id = ?')
+  const promosConReglas = promos.map((p) => ({
+    id: p.id,
+    tipo: p.tipo,
+    valor: p.valor as number | null,
+    valorPago: p.valor_pago as number | null, // <-- Nuevo: para '2x1' generalizado
+    categorias: (getCategorias.all(p.id) as any[]).map((r) => r.categoria_id),
+    productos: (getProductos.all(p.id) as any[]).map((r) => r.producto_id)
+  }))
+
+  // 3. Cargar los items de la orden con su categoria_id (igual que en open-table-order)
+  const items = db.prepare(`
+    SELECT oi.*, p.categoria_id
+    FROM orden_item oi
+    LEFT JOIN producto p ON oi.producto_id = p.id
+    WHERE oi.orden_id = ?
+  `).all(ordenId) as any[]
+
+  let subtotal = 0
+  let descuentoTotal = 0
+  const itemUpdates: { id: number; descuento: number; promocionId: number | null }[] = []
+
+  items.forEach((item) => {
+    const itemSubtotal = item.precio * item.cantidad
+    subtotal += itemSubtotal
+
+    let itemDescuento = 0
+    let itemPromoId: number | null = null
+
+    for (const promo of promosConReglas) {
+      if (promo.tipo === '% TOTAL') continue // esta se aplica al final, sobre el total, no por item
+
+      const matchProducto = promo.productos.includes(item.producto_id)
+      const matchCategoria = item.categoria_id ? promo.categorias.includes(item.categoria_id) : false
+      if (!matchProducto && !matchCategoria) continue
+
+      if (promo.tipo === '% de producto') {
+        itemDescuento += itemSubtotal * ((promo.valor || 0) / 100)
+        itemPromoId = promo.id
+      } else if (promo.tipo === '2x1') {
+        // Generalizado: "X productos por el precio de Y" (el clásico 2x1 es X=2, Y=1).
+        // Se defiende con valores por defecto por si alguna promo antigua no tiene valor_pago.
+        const cantidadRequerida = promo.valor && promo.valor > 0 ? promo.valor : 2
+        const cantidadPagada = promo.valorPago && promo.valorPago > 0 ? promo.valorPago : 1
+        if (cantidadPagada < cantidadRequerida) {
+          const grupos = Math.floor(item.cantidad / cantidadRequerida)
+          const itemsGratis = grupos * (cantidadRequerida - cantidadPagada)
+          itemDescuento += itemsGratis * item.precio
+          itemPromoId = promo.id
+        }
+      } else if (promo.tipo === 'Precio Fijo') {
+        itemDescuento += (promo.valor || 0)
+        itemPromoId = promo.id
+      }
+    }
+
+    itemUpdates.push({ id: item.id, descuento: itemDescuento, promocionId: itemPromoId })
+    descuentoTotal += itemDescuento
+  })
+
+  // % TOTAL: sobre el subtotal original completo
+  promosConReglas.forEach((promo) => {
+    if (promo.tipo === '% TOTAL') {
+      descuentoTotal += subtotal * ((promo.valor || 0) / 100)
+    }
+  })
+
+  const totalFinal = Math.max(0, subtotal - descuentoTotal)
+
+  const updateItemStmt = db.prepare('UPDATE orden_item SET descuento_aplicado = ?, promocion_id = ? WHERE id = ?')
+  itemUpdates.forEach((u) => updateItemStmt.run(u.descuento, u.promocionId, u.id))
+
+  db.prepare('UPDATE orden SET total = ?, descuento_total = ? WHERE id = ?').run(totalFinal, descuentoTotal, ordenId)
 }
