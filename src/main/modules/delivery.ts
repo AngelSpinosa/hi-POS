@@ -14,7 +14,7 @@ import { descontarInventarioPorVenta } from './inventory'
 
 export function registerDeliveryHandlers() {
 
-  // 1. Canales de delivery activos (para el <select> del modal de envío)
+  // 1. Canales de delivery activos (para el <select> del modal de envío en DeliveryPOSView)
   ipcMain.handle('get-canales-delivery', () => {
     if (!db) return []
     try {
@@ -22,6 +22,74 @@ export function registerDeliveryHandlers() {
     } catch (error) {
       console.error('Error obteniendo canales de delivery:', error)
       return []
+    }
+  })
+
+  // 1b. TODAS las plataformas, activas o no (para la tabla de gestión en Ajustes)
+  ipcMain.handle('get-all-canales-delivery', () => {
+    if (!db) return []
+    try {
+      return db.prepare('SELECT * FROM canal_delivery ORDER BY nombre ASC').all()
+    } catch (error) {
+      console.error('Error obteniendo plataformas de delivery:', error)
+      return []
+    }
+  })
+
+  // 1c. Crear plataforma de delivery (desde Ajustes)
+  ipcMain.handle('create-canal-delivery', (_, { nombre, comisionPorcentaje }) => {
+    if (!db) return { success: false, error: 'Base de datos no disponible' }
+    try {
+      if (!nombre || nombre.trim() === '') throw new Error('El nombre de la plataforma es obligatorio')
+      const comision = Number(comisionPorcentaje)
+      if (isNaN(comision) || comision < 0) throw new Error('La comisión no puede ser negativa ni estar vacía')
+
+      const existe = db.prepare('SELECT id FROM canal_delivery WHERE LOWER(nombre) = LOWER(?)').get(nombre.trim())
+      if (existe) throw new Error(`Ya existe una plataforma llamada "${nombre.trim()}"`)
+
+      const stmt = db.prepare(`
+        INSERT INTO canal_delivery (nombre, activo, comision_porcentaje_default, impuesto_retenido_default) 
+        VALUES (?, 1, ?, 0)
+      `)
+      const info = stmt.run(nombre.trim(), comision)
+      return { success: true, id: info.lastInsertRowid }
+    } catch (error: any) {
+      return { success: false, error: error.message }
+    }
+  })
+
+  // 1d. Editar plataforma de delivery
+  ipcMain.handle('update-canal-delivery', (_, { id, nombre, comisionPorcentaje }) => {
+    if (!db) return { success: false, error: 'Base de datos no disponible' }
+    try {
+      if (!nombre || nombre.trim() === '') throw new Error('El nombre de la plataforma es obligatorio')
+      const comision = Number(comisionPorcentaje)
+      if (isNaN(comision) || comision < 0) throw new Error('La comisión no puede ser negativa ni estar vacía')
+
+      const existe = db.prepare('SELECT id FROM canal_delivery WHERE LOWER(nombre) = LOWER(?) AND id != ?').get(nombre.trim(), id)
+      if (existe) throw new Error(`Ya existe otra plataforma llamada "${nombre.trim()}"`)
+
+      db.prepare('UPDATE canal_delivery SET nombre = ?, comision_porcentaje_default = ? WHERE id = ?').run(nombre.trim(), comision, id)
+      return { success: true }
+    } catch (error: any) {
+      return { success: false, error: error.message }
+    }
+  })
+
+  // 1e. Eliminar plataforma. Si ya tiene pedidos asociados (llave foránea en orden_domicilio),
+  // no se puede borrar sin romper el historial — en ese caso se desactiva (soft delete) en su lugar.
+  ipcMain.handle('delete-canal-delivery', (_, { id }) => {
+    if (!db) return { success: false, error: 'Base de datos no disponible' }
+    try {
+      const enUso = db.prepare('SELECT COUNT(*) as total FROM orden_domicilio WHERE canal_delivery_id = ?').get(id) as any
+      if (enUso && enUso.total > 0) {
+        db.prepare('UPDATE canal_delivery SET activo = 0 WHERE id = ?').run(id)
+        return { success: true, softDeleted: true }
+      }
+      db.prepare('DELETE FROM canal_delivery WHERE id = ?').run(id)
+      return { success: true, softDeleted: false }
+    } catch (error: any) {
+      return { success: false, error: error.message }
     }
   })
 

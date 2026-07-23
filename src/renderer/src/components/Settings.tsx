@@ -27,6 +27,13 @@ export function Settings({ onBack }: SettingsProps) {
   // Mesas
   const [activeTablesCount, setActiveTablesCount] = useState(0)
 
+  // Plataformas de delivery
+  const [canalesDelivery, setCanalesDelivery] = useState<any[]>([])
+  const [isAddingCanal, setIsAddingCanal] = useState(false)
+  const [editingCanalId, setEditingCanalId] = useState<number | null>(null)
+  const [canalNombre, setCanalNombre] = useState('')
+  const [canalComision, setCanalComision] = useState('')
+
   // Seguridad
   const [isPinModalOpen, setIsPinModalOpen] = useState(false)
 
@@ -54,10 +61,17 @@ export function Settings({ onBack }: SettingsProps) {
     if (Array.isArray(res)) setActiveTablesCount(res.length);
   }
 
+  const fetchCanalesDelivery = async () => {
+    // @ts-ignore
+    const res = await window.electron.ipcRenderer.invoke('get-all-canales-delivery');
+    if (Array.isArray(res)) setCanalesDelivery(res);
+  }
+
   useEffect(() => {
     fetchLicenseInfo()
     fetchConfig() 
     fetchTablesCount()
+    fetchCanalesDelivery()
   }, [])
 
   const executeReset = async (pin: string) => {
@@ -143,6 +157,54 @@ export function Settings({ onBack }: SettingsProps) {
       const res = await window.electron.ipcRenderer.invoke('remove-last-table');
       if (res.success) setActiveTablesCount(prev => prev - 1);
       else alert('❌ No se pudo eliminar: ' + res.error);
+    }
+  }
+
+  // --- FUNCIONES DE PLATAFORMAS DE DELIVERY ---
+  const resetCanalForm = () => {
+    setCanalNombre('')
+    setCanalComision('')
+    setIsAddingCanal(false)
+    setEditingCanalId(null)
+  }
+
+  const handleStartEditCanal = (canal: any) => {
+    setEditingCanalId(canal.id)
+    setCanalNombre(canal.nombre)
+    setCanalComision(canal.comision_porcentaje_default?.toString() || '0')
+    setIsAddingCanal(true)
+  }
+
+  const handleSaveCanal = async () => {
+    if (!canalNombre.trim()) { alert('⚠️ Ingresa el nombre de la plataforma'); return; }
+    if (canalComision === '' || Number(canalComision) < 0) { alert('⚠️ Ingresa una comisión válida'); return; }
+
+    if (editingCanalId) {
+      // @ts-ignore
+      const res = await window.electron.ipcRenderer.invoke('update-canal-delivery', {
+        id: editingCanalId, nombre: canalNombre, comisionPorcentaje: Number(canalComision)
+      })
+      if (res.success) { resetCanalForm(); fetchCanalesDelivery(); }
+      else alert('❌ Error al actualizar: ' + res.error)
+    } else {
+      // @ts-ignore
+      const res = await window.electron.ipcRenderer.invoke('create-canal-delivery', {
+        nombre: canalNombre, comisionPorcentaje: Number(canalComision)
+      })
+      if (res.success) { resetCanalForm(); fetchCanalesDelivery(); }
+      else alert('❌ Error al crear: ' + res.error)
+    }
+  }
+
+  const handleDeleteCanal = async (canal: any) => {
+    if (!confirm(`¿Eliminar la plataforma "${canal.nombre}"?`)) return;
+    // @ts-ignore
+    const res = await window.electron.ipcRenderer.invoke('delete-canal-delivery', { id: canal.id })
+    if (res.success) {
+      if (res.softDeleted) alert('⚠️ Esta plataforma ya tiene pedidos registrados, así que se desactivó en lugar de borrarse.')
+      fetchCanalesDelivery()
+    } else {
+      alert('❌ No se pudo eliminar: ' + res.error)
     }
   }
 
@@ -439,6 +501,82 @@ export function Settings({ onBack }: SettingsProps) {
                   +
                 </button>
               </div>
+            </div>
+          </div>
+
+          {/* SECCIÓN 6: PLATAFORMAS DE DELIVERY */}
+          <div style={{ marginBottom: '60px' }}>
+            <h3 style={{ color: '#FCA311', borderBottom: '1px solid #333', paddingBottom: '10px', marginBottom: '20px', fontSize: '1.2rem' }}>
+              Plataformas de delivery
+            </h3>
+
+            <div style={{ border: '1px solid #333', borderRadius: '12px', padding: '20px', background: 'transparent' }}>
+              {canalesDelivery.length > 0 && (
+                <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '15px' }}>
+                  <thead>
+                    <tr>
+                      <th style={{ textAlign: 'left', padding: '10px', color: '#9ca3af', fontSize: '0.85rem', borderBottom: '1px solid #333' }}>Nombre</th>
+                      <th style={{ textAlign: 'left', padding: '10px', color: '#9ca3af', fontSize: '0.85rem', borderBottom: '1px solid #333' }}>Comisión %</th>
+                      <th style={{ textAlign: 'left', padding: '10px', color: '#9ca3af', fontSize: '0.85rem', borderBottom: '1px solid #333' }}>Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {canalesDelivery.map(canal => (
+                      <tr key={canal.id} style={{ opacity: canal.activo ? 1 : 0.4 }}>
+                        <td style={{ padding: '12px 10px', color: 'white', fontWeight: 'bold' }}>
+                          {canal.nombre}{!canal.activo && <span style={{ fontSize: '0.75rem', color: '#9ca3af', fontWeight: 'normal' }}> (inactiva)</span>}
+                        </td>
+                        <td style={{ padding: '12px 10px', color: 'white' }}>{canal.comision_porcentaje_default}%</td>
+                        <td style={{ padding: '12px 10px' }}>
+                          <div style={{ display: 'flex', gap: '12px' }}>
+                            <button onClick={() => handleStartEditCanal(canal)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '1.1rem' }} title="Editar">✏️</button>
+                            <button onClick={() => handleDeleteCanal(canal)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '1.1rem' }} title="Eliminar">🗑️</button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+
+              {isAddingCanal ? (
+                <div style={{ display: 'flex', gap: '15px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                  <div style={{ flex: 1, minWidth: '150px' }}>
+                    <label style={{ display: 'block', fontSize: '0.85rem', color: '#9ca3af', marginBottom: '6px' }}>Nombre</label>
+                    <input
+                      value={canalNombre}
+                      onChange={e => setCanalNombre(e.target.value)}
+                      placeholder="Ej. Rappi"
+                      style={{ width: '100%', padding: '10px', background: '#1a1a1a', border: '1px solid #555', borderRadius: '8px', color: 'white', fontFamily: 'inherit', boxSizing: 'border-box' }}
+                    />
+                  </div>
+                  <div style={{ width: '140px' }}>
+                    <label style={{ display: 'block', fontSize: '0.85rem', color: '#9ca3af', marginBottom: '6px' }}>Comisión %</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={canalComision}
+                      onChange={e => setCanalComision(e.target.value)}
+                      placeholder="30"
+                      style={{ width: '100%', padding: '10px', background: '#1a1a1a', border: '1px solid #555', borderRadius: '8px', color: 'white', fontFamily: 'inherit', boxSizing: 'border-box' }}
+                    />
+                  </div>
+                  <button onClick={handleSaveCanal} style={{ padding: '11px 20px', background: '#00E676', color: 'black', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontFamily: 'inherit' }}>
+                    Guardar
+                  </button>
+                  <button onClick={resetCanalForm} style={{ padding: '11px 20px', background: 'transparent', color: 'white', border: '1px solid #555', borderRadius: '8px', cursor: 'pointer', fontFamily: 'inherit' }}>
+                    Cancelar
+                  </button>
+                </div>
+              ) : (
+                <div
+                  onClick={() => setIsAddingCanal(true)}
+                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px 5px', cursor: 'pointer' }}
+                >
+                  <span style={{ color: 'white', fontWeight: 'bold' }}>Añadir plataforma</span>
+                  <div style={{ width: '32px', height: '32px', borderRadius: '50%', border: '1px solid #00E676', color: '#00E676', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem' }}>+</div>
+                </div>
+              )}
             </div>
           </div>
 

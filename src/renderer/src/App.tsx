@@ -11,8 +11,10 @@ import { LicenseScreen } from './components/LicenseScreen'
 import { Settings } from './components/Settings'
 import { OnboardingWizard } from './components/OnboardingWizard' // NUEVO COMPONENTE
 import { PromotionsManagement } from './components/PromotionsManagement' // IMPORT DE PROMOCIONES
+import { DeliveryBoard } from './components/DeliveryBoard'
+import { DeliveryPOSView } from './components/DeliveryPOSView'
 
-type ViewState = 'DASHBOARD' | 'TABLES' | 'ORDER' | 'REPORT' | 'USERS' | 'PRODUCTS' | 'LICENSE_ERROR' | 'SETTINGS' | 'ONBOARDING' | 'PROMOS' | 'DELIVERY';
+type ViewState = 'DASHBOARD' | 'TABLES' | 'ORDER' | 'REPORT' | 'USERS' | 'PRODUCTS' | 'LICENSE_ERROR' | 'SETTINGS' | 'ONBOARDING' | 'PROMOS' | 'DELIVERY' | 'DELIVERY_ORDER';
 
 interface CurrentUser {
   id: number;
@@ -369,6 +371,24 @@ function App() {
           <PromotionsManagement/>
         </div>
       </div>
+    )
+  }
+
+  if (view === 'DELIVERY') {
+    return (
+      <DeliveryBoard 
+        onBack={handleBackToDashboard} 
+        onNewOrder={() => setView('DELIVERY_ORDER')} 
+      />
+    )
+  }
+
+  if (view === 'DELIVERY_ORDER') {
+    return (
+      <DeliveryPOSView 
+        userId={currentUser?.id} 
+        onBack={() => setView('DELIVERY')} 
+      />
     )
   }
 
