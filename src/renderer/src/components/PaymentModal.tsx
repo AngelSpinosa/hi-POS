@@ -474,8 +474,11 @@ export function PaymentModal({ totalOriginal, totalRestante, cart, isOpen, onClo
 }
 
 const btnStyle = (isActive: boolean, isSecondary: boolean = false) => ({
-  padding: '12px', background: isActive ? '#333' : 'transparent', color: 'white', 
-  border: '1px solid #555', borderRadius: '6px', cursor: 'pointer', fontSize: '0.95rem', 
+  padding: '12px', 
+  background: isActive ? (isSecondary ? '#facc1522' : '#333') : 'transparent', 
+  color: isSecondary && isActive ? '#facc15' : 'white', 
+  border: isSecondary && isActive ? '1px solid #facc15' : '1px solid #555', 
+  borderRadius: '6px', cursor: 'pointer', fontSize: '0.95rem', 
   fontWeight: isActive ? 'bold' : 'normal', fontFamily: 'inherit', transition: 'all 0.2s'
 } as React.CSSProperties);
 

@@ -1,6 +1,5 @@
-import { ipcMain, app, BrowserWindow, shell } from 'electron'
+import { ipcMain, app } from 'electron'
 import path from 'path'
-import fs from 'fs'
 import { db } from '../database'
 import { descontarInventarioPorVenta } from './inventory'
 
