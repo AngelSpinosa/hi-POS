@@ -1,14 +1,31 @@
-import type { CartItem } from '../types/db'
+import type { CartItem, Orden } from '../types/db'
+
+interface OrderInfo {
+  tipo_orden: Orden['tipo_orden'];
+  descuento_total: number;
+  costo_envio?: number | null; // Solo viene lleno si tipo_orden === 'domicilio'
+}
 
 interface OrderDetailModalProps {
   orderId: number;
+  order: OrderInfo;
   items: CartItem[];
   pagos?: { metodo: string; monto_recibido: number; cambio: number }[];
   onClose: () => void;
 }
 
-export function OrderDetailModal({ orderId, items, pagos, onClose }: OrderDetailModalProps) {
-  const total = items.reduce((sum, item) => sum + (item.precio * item.cantidad), 0);
+const TIPO_ORDEN_LABEL: Record<Orden['tipo_orden'], string> = {
+  local: 'Para comer aquí',
+  llevar: 'Para llevar',
+  domicilio: 'A domicilio'
+}
+
+export function OrderDetailModal({ orderId, order, items, pagos, onClose }: OrderDetailModalProps) {
+  const subtotal = items.reduce((sum, item) => sum + (item.precio * item.cantidad), 0);
+  const descuento = order.descuento_total || 0;
+  const costoEnvio = order.costo_envio || 0;
+  // Lo que realmente pagó el cliente: productos - descuento + costo de envío (si aplica)
+  const total = subtotal - descuento + costoEnvio;
 
   return (
     <div 
@@ -32,6 +49,11 @@ export function OrderDetailModal({ orderId, items, pagos, onClose }: OrderDetail
           <h2 style={{ margin: 0, fontSize: '1.4rem' }}>Detalle Orden #{orderId}</h2>
           <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: '#ef4444', fontSize: '1.5rem', cursor: 'pointer', lineHeight: 1 }}>&times;</button>
         </div>
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem', color: '#9ca3af', marginBottom: '10px' }}>
+          <span>Tipo de pedido</span>
+          <span style={{ color: '#f3f4f6' }}>{TIPO_ORDEN_LABEL[order.tipo_orden] || order.tipo_orden}</span>
+        </div>
         
         <div style={{ borderTop: '2px dashed #444', borderBottom: '2px dashed #444', padding: '15px 0', margin: '15px 0' }}>
           {items.map((item, idx) => (
@@ -44,6 +66,22 @@ export function OrderDetailModal({ orderId, items, pagos, onClose }: OrderDetail
             </div>
           ))}
         </div>
+
+        {/* Descuento — solo se muestra si hubo alguna promoción/cortesía aplicada */}
+        {descuento > 0 && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1rem', color: '#f97316', marginBottom: '8px' }}>
+            <span>Descuento</span>
+            <span>-${descuento.toFixed(2)}</span>
+          </div>
+        )}
+
+        {/* Costo de envío — solo aplica a pedidos a domicilio con costo capturado */}
+        {costoEnvio > 0 && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1rem', color: '#9ca3af', marginBottom: '8px' }}>
+            <span>Costo de envío</span>
+            <span>${costoEnvio.toFixed(2)}</span>
+          </div>
+        )}
         
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.2rem', fontWeight: 'bold', color: '#00E676', marginBottom: '20px' }}>
           <span>TOTAL</span>

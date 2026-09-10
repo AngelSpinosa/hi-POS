@@ -107,6 +107,13 @@ export function TableGrid({ tables, onSelectTable }: TableGridProps) {
                 {getStatusText(table.estado_orden || 'libre')}
               </div>
 
+              {/* De quién es la mesa — para que el mesero equivocado ni intente el PIN */}
+              {table.mesero_nombre && (
+                <div style={{ marginTop: '6px', color: '#9ca3af', fontSize: '0.8rem', textAlign: 'center' }}>
+                  Mesero: {table.mesero_nombre}
+                </div>
+              )}
+
               {/* Muestra un pequeño indicador 'pill' con el total si hay orden activa */}
               {table.total_actual && table.total_actual > 0 ? (
                 <div style={{ 

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { PedidoDomicilio } from '../types/db'
+import { DeliveryOrderDetailModal } from './DeliveryOrderDetailModal'
 
 interface DeliveryBoardProps {
   onBack: () => void;
@@ -16,6 +17,7 @@ export function DeliveryBoard({ onBack, onNewOrder }: DeliveryBoardProps) {
   const [pedidos, setPedidos] = useState<PedidoDomicilio[]>([])
   const [draggingId, setDraggingId] = useState<number | null>(null)
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null)
+  const [detailPedido, setDetailPedido] = useState<PedidoDomicilio | null>(null)
 
   const fetchPedidos = async () => {
     try {
@@ -105,7 +107,9 @@ export function DeliveryBoard({ onBack, onNewOrder }: DeliveryBoardProps) {
                   draggable
                   onDragStart={() => setDraggingId(pedido.id)}
                   onDragEnd={() => setDraggingId(null)}
+                  onDoubleClick={() => setDetailPedido(pedido)}
                   style={{
+                    position: 'relative',
                     border: '1px solid #444',
                     borderRadius: '10px',
                     padding: '12px 15px',
@@ -115,12 +119,28 @@ export function DeliveryBoard({ onBack, onNewOrder }: DeliveryBoardProps) {
                     opacity: draggingId === pedido.id ? 0.4 : 1
                   }}
                 >
-                  <div style={{ fontWeight: 'bold', fontSize: '0.95rem', marginBottom: '4px' }}>
+                  <button
+                    onClick={() => setDetailPedido(pedido)}
+                    title="Ver detalle"
+                    style={{
+                      position: 'absolute', top: '10px', right: '10px',
+                      background: 'transparent', border: 'none', color: '#9ca3af',
+                      cursor: 'pointer', fontSize: '0.9rem', padding: 0, lineHeight: 1
+                    }}
+                  >
+                    ⤢
+                  </button>
+                  <div style={{ fontWeight: 'bold', fontSize: '0.95rem', marginBottom: '4px', paddingRight: '20px' }}>
                     {pedido.cliente_direccion || 'Sin dirección registrada'}
                   </div>
                   <div style={{ fontSize: '0.85rem', color: '#9ca3af' }}>
                     {pedido.cliente_nombre}{pedido.cliente_telefono ? ` · ${pedido.cliente_telefono}` : ''}
                   </div>
+                  {pedido.notas_entrega && (
+                    <div style={{ fontSize: '0.8rem', color: '#fbbf24', marginTop: '6px' }}>
+                      📌 {pedido.notas_entrega}
+                    </div>
+                  )}
                   <div style={{ fontSize: '0.85rem', color: '#22c55e', marginTop: '6px', fontWeight: 'bold' }}>
                     ${pedido.orden_total.toFixed(2)}
                   </div>
@@ -153,6 +173,10 @@ export function DeliveryBoard({ onBack, onNewOrder }: DeliveryBoardProps) {
       >
         +
       </button>
+
+      {detailPedido && (
+        <DeliveryOrderDetailModal pedido={detailPedido} onClose={() => setDetailPedido(null)} />
+      )}
     </div>
   )
 }

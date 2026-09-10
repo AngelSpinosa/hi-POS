@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { Producto } from '../types/db'
 import { OrderCart } from '../components/OrderCart'
-import { PaymentModal, type PaymentData } from '../components/PaymentModal'
 import { TicketReceipt } from '../components/TicketReceipt'
 import { PinPadModal } from '../components/PinPadModal'
 import { ShippingInfoModal } from '../components/ShippingInfoModal'
@@ -127,7 +126,9 @@ export function DeliveryPOSView({ userId, onBack }: DeliveryPOSViewProps) {
           onFinalizePayment={() => {}}
           onCancelOrder={requestCancel}
           // No hay flujo de "cuenta_solicitada" en domicilio: en cuanto hay items,
-          // el único botón relevante es "Generar comanda" (dispara todo el flujo de envío + cobro)
+          // el único botón relevante es "Generar comanda" — ahora abre primero el
+          // formulario de datos de envío, y hasta confirmarlo se manda la comanda
+          // a cocina y se registra el auto-cobro, todo junto.
           orderStatus="abierta"
         />
       </div>
@@ -141,15 +142,6 @@ export function DeliveryPOSView({ userId, onBack }: DeliveryPOSViewProps) {
         isOpen={order.isShippingModalOpen}
         onClose={() => order.setIsShippingModalOpen(false)}
         onConfirm={order.confirmShipping}
-      />
-
-      <PaymentModal
-        isOpen={order.isPaymentModalOpen}
-        totalOriginal={order.totalConEnvio}
-        totalRestante={order.totalConEnvio}
-        cart={order.cart}
-        onClose={() => order.setIsPaymentModalOpen(false)}
-        onConfirmPayment={(paymentData: PaymentData) => order.confirmPaymentAndCreate(paymentData)}
       />
 
       {order.ticketData && (

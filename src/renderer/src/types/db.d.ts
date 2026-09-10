@@ -25,6 +25,7 @@ export interface Mesa {
   activa: number;
   estado_orden?: 'libre' | 'abierta' | 'enviada_cocina' | 'cuenta_solicitada'; 
   total_actual?: number;
+  mesero_nombre?: string | null; // <-- Nuevo: quién la abrió, para saber de quién es antes de meter el PIN
 }
 
 export interface Orden {
@@ -156,6 +157,7 @@ export interface PedidoDomicilio extends OrdenDomicilio {
   cliente_nombre: string;
   cliente_telefono: string;
   cliente_direccion: string | null; // <-- Viene de cliente.direccion_defecto
+  canal_nombre?: string | null;     // <-- Viene del LEFT JOIN con canal_delivery
   orden_estatus: Orden['estatus'];
   orden_total: number;
 }
@@ -218,11 +220,20 @@ export interface TicketData {
 export interface OrdenHistorial {
   id: number;
   total: number;
+  estatus: Orden['estatus'];
   creado_en: string;
+  metodo?: string; // Método principal ('Mixto' si hubo más de un pago) que arma get-daily-report
   metodos_pago: string[]; // Cambiado a array para pagos mixtos
   tipo_orden: Orden['tipo_orden'];
   mesa?: number | null;
   cajero?: string;
+  descuento_total?: number;
+  // Solo vienen llenos cuando tipo_orden === 'domicilio' (LEFT JOIN con orden_domicilio)
+  costo_envio?: number | null;
+  monto_comision?: number | null;
+  ingreso_neto?: number | null;
+  canal_nombre?: string | null;
+  cliente_nombre?: string | null;
 }
 
 

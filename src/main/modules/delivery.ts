@@ -9,8 +9,10 @@ import { descontarInventarioPorVenta } from './inventory'
 // por ordenId, no por mesa: 'get-productos-pos', 'add-order-item',
 // 'update-order-item-qty', 'remove-order-item' y 'print-command' funcionan
 // igual para una orden de domicilio. Aquí solo se agrega lo que es específico
-// de domicilio: crear la orden base sin mesa, capturar los datos de envío +
-// cobrar (prepago), y el tablero de "Pedidos".
+// de domicilio: crear la orden base sin mesa, capturar los datos de envío y
+// registrar el auto-cobro (CU-75: el cobro real lo hace la app de delivery con
+// el cliente, no el cajero — aquí solo se refleja en la BD), y el tablero de
+// "Pedidos".
 
 export function registerDeliveryHandlers() {
 
@@ -93,6 +95,17 @@ export function registerDeliveryHandlers() {
     }
   })
 
+  // 1f. Reactivar una plataforma previamente desactivada (soft delete inverso)
+  ipcMain.handle('activate-canal-delivery', (_, { id }) => {
+    if (!db) return { success: false, error: 'Base de datos no disponible' }
+    try {
+      db.prepare('UPDATE canal_delivery SET activo = 1 WHERE id = ?').run(id)
+      return { success: true }
+    } catch (error: any) {
+      return { success: false, error: error.message }
+    }
+  })
+
   // 2. Abrir una orden de domicilio nueva (equivalente a open-table-order, pero sin mesa)
   ipcMain.handle('open-delivery-order', (_, { userId }) => {
     if (!db) return { success: false, error: 'Sin conexión BD' }
@@ -111,9 +124,12 @@ export function registerDeliveryHandlers() {
     }
   })
 
-  // 3. Confirmar datos de envío + cobrar (prepago) en una sola transacción.
-  // Se llama DESPUÉS de "Generar comanda" (que ya se manda con el handler
-  // print-command existente) y después de que el cajero llena el modal de envío.
+  // 3. Confirmar datos de envío + registrar el auto-cobro, en una sola transacción.
+  // CU-75 (rediseñado): el pago se marca automáticamente al mismo tiempo que se manda
+  // la comanda a cocina — no se le pide al cajero monto recibido ni método de pago,
+  // porque quien realmente le cobra al cliente es la app de delivery (Uber Eats, Rappi, etc.).
+  // Por eso este handler ya NO recibe "payment": el monto pagado siempre es el total
+  // del pedido y el método se registra como 'app_delivery'.
   ipcMain.handle('create-delivery-info', (_, payload) => {
     if (!db) return { success: false, error: 'Sin conexión BD' }
     try {
@@ -124,7 +140,7 @@ export function registerDeliveryHandlers() {
         direccionEnvio,
         canalDeliveryId,
         costoEnvio,
-        payment // { method: 'efectivo' | 'tarjeta', received: number }
+        notasEntrega
       } = payload
 
       if (!ordenId) throw new Error('Falta la orden')
@@ -141,17 +157,8 @@ export function registerDeliveryHandlers() {
         const orden = db.prepare('SELECT total FROM orden WHERE id = ?').get(ordenId) as any
         if (!orden) throw new Error('La orden no existe')
 
-        // Lo que se le cobra al cliente incluye el costo de envío
+        // Lo que "cobra" la app de delivery al cliente final incluye el costo de envío
         const totalACobrar = orden.total + costoEnvioNum
-
-        let cambio = 0
-        let montoRecibido = payment.received
-        if (payment.method === 'efectivo') {
-          if (payment.received < totalACobrar) throw new Error('El monto recibido es menor al total a cobrar')
-          cambio = payment.received - totalACobrar
-        } else {
-          montoRecibido = totalACobrar
-        }
 
         // 1. Cliente "desechable": solo para esta entrega, no se reutiliza.
         // La dirección va en cliente.direccion_defecto — como este cliente es nuevo
@@ -164,6 +171,7 @@ export function registerDeliveryHandlers() {
         const clienteId = clienteInfo.lastInsertRowid
 
         // 2. Comisión e ingreso neto, calculados con los defaults del canal elegido
+        // (se calculan sobre orden.total, sin incluir el costo de envío)
         const montoComision = orden.total * ((canal.comision_porcentaje_default || 0) / 100)
         const montoRetenido = orden.total * ((canal.impuesto_retenido_default || 0) / 100)
         const ingresoNeto = orden.total - montoComision - montoRetenido
@@ -171,16 +179,19 @@ export function registerDeliveryHandlers() {
         // 3. orden_domicilio
         db.prepare(`
           INSERT INTO orden_domicilio 
-            (orden_id, cliente_id, canal_delivery_id, costo_envio, monto_comision, ingreso_neto, estado_envio)
-          VALUES (?, ?, ?, ?, ?, ?, 'en_cocina')
-        `).run(ordenId, clienteId, canalDeliveryId, costoEnvioNum, montoComision, ingresoNeto)
+            (orden_id, cliente_id, canal_delivery_id, costo_envio, notas_entrega, monto_comision, ingreso_neto, estado_envio)
+          VALUES (?, ?, ?, ?, ?, ?, ?, 'en_cocina')
+        `).run(ordenId, clienteId, canalDeliveryId, costoEnvioNum, notasEntrega ? String(notasEntrega).trim() : null, montoComision, ingresoNeto)
 
-        // 4. Registrar el pago (prepago, de una sola vez, sin parcialidades)
+        // 4. Registrar el pago automático — sin monto recibido, cambio ni método manual.
+        // 'app_delivery' identifica que este cobro no pasó por la caja.
         db.prepare('INSERT INTO pago (orden_id, metodo, monto_recibido, cambio) VALUES (?, ?, ?, ?)').run(
-          ordenId, payment.method, montoRecibido, cambio
+          ordenId, 'app_delivery', totalACobrar, 0
         )
 
-        // 5. Reporte diario
+        // 5. Reporte diario — este ingreso no es efectivo ni tarjeta, así que se refleja
+        // en total_ingreso_apps (lo que efectivamente reciben del canal) y
+        // total_comisiones_pagadas (lo que se llevó la plataforma), no en total_efectivo/total_tarjeta.
         const tzOffset = new Date().getTimezoneOffset() * 60000
         const today = new Date(Date.now() - tzOffset).toISOString().split('T')[0]
         let reporte = db.prepare('SELECT id FROM reporte_diario WHERE date(fecha) = ?').get(today) as any
@@ -188,20 +199,21 @@ export function registerDeliveryHandlers() {
           const info = db.prepare('INSERT INTO reporte_diario (fecha) VALUES (?)').run(today)
           reporte = { id: info.lastInsertRowid }
         }
-        const montoEfectivo = payment.method === 'efectivo' ? totalACobrar : 0
-        const montoTarjeta = payment.method === 'tarjeta' ? totalACobrar : 0
         db.prepare(`
           UPDATE reporte_diario 
-          SET total_ventas = total_ventas + ?, total_efectivo = total_efectivo + ?, total_tarjeta = total_tarjeta + ?, total_pedidos = total_pedidos + 1 
+          SET total_ventas = total_ventas + ?, 
+              total_ingreso_apps = total_ingreso_apps + ?, 
+              total_comisiones_pagadas = total_comisiones_pagadas + ?, 
+              total_pedidos = total_pedidos + 1 
           WHERE id = ?
-        `).run(totalACobrar, montoEfectivo, montoTarjeta, reporte.id)
+        `).run(totalACobrar, ingresoNeto, montoComision, reporte.id)
 
         // 6. Cerrar la orden y descontar inventario (ya está pagada de una vez)
         db.prepare("UPDATE orden SET estatus = 'pagada', ticket_impreso = 0, id_reporte_diario = ? WHERE id = ?").run(reporte.id, ordenId)
         const items = db.prepare('SELECT producto_id, cantidad FROM orden_item WHERE orden_id = ?').all(ordenId) as any[]
         descontarInventarioPorVenta(items)
 
-        return { totalACobrar, cambio }
+        return { totalACobrar }
       })
 
       const resultado = tx()
@@ -219,9 +231,11 @@ export function registerDeliveryHandlers() {
       return db.prepare(`
         SELECT od.*, c.nombre AS cliente_nombre, c.telefono AS cliente_telefono, 
                c.direccion_defecto AS cliente_direccion,
+               cd.nombre AS canal_nombre,
                o.estatus AS orden_estatus, o.total AS orden_total
         FROM orden_domicilio od
         JOIN cliente c ON od.cliente_id = c.id
+        LEFT JOIN canal_delivery cd ON od.canal_delivery_id = cd.id
         JOIN orden o ON od.orden_id = o.id
         WHERE o.estatus != 'cancelada'
         ORDER BY od.id DESC

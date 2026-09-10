@@ -1,6 +1,5 @@
 import { useState, useCallback, useEffect } from 'react'
 import type { Producto, CartItem, TicketData } from '../types/db'
-import type { PaymentData } from '../components/PaymentModal'
 
 export interface ShippingData {
   clienteNombre: string;
@@ -8,6 +7,7 @@ export interface ShippingData {
   direccionEnvio: string;
   canalDeliveryId: number;
   costoEnvio: number;
+  notasEntrega: string;
 }
 
 // A diferencia de useActiveOrder.ts (mesas), este hook NO duplica el motor de
@@ -22,8 +22,6 @@ export function useDeliveryOrder(userId?: number) {
   const [descuentoTotal, setDescuentoTotal] = useState(0)
 
   const [isShippingModalOpen, setIsShippingModalOpen] = useState(false)
-  const [pendingShipping, setPendingShipping] = useState<ShippingData | null>(null)
-  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false)
   const [ticketData, setTicketData] = useState<TicketData | null>(null)
   const [kitchenData, setKitchenData] = useState<{ items: CartItem[] } | null>(null)
 
@@ -77,63 +75,61 @@ export function useDeliveryOrder(userId?: number) {
     await refreshOrder()
   }
 
-  // "Generar comanda": manda el ticket a cocina y, justo después, abre el modal de envío
-  const generateCommand = async () => {
+  // Botón "Generar comanda" del carrito: ya no manda nada a cocina todavía.
+  // Primero se piden los datos de envío (nuevo orden del flujo, CU-75 rediseñado);
+  // la comanda y el auto-cobro se disparan juntos hasta confirmar ese formulario.
+  const generateCommand = () => {
     if (!activeOrderId) return
-    if (cart.length === 0) { alert('⚠️ Agrega al menos un producto antes de generar la comanda.'); return; }
-    try {
-      // @ts-ignore
-      const res = await window.electron.ipcRenderer.invoke('print-command', { ordenId: activeOrderId })
-      if (res && res.success && res.items.length > 0) {
-        setKitchenData({ items: res.items })
-        setIsShippingModalOpen(true)
-        await refreshOrder()
-      } else {
-        alert('No hay productos nuevos para enviar a la cocina.')
-      }
-    } catch (e) { console.error(e) }
+    if (cart.length === 0) { alert('⚠️ Agrega al menos un producto antes de continuar.'); return; }
+    setIsShippingModalOpen(true)
   }
 
-  // Se llama al confirmar ShippingInfoModal: guarda los datos y abre el PaymentModal (prepago)
-  const confirmShipping = (data: ShippingData) => {
-    setPendingShipping(data)
+  // Se llama al confirmar ShippingInfoModal: aquí se hace todo en un solo paso —
+  // se manda la comanda a cocina (print-command) y, si hay algo que imprimir,
+  // se registran los datos de envío + el auto-cobro (create-delivery-info).
+  // Ya no hay PaymentModal de por medio: el cajero no captura nada de pago.
+  const confirmShipping = async (data: ShippingData) => {
+    if (!activeOrderId) return
     setIsShippingModalOpen(false)
-    setIsPaymentModalOpen(true)
-  }
-
-  // Se llama al confirmar el PaymentModal: aquí sí se cobra y se cierra el pedido
-  const confirmPaymentAndCreate = async (paymentData: PaymentData) => {
-    if (!activeOrderId || !pendingShipping) return false
     try {
+      // 1. Mandar comanda a cocina
+      // @ts-ignore
+      const printRes = await window.electron.ipcRenderer.invoke('print-command', { ordenId: activeOrderId })
+      if (!printRes || !printRes.success || !printRes.items || printRes.items.length === 0) {
+        alert('⚠️ No hay productos nuevos para enviar a la cocina.')
+        return
+      }
+
+      // 2. Registrar datos de envío + auto-cobro con esos mismos datos
       // @ts-ignore
       const result = await window.electron.ipcRenderer.invoke('create-delivery-info', {
         ordenId: activeOrderId,
-        clienteNombre: pendingShipping.clienteNombre,
-        clienteTelefono: pendingShipping.clienteTelefono,
-        direccionEnvio: pendingShipping.direccionEnvio,
-        canalDeliveryId: pendingShipping.canalDeliveryId,
-        costoEnvio: pendingShipping.costoEnvio,
-        payment: { method: paymentData.method, received: paymentData.received }
+        clienteNombre: data.clienteNombre,
+        clienteTelefono: data.clienteTelefono,
+        direccionEnvio: data.direccionEnvio,
+        canalDeliveryId: data.canalDeliveryId,
+        costoEnvio: data.costoEnvio,
+        notasEntrega: data.notasEntrega
       })
 
       if (result && result.success) {
+        setKitchenData({ items: printRes.items })
         setTicketData({
           orderId: activeOrderId,
           items: [...cart],
           total: result.totalACobrar,
           date: new Date().toLocaleString(),
           pagos: [{
-            metodo: paymentData.method,
-            monto: paymentData.received,
-            cambio: result.cambio || 0
+            metodo: 'app_delivery',
+            monto: result.totalACobrar,
+            cambio: 0
           }],
         } as any)
-        setIsPaymentModalOpen(false)
-        return true
+        await refreshOrder()
+      } else {
+        alert(result?.error || 'Error al procesar el pedido de domicilio')
       }
-      alert(result?.error || 'Error al procesar el pedido de domicilio')
-      return false
-    } catch (e) { console.error(e); return false }
+    } catch (e) { console.error(e) }
   }
 
   const cancelOrder = async (pin: string) => {
@@ -151,13 +147,9 @@ export function useDeliveryOrder(userId?: number) {
   return {
     activeOrderId, cart, orderTotal, descuentoTotal,
     isShippingModalOpen, setIsShippingModalOpen,
-    isPaymentModalOpen, setIsPaymentModalOpen,
     ticketData, setTicketData,
     kitchenData, setKitchenData,
-    // Total que debe cobrar el PaymentModal: el de la orden + el costo de envío que
-    // se acaba de capturar en ShippingInfoModal (0 si todavía no se ha llenado)
-    totalConEnvio: orderTotal + (pendingShipping?.costoEnvio || 0),
     addToCart, removeFromCart, updateQuantity,
-    generateCommand, confirmShipping, confirmPaymentAndCreate, cancelOrder
+    generateCommand, confirmShipping, cancelOrder
   }
 }

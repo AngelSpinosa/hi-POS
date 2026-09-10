@@ -17,8 +17,11 @@ export function DailyReport() {
   const [isSaving, setIsSaving] = useState(false)
   
   // Estado para modales
-  const [selectedOrder, setSelectedOrder] = useState<{id: number, items: CartItem[], pagos?: any[]} | null>(null)
+  const [selectedOrder, setSelectedOrder] = useState<{id: number, order: any, items: CartItem[], pagos?: any[]} | null>(null)
   const [isExportModalOpen, setIsExportModalOpen] = useState(false)
+
+  // Pestañas: "En restaurante" agrupa local + llevar; "A domicilio" es tipo_orden === 'domicilio'
+  const [activeTab, setActiveTab] = useState<'restaurante' | 'domicilio'>('restaurante')
 
   const fetchReport = async () => {
     // @ts-ignore
@@ -44,7 +47,7 @@ export function DailyReport() {
     // @ts-ignore
     const res = await window.electron.ipcRenderer.invoke('get-order-details', { orderId })
     if (res.success) {
-      setSelectedOrder({ id: orderId, items: res.items, pagos: res.pagos })
+      setSelectedOrder({ id: orderId, order: res.order, items: res.items, pagos: res.pagos })
     }
   }
 
@@ -64,14 +67,34 @@ export function DailyReport() {
     }
   }
 
-  const totalVentas = orders.reduce((sum, order) => sum + order.total, 0);
-  const totalPedidos = orders.length;
-  
-  const expectedCash = orders.filter((o: any) => o.metodo === 'efectivo' || o.metodo === 'Mixto').reduce((sum, o) => sum + o.total, 0); 
-  const totalTarjeta = orders.filter((o: any) => o.metodo === 'tarjeta').reduce((sum, o) => sum + o.total, 0);
+  // Solo las órdenes realmente pagadas cuentan como venta — antes se incluían
+  // también las canceladas en los totales, lo cual inflaba las cifras.
+  const paidOrders = orders.filter((o: any) => o.estatus === 'pagada')
+
+  // Venta neta de una orden: en restaurante es simplemente order.total (ya viene
+  // con descuentos aplicados). En domicilio, lo que realmente le queda al negocio
+  // es ingreso_neto (total del pedido ya sin la comisión de la plataforma) más el
+  // costo de envío completo (el envío no paga comisión).
+  const netoOrden = (o: any) =>
+    o.tipo_orden === 'domicilio'
+      ? (o.ingreso_neto || 0) + (o.costo_envio || 0)
+      : o.total
+
+  const totalVentas = paidOrders.reduce((sum, order: any) => sum + netoOrden(order), 0);
+  const totalPedidos = paidOrders.length;
+
+  // Efectivo/Tarjeta son estrictamente lo que pasa por la caja física — los pedidos
+  // a domicilio (metodo 'app_delivery') nunca entran aquí, por diseño.
+  const expectedCash = paidOrders.filter((o: any) => o.metodo === 'efectivo' || o.metodo === 'Mixto').reduce((sum, o: any) => sum + netoOrden(o), 0);
+  const totalTarjeta = paidOrders.filter((o: any) => o.metodo === 'tarjeta').reduce((sum, o: any) => sum + netoOrden(o), 0);
 
   const realCash = parseFloat(cashInDrawer) || 0
   const difference = realCash - expectedCash
+
+  // Filtra el historial de ventas según la pestaña activa
+  const ordersInTab = orders.filter((o: any) =>
+    activeTab === 'domicilio' ? o.tipo_orden === 'domicilio' : o.tipo_orden !== 'domicilio'
+  )
 
   const isAlreadySaved = report?.dinero_real !== null && report?.dinero_real !== undefined
 
@@ -186,27 +209,60 @@ export function DailyReport() {
           
           {/* PANEL IZQUIERDO: HISTORIAL */}
           <div className="report-panel">
+            <div style={{ display: 'flex', gap: '25px', borderBottom: '1px solid #333', marginBottom: '15px' }}>
+              <button
+                onClick={() => setActiveTab('restaurante')}
+                style={{
+                  background: 'transparent', border: 'none', cursor: 'pointer',
+                  padding: '0 0 10px 0', fontFamily: 'inherit', fontSize: '1rem', fontWeight: 'bold',
+                  color: activeTab === 'restaurante' ? '#00E676' : '#9ca3af',
+                  borderBottom: activeTab === 'restaurante' ? '2px solid #00E676' : '2px solid transparent'
+                }}
+              >
+                En restaurante
+              </button>
+              <button
+                onClick={() => setActiveTab('domicilio')}
+                style={{
+                  background: 'transparent', border: 'none', cursor: 'pointer',
+                  padding: '0 0 10px 0', fontFamily: 'inherit', fontSize: '1rem', fontWeight: 'bold',
+                  color: activeTab === 'domicilio' ? '#00E676' : '#9ca3af',
+                  borderBottom: activeTab === 'domicilio' ? '2px solid #00E676' : '2px solid transparent'
+                }}
+              >
+                A domicilio
+              </button>
+            </div>
             <h2 className="panel-title">Historial de ventas</h2>
             <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
               <table className="history-table">
                 <thead>
                   <tr>
                     <th>Hora</th>
-                    <th>Mesa</th>
+                    <th>{activeTab === 'domicilio' ? 'Cliente' : 'Mesa'}</th>
                     <th>Total</th>
                     <th>Método de P.</th>
                     <th></th>
                   </tr>
                 </thead>
                 <tbody>
-                  {orders.map(order => (
+                  {ordersInTab.map(order => (
                     <tr key={order.id}>
                       <td>{new Date(order.creado_en).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</td>
                       <td>
-                        <div>#{order.mesa || 'N/A'}</div>
-                        <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '3px' }}>Mesero: {order.cajero || 'N/A'}</div>
+                        {activeTab === 'domicilio' ? (
+                          <>
+                            <div>{(order as any).cliente_nombre || 'Sin nombre'}</div>
+                            <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '3px' }}>{(order as any).canal_nombre || 'N/A'}</div>
+                          </>
+                        ) : (
+                          <>
+                            <div>#{order.mesa || 'N/A'}</div>
+                            <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '3px' }}>Mesero: {order.cajero || 'N/A'}</div>
+                          </>
+                        )}
                       </td>
-                      <td>${order.total.toFixed(2)}</td>
+                      <td>${(order.total + ((order as any).costo_envio || 0)).toFixed(2)}</td>
                       <td style={{ textTransform: 'capitalize' }}>{(order as any).metodo}</td>
                       <td style={{ textAlign: 'right' }}>
                         <button className="btn-ver" onClick={() => handleOpenDetail(order.id)}>
@@ -215,7 +271,7 @@ export function DailyReport() {
                       </td>
                     </tr>
                   ))}
-                  {orders.length === 0 && (
+                  {ordersInTab.length === 0 && (
                     <tr><td colSpan={5} style={{ textAlign: 'center', padding: '30px', color: '#666', borderBottom: 'none' }}>Sin ventas registradas este día</td></tr>
                   )}
                 </tbody>
@@ -279,6 +335,7 @@ export function DailyReport() {
       {selectedOrder && (
         <OrderDetailModal 
           orderId={selectedOrder.id} 
+          order={selectedOrder.order}
           items={selectedOrder.items} 
           pagos={selectedOrder.pagos} 
           onClose={() => setSelectedOrder(null)} 

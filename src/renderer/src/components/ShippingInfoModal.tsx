@@ -38,6 +38,7 @@ export function ShippingInfoModal({ isOpen, onClose, onConfirm }: ShippingInfoMo
   const [direccionEnvio, setDireccionEnvio] = useState('')
   const [canalDeliveryId, setCanalDeliveryId] = useState('')
   const [costoEnvio, setCostoEnvio] = useState('0')
+  const [notasEntrega, setNotasEntrega] = useState('')
 
   useEffect(() => {
     if (!isOpen) return
@@ -53,6 +54,7 @@ export function ShippingInfoModal({ isOpen, onClose, onConfirm }: ShippingInfoMo
     setDireccionEnvio('')
     setCanalDeliveryId('')
     setCostoEnvio('0')
+    setNotasEntrega('')
   }
 
   const handleClose = () => {
@@ -70,7 +72,8 @@ export function ShippingInfoModal({ isOpen, onClose, onConfirm }: ShippingInfoMo
       clienteTelefono: clienteTelefono.trim(),
       direccionEnvio: direccionEnvio.trim(),
       canalDeliveryId: Number(canalDeliveryId),
-      costoEnvio: Number(costoEnvio) || 0
+      costoEnvio: Number(costoEnvio) || 0,
+      notasEntrega: notasEntrega.trim()
     })
     resetForm()
   }
@@ -94,6 +97,14 @@ export function ShippingInfoModal({ isOpen, onClose, onConfirm }: ShippingInfoMo
           value={direccionEnvio}
           onChange={e => setDireccionEnvio(e.target.value)}
           placeholder="Calle, número, colonia, referencias..."
+        />
+
+        <label style={labelStyle}>Indicaciones especiales (opcional)</label>
+        <textarea
+          style={{ ...inputStyle, minHeight: '50px', resize: 'vertical' }}
+          value={notasEntrega}
+          onChange={e => setNotasEntrega(e.target.value)}
+          placeholder="Ej. Tocar el timbre 2 veces, dejar con el portero..."
         />
 
         <label style={labelStyle}>Canal de delivery</label>

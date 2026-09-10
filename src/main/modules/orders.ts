@@ -34,15 +34,17 @@ export function registerOrderHandlers() {
       const mesas = db.prepare('SELECT * FROM mesa WHERE activa = 1').all() as any[]
       return mesas.map(mesa => {
         const ordenActiva = db.prepare(`
-          SELECT estatus, total FROM orden 
-          WHERE mesa_id = ? AND estatus IN ('abierta', 'enviada_cocina', 'cuenta_solicitada') 
-          ORDER BY id DESC LIMIT 1
+          SELECT o.estatus, o.total, u.nombre as mesero_nombre FROM orden o
+          LEFT JOIN user u ON o.user_id = u.id
+          WHERE o.mesa_id = ? AND o.estatus IN ('abierta', 'enviada_cocina', 'cuenta_solicitada') 
+          ORDER BY o.id DESC LIMIT 1
         `).get(mesa.id) as any
         
         return { 
           ...mesa, 
           estado_orden: ordenActiva ? ordenActiva.estatus : 'libre', 
-          total_actual: ordenActiva ? ordenActiva.total : 0 
+          total_actual: ordenActiva ? ordenActiva.total : 0,
+          mesero_nombre: ordenActiva ? ordenActiva.mesero_nombre : null
         }
       })
     } catch (error) { return [] }
@@ -55,6 +57,7 @@ export function registerOrderHandlers() {
       const targetUserId = args.userId
 
       if (!targetTableId) return { success: false, error: 'ID de mesa no proporcionado' }
+      if (!targetUserId) return { success: false, error: 'Falta el usuario' }
 
       let order = db.prepare(`
         SELECT o.*, u.nombre as nombre_mesero FROM orden o
@@ -63,10 +66,23 @@ export function registerOrderHandlers() {
         ORDER BY o.id DESC LIMIT 1
       `).get(targetTableId) as any
 
-      if (!order) {
-        if (!targetUserId) return { success: false, error: 'Falta el usuario' }
+      if (order) {
+        // La mesa ya tiene "dueño" (quien la abrió). Solo esa persona o un admin
+        // en turno pueden seguir cobrando ahí — así evitamos que otro mesero se
+        // atribuya ventas ajenas (esto también sienta la base para repartir propinas
+        // por mesero más adelante).
+        if (order.user_id !== targetUserId) {
+          const requestingUser = db.prepare('SELECT rol FROM user WHERE id = ?').get(targetUserId) as any
+          if (!requestingUser || requestingUser.rol !== 'admin') {
+            return {
+              success: false,
+              error: `Esta mesa ya la está atendiendo ${order.nombre_mesero || 'otro mesero'}. Solo ${order.nombre_mesero || 'esa persona'} o un administrador pueden continuarla.`
+            }
+          }
+        }
+      } else {
         const info = db.prepare(`INSERT INTO orden (user_id, mesa_id, estatus, total, creado_en) VALUES (?, ?, 'abierta', 0, datetime('now', 'localtime'))`).run(targetUserId, targetTableId)
-        order = { id: info.lastInsertRowid, estatus: 'abierta', total: 0, mesa_id: targetTableId }
+        order = { id: info.lastInsertRowid, estatus: 'abierta', total: 0, mesa_id: targetTableId, user_id: targetUserId }
       }
 
       // Recalculamos descuentos/promociones vigentes cada vez que se abre/recarga la orden,

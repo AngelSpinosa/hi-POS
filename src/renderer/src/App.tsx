@@ -136,7 +136,8 @@ function App() {
 
         if (pendingView === 'TABLES') {
           if (pendingTableId) {
-             await openTableOrder(pendingTableId, user.id)
+             const opened = await openTableOrder(pendingTableId, user.id)
+             if (!opened) return // No cerramos el modal: puede reintentar con el PIN del mesero dueño o de un admin
           } else {
              loadTables()
              setView('TABLES')
@@ -160,11 +161,16 @@ function App() {
     } catch (error) { console.error(error) }
   }
 
-  const openTableOrder = async (tableId: number, userId: number) => {
-    setActiveTableId(tableId)
+  const openTableOrder = async (tableId: number, userId: number): Promise<boolean> => {
     // @ts-ignore
-    await window.electron.ipcRenderer.invoke('open-table-order', { tableId, userId })
-    setView('ORDER')
+    const result = await window.electron.ipcRenderer.invoke('open-table-order', { tableId, userId })
+    if (result && result.success) {
+      setActiveTableId(tableId)
+      setView('ORDER')
+      return true
+    }
+    alert('🔒 ' + (result?.error || 'No se pudo abrir la mesa'))
+    return false
   }
 
   const handleSelectTableRequest = (id: number) => {

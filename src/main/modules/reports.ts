@@ -13,10 +13,21 @@ export function registerReportHandlers() {
       const report = db.prepare('SELECT * FROM reporte_diario WHERE date(fecha) = ?').get(date)
 
       // SIN LEFT JOIN EN PAGO: Así evitamos filas duplicadas en el historial.
+      // Se agrega LEFT JOIN con orden_domicilio/canal_delivery/cliente para poder
+      // separar "En restaurante" vs "A domicilio" en el frontend, y para calcular
+      // la venta neta de cada pedido a domicilio (descontando comisión de la
+      // plataforma, sumando el costo de envío).
       const orders = db.prepare(`
-        SELECT o.id, o.total, o.estatus, o.creado_en, u.nombre as cajero, o.mesa_id as mesa
+        SELECT o.id, o.total, o.estatus, o.creado_en, o.tipo_orden, o.descuento_total,
+               u.nombre as cajero, o.mesa_id as mesa,
+               od.costo_envio, od.monto_comision, od.ingreso_neto,
+               cd.nombre as canal_nombre,
+               c.nombre as cliente_nombre
         FROM orden o
         LEFT JOIN user u ON o.user_id = u.id
+        LEFT JOIN orden_domicilio od ON od.orden_id = o.id
+        LEFT JOIN canal_delivery cd ON od.canal_delivery_id = cd.id
+        LEFT JOIN cliente c ON od.cliente_id = c.id
         WHERE date(o.creado_en) = ? AND o.estatus IN ('pagada', 'cancelada')
         ORDER BY o.id DESC
       `).all(date) as any[]
@@ -38,10 +49,19 @@ export function registerReportHandlers() {
   ipcMain.handle('get-order-details', (_, { orderId }) => {
     if (!db) return { success: false }
     try {
+      // Tipo de pedido + descuento vienen de "orden"; costo_envio solo existe
+      // si la orden es de domicilio (LEFT JOIN, será null en pedidos de restaurante)
+      const order = db.prepare(`
+        SELECT o.tipo_orden, o.descuento_total, od.costo_envio
+        FROM orden o
+        LEFT JOIN orden_domicilio od ON od.orden_id = o.id
+        WHERE o.id = ?
+      `).get(orderId)
+
       const items = db.prepare('SELECT nombre, cantidad, precio FROM orden_item WHERE orden_id = ?').all(orderId)
       // ESTA ES LA LÍNEA QUE FALTABA: Mandamos el arreglo de pagos al frontend para que el modal los dibuje
       const pagos = db.prepare('SELECT metodo, monto_recibido, cambio FROM pago WHERE orden_id = ?').all(orderId)
-      return { success: true, items, pagos }
+      return { success: true, order, items, pagos }
     } catch (error: any) { return { success: false, error: error.message } }
   })
 

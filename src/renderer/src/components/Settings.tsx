@@ -208,6 +208,13 @@ export function Settings({ onBack }: SettingsProps) {
     }
   }
 
+  const handleActivateCanal = async (canal: any) => {
+    // @ts-ignore
+    const res = await window.electron.ipcRenderer.invoke('activate-canal-delivery', { id: canal.id })
+    if (res.success) fetchCanalesDelivery()
+    else alert('❌ No se pudo activar: ' + res.error)
+  }
+
  // ==============================================
   // ESTADOS PARA EL HISTORIAL DE TICKETS
   // ==============================================
@@ -529,8 +536,14 @@ export function Settings({ onBack }: SettingsProps) {
                         <td style={{ padding: '12px 10px', color: 'white' }}>{canal.comision_porcentaje_default}%</td>
                         <td style={{ padding: '12px 10px' }}>
                           <div style={{ display: 'flex', gap: '12px' }}>
-                            <button onClick={() => handleStartEditCanal(canal)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '1.1rem' }} title="Editar">✏️</button>
-                            <button onClick={() => handleDeleteCanal(canal)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '1.1rem' }} title="Eliminar">🗑️</button>
+                            {canal.activo ? (
+                              <>
+                                <button onClick={() => handleStartEditCanal(canal)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '1.1rem' }} title="Editar">✏️</button>
+                                <button onClick={() => handleDeleteCanal(canal)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '1.1rem' }} title="Eliminar">🗑️</button>
+                              </>
+                            ) : (
+                              <button onClick={() => handleActivateCanal(canal)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '1.1rem' }} title="Activar">♻️</button>
+                            )}
                           </div>
                         </td>
                       </tr>
