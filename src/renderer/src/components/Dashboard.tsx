@@ -13,8 +13,8 @@ import IconLogout from '../assets/icons/Logout.svg'
 import IconClose from '../assets/icons/Close.svg'
 
 interface DashboardProps {
-  // Actualizado para incluir las nuevas vistas (DELIVERY y PROMOS)
-  onNavigate: (view: 'TABLES' | 'REPORT' | 'USERS' | 'PRODUCTS' | 'SETTINGS' | 'DELIVERY' | 'PROMOS') => void;
+  // Actualizado para incluir las nuevas vistas (DELIVERY, PROMOS y TAKEAWAY)
+  onNavigate: (view: 'TABLES' | 'REPORT' | 'USERS' | 'PRODUCTS' | 'SETTINGS' | 'DELIVERY' | 'PROMOS' | 'TAKEAWAY') => void;
   licenseInfo?: { type: string; remainingDays?: number } | null;
   appConfig?: AppConfig | null;
 }
@@ -111,6 +111,20 @@ export function Dashboard({ onNavigate, licenseInfo, appConfig }: DashboardProps
             <img src={IconDelivery} alt="Envíos" className="pos-card-icon" />
             <h2 className="pos-card-title">Envíos</h2>
             <p className="pos-card-subtitle">Pedidos a domicilio</p>
+          </div>
+
+          {/* NUEVO BOTÓN PARA LLEVAR */}
+          {/* No existe un ícono SVG dedicado todavía (ni bag.svg ni door.svg en assets/icons),
+              así que se usa un SVG inline en lugar de importar un archivo que podría no existir.
+              Si luego agregas un ícono propio, basta con reemplazar este <svg> por <img src={IconTakeaway} .../> */}
+          <div className="pos-card" onClick={() => onNavigate('TAKEAWAY')}>
+            <svg className="pos-card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ width: '48px', height: '48px' }}>
+              <path d="M6 2 L18 2 L20 8 L4 8 Z" strokeLinejoin="round" />
+              <path d="M4 8 L5.5 21 L18.5 21 L20 8" strokeLinejoin="round" />
+              <path d="M9 12 C9 12 9 14 12 14 C15 14 15 12 15 12" strokeLinecap="round" />
+            </svg>
+            <h2 className="pos-card-title">Para llevar</h2>
+            <p className="pos-card-subtitle">Abrir órdenes para llevar</p>
           </div>
 
           {/* BOTÓN REPORTES */}

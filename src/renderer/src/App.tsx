@@ -12,9 +12,10 @@ import { Settings } from './components/Settings'
 import { OnboardingWizard } from './components/OnboardingWizard' // NUEVO COMPONENTE
 import { PromotionsManagement } from './components/PromotionsManagement' // IMPORT DE PROMOCIONES
 import { DeliveryBoard } from './components/DeliveryBoard'
-import { DeliveryPOSView } from './components/DeliveryPOSView'
+import { DeliveryPOSView } from './views/DeliveryPOSView'
+import { TakeawayPOSView } from './views/TakeAwayPOSView'
 
-type ViewState = 'DASHBOARD' | 'TABLES' | 'ORDER' | 'REPORT' | 'USERS' | 'PRODUCTS' | 'LICENSE_ERROR' | 'SETTINGS' | 'ONBOARDING' | 'PROMOS' | 'DELIVERY' | 'DELIVERY_ORDER';
+type ViewState = 'DASHBOARD' | 'TABLES' | 'ORDER' | 'REPORT' | 'USERS' | 'PRODUCTS' | 'LICENSE_ERROR' | 'SETTINGS' | 'ONBOARDING' | 'PROMOS' | 'DELIVERY' | 'DELIVERY_ORDER' | 'TAKEAWAY';
 
 interface CurrentUser {
   id: number;
@@ -136,12 +137,16 @@ function App() {
 
         if (pendingView === 'TABLES') {
           if (pendingTableId) {
-             const opened = await openTableOrder(pendingTableId, user.id)
-             if (!opened) return // No cerramos el modal: puede reintentar con el PIN del mesero dueño o de un admin
+             await openTableOrder(pendingTableId, user.id)
           } else {
              loadTables()
              setView('TABLES')
           }
+        }
+        else if (pendingView === 'TAKEAWAY') {
+          // Igual que TABLES: cualquier usuario logueado puede abrir una venta
+          // para llevar, no se restringe a admin (es una venta de mostrador rutinaria).
+          setView('TAKEAWAY')
         }
         else if (['REPORT', 'USERS', 'PRODUCTS', 'SETTINGS', 'PROMOS', 'DELIVERY'].includes(pendingView || '')) {
           if (user.rol === 'admin') {
@@ -161,16 +166,11 @@ function App() {
     } catch (error) { console.error(error) }
   }
 
-  const openTableOrder = async (tableId: number, userId: number): Promise<boolean> => {
+  const openTableOrder = async (tableId: number, userId: number) => {
+    setActiveTableId(tableId)
     // @ts-ignore
-    const result = await window.electron.ipcRenderer.invoke('open-table-order', { tableId, userId })
-    if (result && result.success) {
-      setActiveTableId(tableId)
-      setView('ORDER')
-      return true
-    }
-    alert('🔒 ' + (result?.error || 'No se pudo abrir la mesa'))
-    return false
+    await window.electron.ipcRenderer.invoke('open-table-order', { tableId, userId })
+    setView('ORDER')
   }
 
   const handleSelectTableRequest = (id: number) => {
@@ -233,7 +233,8 @@ function App() {
               'PRODUCTS': 'Gestión de Productos',
               'SETTINGS': 'Configuración del Sistema',
               'PROMOS': 'Gestión de Descuentos',
-              'DELIVERY': 'Pedidos a Domicilio'
+              'DELIVERY': 'Pedidos a Domicilio',
+              'TAKEAWAY': 'Venta para Llevar'
             }
             requestViewChange(v as ViewState, titles[v])
           }}
@@ -394,6 +395,15 @@ function App() {
       <DeliveryPOSView 
         userId={currentUser?.id} 
         onBack={() => setView('DELIVERY')} 
+      />
+    )
+  }
+
+  if (view === 'TAKEAWAY') {
+    return (
+      <TakeawayPOSView 
+        userId={currentUser?.id} 
+        onBack={handleBackToDashboard} 
       />
     )
   }

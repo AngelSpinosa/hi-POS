@@ -15,13 +15,14 @@ interface OrderCartProps {
   onFinalizePayment: () => void;
   onCancelOrder: () => void; // <--- NUEVA PROP
   orderStatus: string;
+  payButtonLabel?: string; // <-- Nuevo: texto del botón de cobro, por si no aplica "CERRAR MESA" (ej. para llevar)
 }
 
 export function OrderCart({ 
   cart, total, subtotal, descuento, promos, orderId, // <--- AÑADE ESTAS TRES AQUÍ
   onRemove, onUpdateQuantity, 
   onGenerateCommand, onRequestBill, onFinalizePayment, onCancelOrder,
-  orderStatus
+  orderStatus, payButtonLabel = 'COBRAR Y CERRAR MESA'
 }: OrderCartProps) {
 
   const newItems = cart.filter(item => item.comanda_impresa === 0);
@@ -185,7 +186,7 @@ return (
                 onClick={onFinalizePayment} 
                 style={{ width: '100%', padding: '14px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontFamily: 'inherit', textTransform: 'uppercase', fontSize: '0.9rem' }}
               >
-                COBRAR Y CERRAR MESA
+                {payButtonLabel}
               </button>
             )}
             
