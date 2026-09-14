@@ -94,7 +94,7 @@ export function OrderDetailModal({ orderId, order, items, pagos, onClose }: Orde
             <h4 style={{ margin: '0 0 10px 0', color: '#9ca3af', fontSize: '0.9rem', textTransform: 'uppercase' }}>Pagos Registrados:</h4>
             {pagos.map((p, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.95rem' }}>
-                <span style={{ textTransform: 'capitalize' }}>✅ {p.metodo}</span>
+                <span style={{ textTransform: 'capitalize' }}> {p.metodo}</span>
                 <span>${p.monto_recibido.toFixed(2)}</span>
               </div>
             ))}

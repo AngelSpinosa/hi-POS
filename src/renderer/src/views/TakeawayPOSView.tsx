@@ -5,6 +5,7 @@ import { PaymentModal, type PaymentData } from '../components/PaymentModal'
 import { TicketReceipt } from '../components/TicketReceipt'
 import { PinPadModal } from '../components/PinPadModal'
 import { useTakeawayOrder } from '../hooks/useTakeawayOrder'
+import { ScreenHeader } from '../components/ScreenHeader'
 
 // eslint-disable-next-line react/prop-types
 function KitchenCommand({ items, onClose }: any) {
@@ -64,17 +65,14 @@ export function TakeawayPOSView({ userId, onBack }: TakeawayPOSViewProps) {
   }
 
   return (
-    <div style={{ display: 'flex', height: '100vh', backgroundColor: '#111', color: 'white' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', backgroundColor: '#111', color: 'white' }}>
+
+      <ScreenHeader title={`Para llevar #${order.activeOrderId ? order.activeOrderId.toString().padStart(4, '0') : '...'}`} onBack={onBack} />
+
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
 
       {/* SECCIÓN IZQUIERDA: Menú de Productos */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-        <div style={{ padding: '20px', backgroundColor: '#1a1a1a', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #333' }}>
-          <button onClick={onBack} style={{ background: 'transparent', color: '#9ca3af', border: 'none', cursor: 'pointer', fontSize: '1.2rem', fontWeight: 'bold' }}>
-            ← Menú principal
-          </button>
-          <h2 style={{ margin: 0, color: '#f97316' }}>Para llevar #{order.activeOrderId ? order.activeOrderId.toString().padStart(4, '0') : '...'}</h2>
-          <div style={{ width: '100px' }}></div>
-        </div>
 
         <div style={{ flex: 1, padding: '30px', overflowY: 'auto' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '20px' }}>
@@ -132,6 +130,8 @@ export function TakeawayPOSView({ userId, onBack }: TakeawayPOSViewProps) {
           orderStatus={order.orderStatus}
           payButtonLabel="COBRAR"
         />
+      </div>
+
       </div>
 
       {/* MODALES */}

@@ -63,9 +63,9 @@ export function ShippingInfoModal({ isOpen, onClose, onConfirm }: ShippingInfoMo
   }
 
   const handleConfirm = () => {
-    if (!clienteNombre.trim()) { alert('⚠️ Ingresa el nombre del cliente'); return; }
-    if (!direccionEnvio.trim()) { alert('⚠️ Ingresa la dirección de envío'); return; }
-    if (!canalDeliveryId) { alert('⚠️ Selecciona el canal de delivery'); return; }
+    if (!clienteNombre.trim()) { alert('Ingresa el nombre del cliente'); return; }
+    if (!direccionEnvio.trim()) { alert('Ingresa la dirección de envío'); return; }
+    if (!canalDeliveryId) { alert('Selecciona el canal de delivery'); return; }
 
     onConfirm({
       clienteNombre: clienteNombre.trim(),

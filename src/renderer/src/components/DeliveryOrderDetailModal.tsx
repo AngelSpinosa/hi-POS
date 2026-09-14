@@ -66,11 +66,11 @@ export function DeliveryOrderDetailModal({ pedido, onClose }: DeliveryOrderDetai
         <div style={{ background: '#1a1a1a', border: '1px solid #333', borderRadius: '8px', padding: '12px 15px', marginBottom: '15px' }}>
           <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>{pedido.cliente_nombre}</div>
           {pedido.cliente_telefono && (
-            <div style={{ color: '#9ca3af', fontSize: '0.9rem', marginBottom: '6px' }}>📞 {pedido.cliente_telefono}</div>
+            <div style={{ color: '#9ca3af', fontSize: '0.9rem', marginBottom: '6px' }}>{pedido.cliente_telefono}</div>
           )}
-          <div style={{ color: '#f3f4f6', fontSize: '0.9rem', marginBottom: '6px' }}>📍 {pedido.cliente_direccion || 'Sin dirección registrada'}</div>
+          <div style={{ color: '#f3f4f6', fontSize: '0.9rem', marginBottom: '6px' }}>{pedido.cliente_direccion || 'Sin dirección registrada'}</div>
           {pedido.notas_entrega && (
-            <div style={{ color: '#fbbf24', fontSize: '0.85rem', marginBottom: '6px' }}>📌 {pedido.notas_entrega}</div>
+            <div style={{ color: '#fbbf24', fontSize: '0.85rem', marginBottom: '6px' }}>{pedido.notas_entrega}</div>
           )}
           <div style={{ color: '#9ca3af', fontSize: '0.85rem' }}>
             Plataforma: <span style={{ color: '#f3f4f6' }}>{pedido.canal_nombre || 'N/A'}</span>
@@ -120,7 +120,7 @@ export function DeliveryOrderDetailModal({ pedido, onClose }: DeliveryOrderDetai
                 <h4 style={{ margin: '0 0 10px 0', color: '#9ca3af', fontSize: '0.9rem', textTransform: 'uppercase' }}>Pagos registrados:</h4>
                 {detail.pagos.map((p, i) => (
                   <div key={i} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.95rem' }}>
-                    <span style={{ textTransform: 'capitalize' }}>✅ {p.metodo}</span>
+                    <span style={{ textTransform: 'capitalize' }}> {p.metodo}</span>
                     <span>${p.monto_recibido.toFixed(2)}</span>
                   </div>
                 ))}

@@ -6,6 +6,7 @@ import { PaymentModal, type PaymentData } from '../components/PaymentModal'
 import { TicketReceipt } from '../components/TicketReceipt'
 import { PinPadModal } from '../components/PinPadModal'
 import { useActiveOrder } from '../hooks/useActiveOrder' // <-- ¡Aquí está el import que faltaba!
+import { ScreenHeader } from '../components/ScreenHeader'
 
 // Componente KitchenCommand local
 // eslint-disable-next-line react/prop-types
@@ -76,17 +77,14 @@ const totalRestante = Math.max(0, order.totalCalculado - order.totalPagado)
   }
 
   return (
-    <div style={{ display: 'flex', height: '100vh', backgroundColor: '#111', color: 'white' }}>
-      
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', backgroundColor: '#111', color: 'white' }}>
+
+      <ScreenHeader title={`Mesa ${tableId}`} onBack={onBack} backLabel="Volver al Mapa" />
+
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+
       {/* SECCIÓN IZQUIERDA: Menú de Productos */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-        <div style={{ padding: '20px', backgroundColor: '#1a1a1a', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #333' }}>
-          <button onClick={onBack} style={{ background: 'transparent', color: '#9ca3af', border: 'none', cursor: 'pointer', fontSize: '1.2rem', fontWeight: 'bold' }}>
-            ← Volver al Mapa
-          </button>
-          <h2 style={{ margin: 0, color: '#f97316' }}>Mesa {tableId}</h2>
-          <div style={{ width: '100px' }}></div>
-        </div>
 
         <div style={{ flex: 1, padding: '30px', overflowY: 'auto' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '20px' }}>
@@ -144,6 +142,8 @@ const totalRestante = Math.max(0, order.totalCalculado - order.totalPagado)
           onCancelOrder={requestCancel} 
           orderStatus={order.orderStatus}
         />
+      </div>
+
       </div>
 
       {/* MODALES */}

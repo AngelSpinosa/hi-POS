@@ -145,8 +145,8 @@ export function ProductManagement() {
   }
 
   const handleSaveClick = () => {
-    if (!formName.trim() || formPrice === '') { alert('⚠️ Por favor ingresa el nombre y el precio.'); return; }
-    if (Number(formPrice) < 0) { alert('⚠️ El precio no puede ser negativo.'); return; }
+    if (!formName.trim() || formPrice === '') { alert('Por favor ingresa el nombre y el precio.'); return; }
+    if (Number(formPrice) < 0) { alert('El precio no puede ser negativo.'); return; }
     
     const actionToExecute = async () => {
       const channel = editingId ? 'update-product' : 'create-product'

@@ -83,10 +83,10 @@ export function Settings({ onBack }: SettingsProps) {
       const resetRes = await window.electron.ipcRenderer.invoke('reset-database', resetOptions);
       if (resetRes.success) {
         setIsResetModalOpen(false);
-        alert('✅ Sistema restablecido con éxito. Volviendo al menú principal.');
+        alert('Sistema restablecido con éxito. Volviendo al menú principal.');
         onBack(); 
-      } else { alert('❌ Ocurrió un error al restablecer: ' + resetRes.error); }
-    } else { alert('⛔ PIN Incorrecto o no cuentas con permisos suficientes.'); }
+      } else { alert('Ocurrió un error al restablecer: ' + resetRes.error); }
+    } else { alert('PIN Incorrecto o no cuentas con permisos suficientes.'); }
   }
 
   const handleConfirmResetRequest = () => {
@@ -100,17 +100,17 @@ export function Settings({ onBack }: SettingsProps) {
     // @ts-ignore
     const res = await window.electron.ipcRenderer.invoke('export-database');
     if (res.canceled) return;
-    if (res.success) alert('✅ Respaldo exportado correctamente. Guarda este archivo en un lugar seguro.');
-    else alert('❌ Ocurrió un error al exportar: ' + res.error);
+    if (res.success) alert('Respaldo exportado correctamente. Guarda este archivo en un lugar seguro.');
+    else alert('Ocurrió un error al exportar: ' + res.error);
   }
 
   const handleImportBackup = async () => {
-    const confirmacion = window.confirm('⚠️ ATENCIÓN: Importar un respaldo SOBRESCRIBIRÁ TODA tu información actual.\n\n¿Estás completamente seguro de continuar?');
+    const confirmacion = window.confirm('ATENCIÓN: Importar un respaldo SOBRESCRIBIRÁ TODA tu información actual.\n\n¿Estás completamente seguro de continuar?');
     if (!confirmacion) return;
     // @ts-ignore
     const res = await window.electron.ipcRenderer.invoke('import-database');
     if (res.canceled) return;
-    if (!res.success) alert('❌ Ocurrió un error al importar: ' + res.error);
+    if (!res.success) alert('Ocurrió un error al importar: ' + res.error);
   }
 
   const handleUpdateLicense = async () => {
@@ -118,8 +118,8 @@ export function Settings({ onBack }: SettingsProps) {
     // @ts-ignore
     const res = await window.electron.ipcRenderer.invoke('license:activate', { code: newLicenseCode });
     if (res.success) {
-      alert("✅ Licencia validada y activada correctamente."); setIsLicenseModalOpen(false); setNewLicenseCode(''); fetchLicenseInfo(); 
-    } else { alert("❌ Error: " + res.error); }
+      alert("Licencia validada y activada correctamente."); setIsLicenseModalOpen(false); setNewLicenseCode(''); fetchLicenseInfo(); 
+    } else { alert("Error: " + res.error); }
   }
 
   const handleSelectLogo = async () => {
@@ -136,8 +136,8 @@ export function Settings({ onBack }: SettingsProps) {
     if (res.success) {
       document.documentElement.style.setProperty('--color-primary', colorPrimary);
       document.documentElement.style.setProperty('--color-secondary', colorSecondary);
-      alert('✅ Identidad visual actualizada. Los cambios ya se reflejaron en el sistema.');
-    } else { alert('❌ Error al guardar la configuración: ' + res.error); }
+      alert('Identidad visual actualizada. Los cambios ya se reflejaron en el sistema.');
+    } else { alert('Error al guardar la configuración: ' + res.error); }
   }
 
   // --- FUNCIONES DE MESAS ---
@@ -145,18 +145,18 @@ export function Settings({ onBack }: SettingsProps) {
     // @ts-ignore
     const res = await window.electron.ipcRenderer.invoke('add-table');
     if (res.success) setActiveTablesCount(prev => prev + 1);
-    else alert('❌ Error: ' + res.error);
+    else alert('Error: ' + res.error);
   }
 
   const handleRemoveTable = async () => {
     if (activeTablesCount <= 1) {
-      alert('⚠️ No puedes eliminar todas las mesas. Debes tener al menos 1.'); return;
+      alert('No puedes eliminar todas las mesas. Debes tener al menos 1.'); return;
     }
     if (confirm('¿Estás seguro de eliminar la última mesa del sistema?')) {
       // @ts-ignore
       const res = await window.electron.ipcRenderer.invoke('remove-last-table');
       if (res.success) setActiveTablesCount(prev => prev - 1);
-      else alert('❌ No se pudo eliminar: ' + res.error);
+      else alert('No se pudo eliminar: ' + res.error);
     }
   }
 
@@ -176,8 +176,8 @@ export function Settings({ onBack }: SettingsProps) {
   }
 
   const handleSaveCanal = async () => {
-    if (!canalNombre.trim()) { alert('⚠️ Ingresa el nombre de la plataforma'); return; }
-    if (canalComision === '' || Number(canalComision) < 0) { alert('⚠️ Ingresa una comisión válida'); return; }
+    if (!canalNombre.trim()) { alert('Ingresa el nombre de la plataforma'); return; }
+    if (canalComision === '' || Number(canalComision) < 0) { alert('Ingresa una comisión válida'); return; }
 
     if (editingCanalId) {
       // @ts-ignore
@@ -185,14 +185,14 @@ export function Settings({ onBack }: SettingsProps) {
         id: editingCanalId, nombre: canalNombre, comisionPorcentaje: Number(canalComision)
       })
       if (res.success) { resetCanalForm(); fetchCanalesDelivery(); }
-      else alert('❌ Error al actualizar: ' + res.error)
+      else alert('Error al actualizar: ' + res.error)
     } else {
       // @ts-ignore
       const res = await window.electron.ipcRenderer.invoke('create-canal-delivery', {
         nombre: canalNombre, comisionPorcentaje: Number(canalComision)
       })
       if (res.success) { resetCanalForm(); fetchCanalesDelivery(); }
-      else alert('❌ Error al crear: ' + res.error)
+      else alert('Error al crear: ' + res.error)
     }
   }
 
@@ -201,10 +201,10 @@ export function Settings({ onBack }: SettingsProps) {
     // @ts-ignore
     const res = await window.electron.ipcRenderer.invoke('delete-canal-delivery', { id: canal.id })
     if (res.success) {
-      if (res.softDeleted) alert('⚠️ Esta plataforma ya tiene pedidos registrados, así que se desactivó en lugar de borrarse.')
+      if (res.softDeleted) alert('Esta plataforma ya tiene pedidos registrados, así que se desactivó en lugar de borrarse.')
       fetchCanalesDelivery()
     } else {
-      alert('❌ No se pudo eliminar: ' + res.error)
+      alert('No se pudo eliminar: ' + res.error)
     }
   }
 
@@ -212,7 +212,7 @@ export function Settings({ onBack }: SettingsProps) {
     // @ts-ignore
     const res = await window.electron.ipcRenderer.invoke('activate-canal-delivery', { id: canal.id })
     if (res.success) fetchCanalesDelivery()
-    else alert('❌ No se pudo activar: ' + res.error)
+    else alert('No se pudo activar: ' + res.error)
   }
 
  // ==============================================
@@ -655,7 +655,7 @@ export function Settings({ onBack }: SettingsProps) {
       )}
 
       {/* MODAL PIN DE AUTORIZACIÓN */}
-      <PinPadModal title="Autorizar Acción 🛡️" isOpen={isPinModalOpen} onClose={() => setIsPinModalOpen(false)} onVerify={executeReset} />
+      <PinPadModal title="Autorizar Acción" isOpen={isPinModalOpen} onClose={() => setIsPinModalOpen(false)} onVerify={executeReset} />
     </div>
   )
 }

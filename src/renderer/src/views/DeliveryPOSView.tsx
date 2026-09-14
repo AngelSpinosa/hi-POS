@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
 import type { Producto } from '../types/db'
 import { OrderCart } from '../components/OrderCart'
+import { PaymentModal, type PaymentData } from '../components/PaymentModal'
 import { TicketReceipt } from '../components/TicketReceipt'
 import { PinPadModal } from '../components/PinPadModal'
 import { ShippingInfoModal } from '../components/ShippingInfoModal'
+import { ScreenHeader } from '../components/ScreenHeader'
 import { useDeliveryOrder } from '../hooks/useDeliveryOrder'
 
 // Igual que en POSView.tsx: modal simple para mostrar lo que se manda a cocina
@@ -60,17 +62,15 @@ export function DeliveryPOSView({ userId, onBack }: DeliveryPOSViewProps) {
   }
 
   return (
-    <div style={{ display: 'flex', height: '100vh', backgroundColor: '#111', color: 'white' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', backgroundColor: '#111', color: 'white' }}>
+
+      <ScreenHeader title={`Envío #${order.activeOrderId ? order.activeOrderId.toString().padStart(4, '0') : '...'}`} onBack={onBack} />
+
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
 
       {/* SECCIÓN IZQUIERDA: Menú de Productos (idéntico a POSView.tsx) */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-        <div style={{ padding: '20px', backgroundColor: '#1a1a1a', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #333' }}>
-          <button onClick={onBack} style={{ background: 'transparent', color: '#9ca3af', border: 'none', cursor: 'pointer', fontSize: '1.2rem', fontWeight: 'bold' }}>
-            ← Menú principal
-          </button>
-          <h2 style={{ margin: 0, color: '#f97316' }}>Envío #{order.activeOrderId ? order.activeOrderId.toString().padStart(4, '0') : '...'}</h2>
-          <div style={{ width: '100px' }}></div>
-        </div>
+
 
         <div style={{ flex: 1, padding: '30px', overflowY: 'auto' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '20px' }}>
@@ -126,11 +126,11 @@ export function DeliveryPOSView({ userId, onBack }: DeliveryPOSViewProps) {
           onFinalizePayment={() => {}}
           onCancelOrder={requestCancel}
           // No hay flujo de "cuenta_solicitada" en domicilio: en cuanto hay items,
-          // el único botón relevante es "Generar comanda" — ahora abre primero el
-          // formulario de datos de envío, y hasta confirmarlo se manda la comanda
-          // a cocina y se registra el auto-cobro, todo junto.
+          // el único botón relevante es "Generar comanda" (dispara todo el flujo de envío + cobro)
           orderStatus="abierta"
         />
+      </div>
+
       </div>
 
       {/* MODALES */}
@@ -142,6 +142,15 @@ export function DeliveryPOSView({ userId, onBack }: DeliveryPOSViewProps) {
         isOpen={order.isShippingModalOpen}
         onClose={() => order.setIsShippingModalOpen(false)}
         onConfirm={order.confirmShipping}
+      />
+
+      <PaymentModal
+        isOpen={order.isPaymentModalOpen}
+        totalOriginal={order.totalConEnvio}
+        totalRestante={order.totalConEnvio}
+        cart={order.cart}
+        onClose={() => order.setIsPaymentModalOpen(false)}
+        onConfirmPayment={(paymentData: PaymentData) => order.confirmPaymentAndCreate(paymentData)}
       />
 
       {order.ticketData && (

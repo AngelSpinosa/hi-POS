@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import type { AppConfig } from '../types/db'
+import { DashboardHeader } from '../components/DashboardHeader'
 
 // Importación de Íconos SVG locales
 import IconTable from '../assets/icons/TableRestaurant.svg'
@@ -9,6 +10,7 @@ import IconUsers from '../assets/icons/Users.svg'
 import IconSettings from '../assets/icons/Settings.svg'
 import IconDelivery from '../assets/icons/bike.svg' // Añadido para Envíos
 import IconDiscount from '../assets/icons/Discount.svg' // Añadido para Descuentos
+import IconTakeaway from '../assets/icons/takeout.svg' // Añadido para Para llevar
 import IconLogout from '../assets/icons/Logout.svg'
 import IconClose from '../assets/icons/Close.svg'
 
@@ -20,25 +22,10 @@ interface DashboardProps {
 }
 
 export function Dashboard({ onNavigate, licenseInfo, appConfig }: DashboardProps) {
-  const [time, setTime] = useState(new Date())
-  
   // VERIFICAR ESTADO GUARDADO EN LOCALSTORAGE PARA OCULTAR EL BANNER
   const [showDemoBanner, setShowDemoBanner] = useState(() => {
     return localStorage.getItem('hideDemoBanner') !== 'true'
   })
-
-  useEffect(() => {
-    const timer = setInterval(() => setTime(new Date()), 1000)
-    return () => clearInterval(timer)
-  }, [])
-
-  const formatTime = (date: Date) => {
-    return date.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
-  }
-
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' })
-  }
 
   // FUNCIÓN PARA CERRAR EL BANNER PERMANENTEMENTE
   const handleDismissBanner = () => {
@@ -70,30 +57,10 @@ export function Dashboard({ onNavigate, licenseInfo, appConfig }: DashboardProps
     }
   }
 
-  const displayBusinessName = appConfig?.business_name ? appConfig.business_name : 'NOMBRE DEL\nNEGOCIO';
-
   return (
     <div className="dashboard-container">
       
-      {/* HEADER: Nombre y Reloj */}
-      <div className="dashboard-header">
-        <div className="header-left">
-          <h1 className="brand-title">
-            {displayBusinessName}
-          </h1>
-          
-          {licenseInfo?.type === 'DEMO' && (
-            <div className="demo-pill">
-              Modo Demo, le quedan {licenseInfo.remainingDays} días de prueba
-            </div>
-          )}
-        </div>
-
-        <div className="time-display">
-          <div className="time-hours">HORA : {formatTime(time)}</div>
-          <div className="time-date">{formatDate(time)}</div>
-        </div>
-      </div>
+      <DashboardHeader appConfig={appConfig} licenseInfo={licenseInfo} />
 
       <div className="dashboard-content">
         {/* GRID DE MÓDULOS */}
@@ -113,16 +80,9 @@ export function Dashboard({ onNavigate, licenseInfo, appConfig }: DashboardProps
             <p className="pos-card-subtitle">Pedidos a domicilio</p>
           </div>
 
-          {/* NUEVO BOTÓN PARA LLEVAR */}
-          {/* No existe un ícono SVG dedicado todavía (ni bag.svg ni door.svg en assets/icons),
-              así que se usa un SVG inline en lugar de importar un archivo que podría no existir.
-              Si luego agregas un ícono propio, basta con reemplazar este <svg> por <img src={IconTakeaway} .../> */}
+          {/* BOTÓN PARA LLEVAR */}
           <div className="pos-card" onClick={() => onNavigate('TAKEAWAY')}>
-            <svg className="pos-card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ width: '48px', height: '48px' }}>
-              <path d="M6 2 L18 2 L20 8 L4 8 Z" strokeLinejoin="round" />
-              <path d="M4 8 L5.5 21 L18.5 21 L20 8" strokeLinejoin="round" />
-              <path d="M9 12 C9 12 9 14 12 14 C15 14 15 12 15 12" strokeLinecap="round" />
-            </svg>
+            <img src={IconTakeaway} alt="Para llevar" className="pos-card-icon" />
             <h2 className="pos-card-title">Para llevar</h2>
             <p className="pos-card-subtitle">Abrir órdenes para llevar</p>
           </div>
@@ -164,7 +124,16 @@ export function Dashboard({ onNavigate, licenseInfo, appConfig }: DashboardProps
 
           {/* BOTÓN SALIR */}
           <div className="pos-card pos-card-danger" onClick={() => window.close()}>
-            <img src={IconLogout} alt="Salir" className="pos-card-icon" />
+            {/* El ícono es un <img src="...svg">, no un SVG inline, así que "color"/"fill"
+                normales no lo tocan — se usa filter para teñirlo del mismo rojo que el
+                borde/texto de pos-card-danger. Si el rojo no calza exacto con tu paleta,
+                puedes regenerar el filter en https://codepen.io/sosuke/pen/Pjoqqp */}
+            <img 
+              src={IconLogout} 
+              alt="Salir" 
+              className="pos-card-icon" 
+              style={{ filter: 'invert(24%) sepia(94%) saturate(4711%) hue-rotate(353deg) brightness(97%) contrast(93%)' }} 
+            />
             <h2 className="pos-card-title">Salir</h2>
             <p className="pos-card-subtitle">Cerrar App</p>
           </div>

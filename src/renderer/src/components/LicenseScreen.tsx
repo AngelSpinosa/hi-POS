@@ -43,7 +43,7 @@ export function LicenseScreen({ onLicenseActivated, reason, onViewReports }: Lic
       const result = await window.electron.ipcRenderer.invoke('license:activate', { code: licenseCode.trim() })
       
       if (result.success) {
-        alert('✅ ¡Licencia activada con éxito!')
+        alert('¡Licencia activada con éxito!')
         onLicenseActivated() 
       } else {
         setErrorMsg(result.error || 'Código de licencia inválido.')
@@ -73,7 +73,7 @@ export function LicenseScreen({ onLicenseActivated, reason, onViewReports }: Lic
     if (reason === 'INVALID_SIGNATURE') return 'La firma de la licencia es inválida o ha sido alterada.'
     
     // NUEVO: Mensaje de castigo para los que modifican la fecha
-    if (isTimeTampering) return '⏳ ALTERACIÓN DE RELOJ DETECTADA ⏳'
+    if (isTimeTampering) return 'ALTERACIÓN DE RELOJ DETECTADA'
     
     return 'Activación de Software Requerida'
   }

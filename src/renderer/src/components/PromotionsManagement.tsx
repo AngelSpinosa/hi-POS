@@ -107,17 +107,17 @@ export function PromotionsManagement() {
 
   // Guardar nueva promoción o actualizar existente
   const handleSavePromocion = async () => {
-    if (!promoName.trim()) { alert('⚠️ Ingresa un nombre para la promoción'); return; }
-    if (!promoValue || Number(promoValue) < 0) { alert('⚠️ Ingresa un valor válido'); return; }
+    if (!promoName.trim()) { alert('Ingresa un nombre para la promoción'); return; }
+    if (!promoValue || Number(promoValue) < 0) { alert('Ingresa un valor válido'); return; }
 
     // Validación específica para '2x1' generalizado (X productos por el precio de Y)
     if (promoType === '2x1') {
-      if (!promoValuePago || Number(promoValuePago) <= 0) { alert('⚠️ Ingresa por el precio de cuántos productos se paga'); return; }
-      if (Number(promoValuePago) >= Number(promoValue)) { alert('⚠️ El "precio de" debe ser menor a la cantidad de productos'); return; }
+      if (!promoValuePago || Number(promoValuePago) <= 0) { alert('Ingresa por el precio de cuántos productos se paga'); return; }
+      if (Number(promoValuePago) >= Number(promoValue)) { alert('El "precio de" debe ser menor a la cantidad de productos'); return; }
     }
     
     // Solo validamos la selección de categoría/producto si estamos creando una nueva
-    if (!editingPromoId && !selectedRefId) { alert(`⚠️ Selecciona un ${applyTo === 'Categorias' ? 'categoría' : 'producto'}`); return; }
+    if (!editingPromoId && !selectedRefId) { alert(`Selecciona un ${applyTo === 'Categorias' ? 'categoría' : 'producto'}`); return; }
 
     if (editingPromoId) {
       // --- LÓGICA PARA ACTUALIZAR ---
@@ -134,11 +134,11 @@ export function PromotionsManagement() {
       // @ts-ignore
       const res = await window.electron.ipcRenderer.invoke('update-promocion', payload)
       if (res.success) {
-        alert('✅ Promoción actualizada exitosamente.')
+        alert('Promoción actualizada exitosamente.')
         handleCloseModal()
         await fetchData()
       } else {
-        alert('❌ Error al actualizar: ' + res.error)
+        alert('Error al actualizar: ' + res.error)
       }
       
     } else {
@@ -158,11 +158,11 @@ export function PromotionsManagement() {
       // @ts-ignore
       const res = await window.electron.ipcRenderer.invoke('create-promocion', payload)
       if (res.success) {
-        alert('✅ Promoción creada exitosamente.')
+        alert('Promoción creada exitosamente.')
         handleCloseModal()
         await fetchData()
       } else {
-        alert('❌ Error al crear promoción: ' + res.error)
+        alert('Error al crear promoción: ' + res.error)
       }
     }
   }

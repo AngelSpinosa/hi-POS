@@ -13,7 +13,8 @@ import { OnboardingWizard } from './components/OnboardingWizard' // NUEVO COMPON
 import { PromotionsManagement } from './components/PromotionsManagement' // IMPORT DE PROMOCIONES
 import { DeliveryBoard } from './components/DeliveryBoard'
 import { DeliveryPOSView } from './views/DeliveryPOSView'
-import { TakeawayPOSView } from './views/TakeAwayPOSView'
+import { TakeawayPOSView } from './views/TakeawayPOSView'
+import { ScreenHeader } from './components/ScreenHeader'
 
 type ViewState = 'DASHBOARD' | 'TABLES' | 'ORDER' | 'REPORT' | 'USERS' | 'PRODUCTS' | 'LICENSE_ERROR' | 'SETTINGS' | 'ONBOARDING' | 'PROMOS' | 'DELIVERY' | 'DELIVERY_ORDER' | 'TAKEAWAY';
 
@@ -25,7 +26,6 @@ interface CurrentUser {
 
 function App() {
   const [view, setView] = useState<ViewState>('DASHBOARD')
-  const [currentTime, setCurrentTime] = useState(new Date())
 
   // NUEVOS ESTADOS DE CONFIGURACIÓN
   const [appConfig, setAppConfig] = useState<AppConfig | null>(null)
@@ -45,11 +45,8 @@ function App() {
   const [pendingView, setPendingView] = useState<ViewState | null>(null)
   const [pendingTableId, setPendingTableId] = useState<number | null>(null)
 
-  // NUEVO: Efecto para mantener el reloj actualizado
-  useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 1000)
-    return () => clearInterval(timer)
-  }, [])
+  // El reloj de App.tsx ya no hace falta: cada pantalla lo maneja por su cuenta
+  // vía useClock (DashboardHeader / ScreenHeader).
 
   // 1. Al abrir la app, primero leemos la configuración
   useEffect(() => {
@@ -246,19 +243,11 @@ function App() {
   if (view === 'REPORT') {
     return (
       <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--color-bg-main, #121212)', color: 'white', fontFamily: 'var(--font-heading, monospace)' }}>
-        <div style={{ padding: '25px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #333' }}>
-          <button onClick={handleBackToDashboard} style={{ background: 'transparent', color: 'white', border: 'none', cursor: 'pointer', fontSize: '1.2rem', fontWeight: 'bold', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span>←</span> {hasValidLicense ? 'Menú principal' : 'Volver a Activación'}
-          </button>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'white', textTransform: 'uppercase' }}>
-              REPORTE DIARIO {hasValidLicense ? '' : '(SOLO LECTURA)'}
-            </div>
-            <div style={{ fontSize: '1.1rem', color: '#F8F3B9', marginTop: '5px', fontWeight: 'bold' }}>
-              HORA : {currentTime.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase()}
-            </div>
-          </div>
-        </div>
+        <ScreenHeader 
+          title={`Reporte diario${hasValidLicense ? '' : ' (solo lectura)'}`} 
+          onBack={handleBackToDashboard} 
+          backLabel={hasValidLicense ? 'Menú principal' : 'Volver a Activación'} 
+        />
         <div style={{ flex: 1 , overflow: 'hidden' }}>
           <DailyReport />
         </div>
@@ -270,16 +259,7 @@ function App() {
     // @ts-ignore
     return (
       <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--color-bg-main, #121212)', color: 'white', fontFamily: 'var(--font-heading, monospace)' }}>
-        <div style={{ padding: '25px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #333' }}>
-          <button onClick={handleBackToDashboard} style={{ background: 'transparent', color: 'white', border: 'none', cursor: 'pointer', fontSize: '1.2rem', fontWeight: 'bold', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span>←</span> Menú principal
-          </button>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'white', textTransform: 'uppercase' }}>
-              GESTIÓN DE PERSONAL
-            </div>
-          </div>
-        </div>
+        <ScreenHeader title="Gestión de Personal" onBack={handleBackToDashboard} />
         <div style={{ flex: 1, overflow: 'hidden' }}>
           <UserManagement onBack={handleBackToDashboard} />
         </div>
@@ -290,16 +270,7 @@ function App() {
   if (view === 'PRODUCTS') {
     return (
       <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--color-bg-main, #121212)', color: 'white', fontFamily: 'var(--font-heading, monospace)' }}>
-        <div style={{ padding: '25px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #333' }}>
-          <button onClick={handleBackToDashboard} style={{ background: 'transparent', color: 'white', border: 'none', cursor: 'pointer', fontSize: '1.2rem', fontWeight: 'bold', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span>←</span> Menú principal
-          </button>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'white', textTransform: 'uppercase' }}>
-              ALMACÉN Y MENÚ
-            </div>
-          </div>
-        </div>
+        <ScreenHeader title="Almacén y Menú" onBack={handleBackToDashboard} />
         <div style={{ flex: 1, overflow: 'hidden' }}>
           <ProductManagement/>
         </div>
@@ -310,16 +281,7 @@ function App() {
   if (view === 'SETTINGS') {
     return (
       <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--color-bg-main, #121212)', color: 'white', fontFamily: 'var(--font-heading, monospace)' }}>
-        <div style={{ padding: '25px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #333' }}>
-          <button onClick={handleBackToDashboard} style={{ background: 'transparent', color: 'white', border: 'none', cursor: 'pointer', fontSize: '1.2rem', fontWeight: 'bold', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span>←</span> Menú principal
-          </button>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'white', textTransform: 'uppercase' }}>
-              CONFIGURACIÓN DEL SISTEMA
-            </div>
-          </div>
-        </div>
+        <ScreenHeader title="Configuración del Sistema" onBack={handleBackToDashboard} />
         <div style={{ flex: 1, overflow: 'hidden' }}>
           <Settings onBack={handleBackToDashboard} />
         </div>
@@ -331,16 +293,7 @@ function App() {
     return (
       <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--color-bg-main, #121212)', color: 'white', fontFamily: 'var(--font-heading, monospace)' }}>
         <PinPadModal title={pinTitle} isOpen={isPinModalOpen} onClose={() => { setIsPinModalOpen(false); setPendingTableId(null); }} onVerify={handlePinVerify} />
-        <div style={{ padding: '25px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #333' }}>
-          <button onClick={handleBackToDashboard} style={{ background: 'transparent', color: 'white', border: 'none', cursor: 'pointer', fontSize: '1.2rem', fontWeight: 'bold', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span>←</span> Menú principal
-          </button>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'white', textTransform: 'uppercase' }}>
-              MAPA DE MESAS
-            </div>
-          </div>
-        </div>
+        <ScreenHeader title="Mapa de Mesas" onBack={handleBackToDashboard} />
         <div style={{ flex: 1, overflow: 'hidden' }}>
           <TableGrid tables={tables} onSelectTable={handleSelectTableRequest} />
         </div>
@@ -364,16 +317,7 @@ function App() {
   if (view === 'PROMOS') {
     return (
       <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--color-bg-main, #121212)', color: 'white', fontFamily: 'var(--font-heading, monospace)' }}>
-        <div style={{ padding: '25px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #333' }}>
-          <button onClick={handleBackToDashboard} style={{ background: 'transparent', color: 'white', border: 'none', cursor: 'pointer', fontSize: '1.2rem', fontWeight: 'bold', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span>←</span> Menú principal
-          </button>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'white', textTransform: 'uppercase' }}>
-              GESTIÓN DE DESCUENTOS
-            </div>
-          </div>
-        </div>
+        <ScreenHeader title="Gestión de Descuentos" onBack={handleBackToDashboard} />
         <div style={{ flex: 1, overflow: 'hidden' }}>
           <PromotionsManagement/>
         </div>
