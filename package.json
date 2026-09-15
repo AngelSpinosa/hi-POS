@@ -24,6 +24,7 @@
     "@electron-toolkit/preload": "^3.0.2",
     "@electron-toolkit/utils": "^4.0.0",
     "better-sqlite3": "^12.6.0",
+    "pdfkit": "^0.20.2",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
@@ -33,6 +34,7 @@
     "@electron/rebuild": "^4.0.2",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^22.19.1",
+    "@types/pdfkit": "^0.17.6",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.1",

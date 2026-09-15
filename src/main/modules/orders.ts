@@ -1,5 +1,4 @@
-import { ipcMain, app } from 'electron'
-import path from 'path'
+import { ipcMain } from 'electron'
 import { db } from '../database'
 import { descontarInventarioPorVenta } from './inventory'
 
@@ -272,7 +271,6 @@ export function registerOrderHandlers() {
     }
   })
 
-  ipcMain.handle('get-tickets-path', () => { return path.join(app.getPath('documents'), 'hi-POS_Tickets'); });
 }
 
 function recalculateOrderTotal(ordenId: number) {

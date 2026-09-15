@@ -253,11 +253,8 @@ export function Settings({ onBack }: SettingsProps) {
       orderId: ticket.id,
       items: ticket.items,
       total: ticket.total,
-      payment: {
-        metodo: ticket.metodo,
-        monto_recibido: ticket.monto_recibido,
-        cambio: ticket.cambio
-      },
+      pagos: ticket.pagos,
+      cajero: ticket.cajero,
       businessName: businessName,
       date: ticket.creado_en
     });

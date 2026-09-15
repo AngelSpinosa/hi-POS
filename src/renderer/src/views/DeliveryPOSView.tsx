@@ -33,7 +33,19 @@ interface DeliveryPOSViewProps {
 export function DeliveryPOSView({ userId, onBack }: DeliveryPOSViewProps) {
   const order = useDeliveryOrder(userId)
   const [products, setProducts] = useState<Producto[]>([])
+  const [businessName, setBusinessName] = useState('')
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false)
+
+  useEffect(() => {
+    // Cargamos el nombre del negocio configurado, para que el ticket impreso
+    // lo use en vez del valor por defecto "MI NEGOCIO POS"
+    // @ts-ignore
+    window.electron.ipcRenderer.invoke('get-app-config').then((res) => {
+      if (res && res.success && res.data) {
+        setBusinessName(res.data.business_name || '')
+      }
+    })
+  }, [])
 
   useEffect(() => {
     // Mismo endpoint que POSView.tsx: cruza productos con recetas e insumos
@@ -59,6 +71,30 @@ export function DeliveryPOSView({ userId, onBack }: DeliveryPOSViewProps) {
   const handleTicketClose = () => {
     order.setTicketData(null)
     onBack()
+  }
+
+  const handlePrintTicket = async () => {
+    if (order.ticketData) {
+      try {
+        // @ts-ignore
+        const res = await window.electron.ipcRenderer.invoke('generate-ticket-pdf', {
+          orderId: order.ticketData.orderId,
+          items: order.ticketData.items,
+          total: order.ticketData.total,
+          subtotal: order.orderTotal + order.descuentoTotal,
+          descuento: order.descuentoTotal,
+          pagos: order.ticketData.pagos,
+          businessName: businessName
+        })
+        if (!res || !res.success) {
+          alert('❌ Error al generar el ticket: ' + (res?.error || 'Desconocido'))
+        }
+      } catch (e) {
+        console.error('Error al imprimir ticket:', e)
+        alert('❌ Ocurrió un error al intentar imprimir el ticket.')
+      }
+    }
+    handleTicketClose()
   }
 
   return (
@@ -158,9 +194,11 @@ export function DeliveryPOSView({ userId, onBack }: DeliveryPOSViewProps) {
           orderId={order.ticketData.orderId}
           items={order.ticketData.items}
           total={order.ticketData.total}
+          subtotal={order.orderTotal + order.descuentoTotal}
+          descuento={order.descuentoTotal}
           pagos={order.ticketData.pagos}
           onClose={handleTicketClose}
-          onPrint={handleTicketClose}
+          onPrint={handlePrintTicket}
         />
       )}
 

@@ -34,9 +34,21 @@ interface POSViewProps {
 export function POSView({ tableId, userId, onBack }: POSViewProps) {
   const order = useActiveOrder(tableId, userId)
   const [products, setProducts] = useState<Producto[]>([])
+  const [businessName, setBusinessName] = useState('')
   
   // Estado para cancelar
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false)
+
+  useEffect(() => {
+    // Cargamos el nombre del negocio configurado, para que el ticket impreso
+    // lo use en vez del valor por defecto "MI NEGOCIO POS"
+    // @ts-ignore
+    window.electron.ipcRenderer.invoke('get-app-config').then((res) => {
+      if (res && res.success && res.data) {
+        setBusinessName(res.data.business_name || '')
+      }
+    })
+  }, [])
 
   useEffect(() => {
     // LLamamos al endpoint que cruza productos con recetas e insumos
@@ -74,6 +86,33 @@ const totalRestante = Math.max(0, order.totalCalculado - order.totalPagado)
   const handleTicketClose = () => {
     order.setTicketData(null)
     onBack() 
+  }
+
+  // Genera el PDF del ticket recién cobrado y lo abre para imprimir
+  const handlePrintTicket = async () => {
+    if (order.ticketData) {
+      try {
+        // @ts-ignore
+        const res = await window.electron.ipcRenderer.invoke('generate-ticket-pdf', {
+          orderId: order.ticketData.orderId,
+          items: order.ticketData.items,
+          total: order.ticketData.total,
+          subtotal: order.subtotal,
+          descuento: order.descuentoTotal,
+          promos: order.promosAplicadas,
+          pagos: order.ticketData.pagos,
+          cajero: order.ticketData.cajero,
+          businessName: businessName
+        })
+        if (!res || !res.success) {
+          alert('❌ Error al generar el ticket: ' + (res?.error || 'Desconocido'))
+        }
+      } catch (e) {
+        console.error('Error al imprimir ticket:', e)
+        alert('❌ Ocurrió un error al intentar imprimir el ticket.')
+      }
+    }
+    handleTicketClose()
   }
 
   return (
@@ -171,7 +210,7 @@ const totalRestante = Math.max(0, order.totalCalculado - order.totalPagado)
           pagos={order.ticketData.pagos}
           cajero={order.ticketData.cajero}
           onClose={handleTicketClose}
-          onPrint={handleTicketClose}
+          onPrint={handlePrintTicket}
         />
       )}
 

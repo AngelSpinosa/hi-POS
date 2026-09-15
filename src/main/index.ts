@@ -17,6 +17,7 @@ import { registerConfigHandlers } from './modules/config'
 import { registerSetupHandlers } from './modules/setup'
 import { registerDeliveryHandlers } from './modules/delivery'
 import { registerTakeawayHandlers } from './modules/takeaway'
+import { registerPrinterHandlers } from './modules/printer'
 
 
 function createWindow(): void {
@@ -68,6 +69,7 @@ app.whenReady().then(() => {
   registerSetupHandlers()
   registerDeliveryHandlers()
   registerTakeawayHandlers()
+  registerPrinterHandlers()
 
   // 4. Crear Ventana
   app.on('browser-window-created', (_, window) => { optimizer.watchWindowShortcuts(window) })
