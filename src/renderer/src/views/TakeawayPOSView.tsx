@@ -91,11 +91,11 @@ export function TakeawayPOSView({ userId, onBack }: TakeawayPOSViewProps) {
           businessName: businessName
         })
         if (!res || !res.success) {
-          alert('❌ Error al generar el ticket: ' + (res?.error || 'Desconocido'))
+          alert('Error al generar el ticket: ' + (res?.error || 'Desconocido'))
         }
       } catch (e) {
         console.error('Error al imprimir ticket:', e)
-        alert('❌ Ocurrió un error al intentar imprimir el ticket.')
+        alert('Ocurrió un error al intentar imprimir el ticket.')
       }
     }
     handleTicketClose()
@@ -200,7 +200,7 @@ export function TakeawayPOSView({ userId, onBack }: TakeawayPOSViewProps) {
       )}
 
       <PinPadModal
-        title="Autorizar Cancelación 🗑️"
+        title="Autorizar Cancelación"
         isOpen={isCancelModalOpen}
         onClose={() => setIsCancelModalOpen(false)}
         onVerify={handleCancelConfirm}

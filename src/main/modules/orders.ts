@@ -22,7 +22,7 @@ export function registerOrderHandlers() {
       const productos = stmt.all() as any[]
       return productos.map(p => ({ ...p, disponible: p.disponible === 1 }))
     } catch (error) { 
-      console.error("❌ Error en get-productos-pos:", error);
+      console.error("Error en get-productos-pos:", error);
       return [] 
     }
   })

@@ -8,6 +8,7 @@ export interface ShippingData {
   direccionEnvio: string;
   canalDeliveryId: number;
   costoEnvio: number;
+  notasEntrega: string;
 }
 
 // A diferencia de useActiveOrder.ts (mesas), este hook NO duplica el motor de
@@ -54,12 +55,12 @@ export function useDeliveryOrder(userId?: number) {
   }, [activeOrderId])
 
   const addToCart = async (product: Producto) => {
-    if (!activeOrderId) { alert('⚠️ La orden no se generó correctamente. Sal y vuelve a entrar.'); return; }
+    if (!activeOrderId) { alert('La orden no se generó correctamente. Sal y vuelve a entrar.'); return; }
     try {
       // @ts-ignore
       const result = await window.electron.ipcRenderer.invoke('add-order-item', { ordenId: activeOrderId, product })
       if (result && result.success) await refreshOrder()
-      else alert('❌ Error al añadir el producto: ' + (result?.error || 'Desconocido'))
+      else alert('Error al añadir el producto: ' + (result?.error || 'Desconocido'))
     } catch (e) { console.error(e) }
   }
 
@@ -113,6 +114,7 @@ export function useDeliveryOrder(userId?: number) {
         direccionEnvio: pendingShipping.direccionEnvio,
         canalDeliveryId: pendingShipping.canalDeliveryId,
         costoEnvio: pendingShipping.costoEnvio,
+        notasEntrega: pendingShipping.notasEntrega,
         payment: { method: paymentData.method, received: paymentData.received }
       })
 
@@ -143,7 +145,7 @@ export function useDeliveryOrder(userId?: number) {
       // @ts-ignore
       const result = await window.electron.ipcRenderer.invoke('cancel-order', { orderId: activeOrderId, pin })
       if (result && result.success) return true
-      alert('❌ No se pudo cancelar: ' + (result?.error || 'PIN incorrecto o sin permisos'))
+      alert('No se pudo cancelar: ' + (result?.error || 'PIN incorrecto o sin permisos'))
       return false
     } catch (e) { return false }
   }

@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react'
 import { PinPadModal } from './PinPadModal'
+import editIcon from '../assets/icons/Edit.svg'
+import trashIcon from '../assets/icons/trash.svg'
+import restaurarIcon from '../assets/icons/restaurar.svg'
 
 interface SettingsProps {
   onBack: () => void;
@@ -535,11 +538,17 @@ export function Settings({ onBack }: SettingsProps) {
                           <div style={{ display: 'flex', gap: '12px' }}>
                             {canal.activo ? (
                               <>
-                                <button onClick={() => handleStartEditCanal(canal)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '1.1rem' }} title="Editar">✏️</button>
-                                <button onClick={() => handleDeleteCanal(canal)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '1.1rem' }} title="Eliminar">🗑️</button>
+                                <button onClick={() => handleStartEditCanal(canal)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 0, display: 'flex' }} title="Editar">
+                                  <img src={editIcon} alt="Editar" style={{ width: '18px', height: '18px' }} />
+                                </button>
+                                <button onClick={() => handleDeleteCanal(canal)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 0, display: 'flex' }} title="Eliminar">
+                                  <img src={trashIcon} alt="Eliminar" style={{ width: '18px', height: '18px', filter: 'invert(29%) sepia(94%) saturate(1946%) hue-rotate(340deg) brightness(89%) contrast(96%)' }} />
+                                </button>
                               </>
                             ) : (
-                              <button onClick={() => handleActivateCanal(canal)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '1.1rem' }} title="Activar">♻️</button>
+                              <button onClick={() => handleActivateCanal(canal)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 0, display: 'flex' }} title="Activar">
+                                <img src={restaurarIcon} alt="Activar" style={{ width: '18px', height: '18px', filter: 'invert(64%) sepia(60%) saturate(478%) hue-rotate(93deg) brightness(92%) contrast(92%)' }} />
+                              </button>
                             )}
                           </div>
                         </td>

@@ -3,7 +3,7 @@ import { db } from '../database'
 import * as crypto from 'crypto'
 import * as os from 'os'
 
-// ✅ SEGURIDAD NIVEL 2: CRIPTOGRAFÍA ASIMÉTRICA (RSA)
+// SEGURIDAD NIVEL 2: CRIPTOGRAFÍA ASIMÉTRICA (RSA)
 const PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAsl3gFJNZs+9p7B4krtfH
 OXjVA3Acptl5gAdmAV2XLipOufrWJK1l+48p2uaYjZeplI+aHukxhP0PMPwQdxE2
@@ -55,7 +55,7 @@ export function registerLicenseHandlers() {
     if (!db) return { valid: false, error: 'DB_ERROR' }
 
     try {
-      // 🛡️ ANTI-FRAUDE PASO 1: Crear tabla oculta si no existe
+      // ANTI-FRAUDE PASO 1: Crear tabla oculta si no existe
       db.prepare('CREATE TABLE IF NOT EXISTS security_config (id TEXT PRIMARY KEY, value TEXT)').run()
 
       const lic = db.prepare('SELECT * FROM licencia WHERE activa = 1 ORDER BY id DESC LIMIT 1').get() as any
@@ -76,7 +76,7 @@ export function registerLicenseHandlers() {
         return { valid: false, reason: 'INVALID_SIGNATURE', deviceId: currentDeviceId }
       }
 
-      // 🛡️ ANTI-FRAUDE PASO 2: Verificar alteración del reloj (Time Tampering)
+      // ANTI-FRAUDE PASO 2: Verificar alteración del reloj (Time Tampering)
       const now = new Date()
       const currentTimeMs = now.getTime()
 
@@ -113,7 +113,7 @@ export function registerLicenseHandlers() {
         remainingDays = Math.max(0, Math.floor(diffTime / (1000 * 60 * 60 * 24)));
       }
 
-      // 🛡️ ANTI-FRAUDE PASO 3: El tiempo es legal, guardar este nuevo momento en la historia
+      // ANTI-FRAUDE PASO 3: El tiempo es legal, guardar este nuevo momento en la historia
       // CORRECCIÓN: Usar parámetros ? para ambos valores
       db.prepare('INSERT OR REPLACE INTO security_config (id, value) VALUES (?, ?)').run('last_valid_time', currentTimeMs.toString())
 
@@ -160,7 +160,7 @@ export function registerLicenseHandlers() {
           VALUES (?, ?, ?, ?, ?, 1)
         `).run(code, tipo, deviceId, expiraEn, firma)
         
-        // 🛡️ NUEVO: "Perdonar" la alteración de tiempo al activar una licencia exitosamente.
+        // NUEVO: "Perdonar" la alteración de tiempo al activar una licencia exitosamente.
         // CORRECCIÓN: Usar parámetro ? para evitar error de comillas
         db.prepare('DELETE FROM security_config WHERE id = ?').run('last_valid_time')
       })

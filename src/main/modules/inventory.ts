@@ -81,7 +81,7 @@ export function registrarMovimiento(movimiento: Omit<movimiento_inventario, 'id'
 }
 
 // ==========================================
-// 📊 NUEVO: HISTORIAL DE MOVIMIENTOS
+// HISTORIAL DE MOVIMIENTOS
 // ==========================================
 
 export function getMovimientosInventario(): any[] {
@@ -97,7 +97,7 @@ export function getMovimientosInventario(): any[] {
 
 
 // ==========================================
-// 🍕 GESTIÓN DE RECETAS (CU-44)
+// GESTIÓN DE RECETAS (CU-44)
 // ==========================================
 
 export function getRecetaByProducto(productoId: number): any[] {
@@ -131,7 +131,7 @@ export function saveRecetaProducto(productoId: number, ingredientes: Omit<receta
 }
 
 /**
- * 🚀 FUNCIÓN MAESTRA (CU-44): Descuenta los insumos automáticamente según la receta de los productos vendidos.
+ * FUNCIÓN MAESTRA (CU-44): Descuenta los insumos automáticamente según la receta de los productos vendidos.
  * Esta función debe ser llamada desde tu módulo de órdenes cuando se confirma un pago.
  */
 export function descontarInventarioPorVenta(itemsVendidos: { producto_id: number; cantidad: number }[]): void {

@@ -192,7 +192,7 @@ function App() {
   if (isConfigLoading || isCheckingLicense) {
     return (
       <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: '#111', color: 'white', alignItems: 'center', justifyContent: 'center' }}>
-        <h1 style={{ color: 'var(--color-primary, #f97316)', marginBottom: '20px' }}>CARGANDO... 🍕</h1>
+        <h1 style={{ color: 'var(--color-primary, #f97316)', marginBottom: '20px' }}>CARGANDO...</h1>
       </div>
     )
   }

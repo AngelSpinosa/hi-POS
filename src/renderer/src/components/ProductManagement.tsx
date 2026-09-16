@@ -159,8 +159,8 @@ export function ProductManagement() {
       
       // @ts-ignore
       const res = await window.electron.ipcRenderer.invoke(channel, payload)
-      if (res.success) { setIsEditing(false); await fetchData(); alert('✅ Guardado.'); } 
-      else { alert('❌ Error: ' + res.error); }
+      if (res.success) { setIsEditing(false); await fetchData(); alert('Guardado.'); } 
+      else { alert('Error: ' + res.error); }
     }
     setPendingAction(() => actionToExecute); setIsPinModalOpen(true);
   }
@@ -169,7 +169,7 @@ export function ProductManagement() {
     const action = async () => {
       // @ts-ignore
       const res = await window.electron.ipcRenderer.invoke('toggle-product-status', { id, active: currentStatus ? 0 : 1 })
-      if (res.success) { await fetchData(); alert(currentStatus ? '🔴 Desactivado' : '🟢 Activado'); }
+      if (res.success) { await fetchData(); alert(currentStatus ? 'Desactivado' : 'Activado'); }
     }
     setPendingAction(() => action); setIsPinModalOpen(true);
   }
@@ -188,7 +188,7 @@ export function ProductManagement() {
   }
 
 const handleSaveCategoryClick = () => {
-    if (!formCategoryName.trim()) { alert('⚠️ Por favor ingresa un nombre para la categoría.'); return; }
+    if (!formCategoryName.trim()) { alert('Por favor ingresa un nombre para la categoría.'); return; }
     
     const actionToExecute = async () => {
       // 1. Ya NO hay alert de "Próximamente" aquí
@@ -202,9 +202,9 @@ const handleSaveCategoryClick = () => {
       if (res.success) { 
         setIsEditingCategory(false); 
         await fetchData(); 
-        alert('✅ Categoría guardada.');
+        alert('Categoría guardada.');
       } else { 
-        alert('❌ Error: ' + res.error); 
+        alert('Error: ' + res.error); 
       }
     }
     setPendingAction(() => actionToExecute); setIsPinModalOpen(true);
@@ -218,7 +218,7 @@ const handleSaveCategoryClick = () => {
       
       if (res.success) { 
         await fetchData(); 
-        alert(currentStatus ? '🔴 Categoría desactivada' : '🟢 Categoría activada');
+        alert(currentStatus ? 'Categoría desactivada' : 'Categoría activada');
       }
     }
     setPendingAction(() => action); setIsPinModalOpen(true);
@@ -234,13 +234,13 @@ const handleSaveCategoryClick = () => {
   }
 
   const handleSaveInsumoClick = () => {
-    if (!formInsumoCodigo.trim() || !formInsumoNombre.trim() || formInsumoStock === '' || formInsumoStockMinimo === '') { alert('⚠️ Completa los campos.'); return; }
+    if (!formInsumoCodigo.trim() || !formInsumoNombre.trim() || formInsumoStock === '' || formInsumoStockMinimo === '') { alert('Completa los campos.'); return; }
     const actionToExecute = async () => {
       const payload = { id: editingInsumoId, codigo: formInsumoCodigo.toUpperCase(), nombre: formInsumoNombre, unidad_medida: formInsumoUnidad, stock_actual: Number(formInsumoStock), stock_minimo: Number(formInsumoStockMinimo) }
       // @ts-ignore
       const res = await window.electron.ipcRenderer.invoke(editingInsumoId ? 'update-insumo' : 'create-insumo', payload)
-      if (res.success) { setIsEditingInsumo(false); await fetchData(); alert('✅ Guardado.'); } 
-      else { alert('❌ Error: ' + res.error); }
+      if (res.success) { setIsEditingInsumo(false); await fetchData(); alert('Guardado.'); } 
+      else { alert('Error: ' + res.error); }
     }
     setPendingAction(() => actionToExecute); setIsPinModalOpen(true);
   }
@@ -280,7 +280,7 @@ const handleSaveCategoryClick = () => {
       const payload = { productoId: recipeProductId, ingredientes: recipeItems.map(item => ({ insumo_id: item.insumo_id, cantidad_requerida: item.cantidad_requerida })) };
       // @ts-ignore
       const res = await window.electron.ipcRenderer.invoke('save-receta', payload);
-      if (res.success) { setIsRecipeModalOpen(false); alert('✅ Receta guardada y lista para automatización.'); } else { alert('❌ Error: ' + res.error); }
+      if (res.success) { setIsRecipeModalOpen(false); alert('Receta guardada y lista para automatización.'); } else { alert('Error: ' + res.error); }
     }
     setPendingAction(() => actionToExecute); setIsPinModalOpen(true);
   }
@@ -291,14 +291,14 @@ const handleSaveCategoryClick = () => {
   }
 
   const handleSaveMovement = () => {
-    if (!movementCantidad || Number(movementCantidad) <= 0 || !movementMotivo.trim()) { alert('⚠️ Por favor ingresa una cantidad válida y un motivo.'); return; }
-    if (movementType === 'MERMA' && movementInsumo && Number(movementCantidad) > movementInsumo.stock_actual) { alert('⚠️ No puedes mermar más del stock actual.'); return; }
+    if (!movementCantidad || Number(movementCantidad) <= 0 || !movementMotivo.trim()) { alert('Por favor ingresa una cantidad válida y un motivo.'); return; }
+    if (movementType === 'MERMA' && movementInsumo && Number(movementCantidad) > movementInsumo.stock_actual) { alert('No puedes mermar más del stock actual.'); return; }
 
     const actionToExecute = async () => {
       const payload = { insumo_id: movementInsumo?.id, tipo: movementType, cantidad: Number(movementCantidad), motivo: movementMotivo };
       // @ts-ignore
       const res = await window.electron.ipcRenderer.invoke('register-movement', payload);
-      if (res.success) { setIsMovementModalOpen(false); await fetchData(); alert(`✅ ${movementType === 'ENTRADA' ? 'Reabasto' : 'Merma'} registrado correctamente.`); } else { alert('❌ Error al registrar movimiento: ' + res.error); }
+      if (res.success) { setIsMovementModalOpen(false); await fetchData(); alert(` ${movementType === 'ENTRADA' ? 'Reabasto' : 'Merma'} registrado correctamente.`); } else { alert('Error al registrar movimiento: ' + res.error); }
     }
     setPendingAction(() => actionToExecute); setIsPinModalOpen(true); 
   }
@@ -311,7 +311,7 @@ const handleSaveCategoryClick = () => {
       setIsPinModalOpen(false)
       if (pendingAction) { await pendingAction() }
       setPendingAction(null)
-    } else { alert('⛔ PIN Incorrecto o sin permisos.') }
+    } else { alert('PIN Incorrecto o sin permisos.') }
   }
 
   return (
@@ -671,7 +671,7 @@ const handleSaveCategoryClick = () => {
 
       {/* (EL RESTO DE TUS MODALES SIGUEN IGUAL AQUÍ, SE OMITEN EN EL RESUMEN POR ESPACIO PERO DEBEN IR EN TU ARCHIVO) */}
       
-      <PinPadModal title="Autorización 🛡️" isOpen={isPinModalOpen} onClose={() => setIsPinModalOpen(false)} onVerify={handlePinVerified} />
+      <PinPadModal title="Autorización" isOpen={isPinModalOpen} onClose={() => setIsPinModalOpen(false)} onVerify={handlePinVerified} />
 
       <style>{`
         .custom-table { width: 100%; border-collapse: collapse; text-align: center; }

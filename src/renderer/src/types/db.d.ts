@@ -163,7 +163,7 @@ export interface PedidoDomicilio extends OrdenDomicilio {
 }
 
 // ==========================================
-// 📦 NUEVAS ENTIDADES: PROMOCIONES
+// NUEVAS ENTIDADES: PROMOCIONES
 // ==========================================
 
 export interface Promocion {

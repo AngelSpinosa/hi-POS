@@ -135,13 +135,13 @@ export function useActiveOrder(tableId: number, userId?: number) {
 
   // --- ACCIONES DEL CARRITO ---
   const addToCart = async (product: Producto) => {
-    if (!activeOrderId) { alert('⚠️ La orden no se generó correctamente. Sal al menú de mesas y vuelve a entrar.'); return; }
-    if (orderStatus === 'cuenta_solicitada') { alert('⚠️ No se pueden añadir productos, la cuenta ya fue solicitada.'); return; }
+    if (!activeOrderId) { alert('La orden no se generó correctamente. Sal al menú de mesas y vuelve a entrar.'); return; }
+    if (orderStatus === 'cuenta_solicitada') { alert('No se pueden añadir productos, la cuenta ya fue solicitada.'); return; }
     try {
       // @ts-ignore
       const result = await window.electron.ipcRenderer.invoke('add-order-item', { ordenId: activeOrderId, product })
       if (result && result.success) await fetchOrder()
-      else alert('❌ Error al añadir el producto: ' + (result?.error || 'Desconocido'))
+      else alert('Error al añadir el producto: ' + (result?.error || 'Desconocido'))
     } catch (e) { console.error('Error:', e) }
   }
 
@@ -206,7 +206,7 @@ export function useActiveOrder(tableId: number, userId?: number) {
           return true
         } else {
           await fetchOrder()
-          alert(`✅ Pago parcial de $${paymentData.amountToPay.toFixed(2)} registrado con éxito.\nRestan: $${result.remaining.toFixed(2)} por cobrar.`)
+          alert(`Pago parcial de $${paymentData.amountToPay.toFixed(2)} registrado con éxito.\nRestan: $${result.remaining.toFixed(2)} por cobrar.`)
           return true
         }
       }
@@ -229,7 +229,7 @@ export function useActiveOrder(tableId: number, userId?: number) {
         setOrderStatus('abierta')
         return true
       }
-      alert('❌ No se pudo cancelar: ' + (result?.error || 'PIN incorrecto o sin permisos'))
+      alert('No se pudo cancelar: ' + (result?.error || 'PIN incorrecto o sin permisos'))
       return false
     } catch (error) { return false }
   }

@@ -238,7 +238,7 @@ return (
 
       {/* MODAL DE SEGURIDAD PARA CONFIRMAR EDICIÓN */}
       <PinPadModal 
-        title="Autorización de Admin Requerida 🛡️"
+        title="Autorización de Admin Requerida"
         isOpen={isPinModalOpen}
         onClose={() => setIsPinModalOpen(false)}
         onVerify={handlePinVerify}

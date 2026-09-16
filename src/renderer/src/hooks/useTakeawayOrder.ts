@@ -46,12 +46,12 @@ export function useTakeawayOrder(userId?: number) {
   }, [activeOrderId])
 
   const addToCart = async (product: Producto) => {
-    if (!activeOrderId) { alert('⚠️ La orden no se generó correctamente. Sal y vuelve a entrar.'); return; }
+    if (!activeOrderId) { alert('La orden no se generó correctamente. Sal y vuelve a entrar.'); return; }
     try {
       // @ts-ignore
       const result = await window.electron.ipcRenderer.invoke('add-order-item', { ordenId: activeOrderId, product })
       if (result && result.success) await refreshOrder()
-      else alert('❌ Error al añadir el producto: ' + (result?.error || 'Desconocido'))
+      else alert('Error al añadir el producto: ' + (result?.error || 'Desconocido'))
     } catch (e) { console.error(e) }
   }
 
@@ -74,7 +74,7 @@ export function useTakeawayOrder(userId?: number) {
   // cajero tenga que dar un tercer paso extra (a diferencia de mesas).
   const generateCommand = async () => {
     if (!activeOrderId) return
-    if (cart.length === 0) { alert('⚠️ Agrega al menos un producto antes de generar la comanda.'); return; }
+    if (cart.length === 0) { alert('Agrega al menos un producto antes de generar la comanda.'); return; }
     try {
       // @ts-ignore
       const res = await window.electron.ipcRenderer.invoke('print-command', { ordenId: activeOrderId })
@@ -122,7 +122,7 @@ export function useTakeawayOrder(userId?: number) {
       // @ts-ignore
       const result = await window.electron.ipcRenderer.invoke('cancel-order', { orderId: activeOrderId, pin })
       if (result && result.success) return true
-      alert('❌ No se pudo cancelar: ' + (result?.error || 'PIN incorrecto o sin permisos'))
+      alert('No se pudo cancelar: ' + (result?.error || 'PIN incorrecto o sin permisos'))
       return false
     } catch (e) { return false }
   }
