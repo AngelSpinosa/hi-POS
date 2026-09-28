@@ -1,4 +1,4 @@
-import { ipcMain, app, shell } from 'electron'
+import { ipcMain, app, BrowserWindow } from 'electron'
 import path from 'path'
 import fs from 'fs'
 import PDFDocument from 'pdfkit'
@@ -7,6 +7,14 @@ import { db } from '../database'
 function getTicketsDir(): string {
   return path.join(app.getPath('documents'), 'hi-POS_Tickets')
 }
+
+// DIAGNÓSTICO TEMPORAL: cambia a true, reinicia y prueba una venta. Si con
+// el diálogo visible SÍ se ve el contenido del ticket (no en blanco), el
+// problema es específico del modo silencioso (tamaño de página / driver).
+// Si el diálogo también muestra el ticket en blanco, el problema está en la
+// generación del HTML o en cómo se está cargando en la ventana oculta.
+// Vuelve a poner esto en false para producción.
+const DEBUG_SHOW_PRINT_DIALOG = false
 
 // Ancho de papel térmico en puntos PDF (1mm ≈ 2.83465pt).
 // La impresora del usuario es de 58mm, no 80mm — si algún día cambian de
@@ -131,6 +139,140 @@ function buildTicketPdf(filePath: string, data: any): Promise<void> {
 
 export function registerPrinterHandlers() {
 
+// Genera una versión HTML del mismo ticket, pensada solo para imprimir
+// (no se guarda en disco). Usamos HTML en vez del PDF generado por pdfkit
+// porque Electron no renderiza PDFs de forma confiable dentro de una
+// BrowserWindow oculta (el visor embebido de Chromium requiere el plugin
+// del PDF y aun así puede no estar listo cuando se dispara la impresión).
+// HTML normal, en cambio, imprime sin ningún tipo de intermediario.
+function buildTicketHtml(data: any): string {
+  const { orderId, items, total, subtotal, descuento, promos, pagos, businessName, cajero, date } = data
+
+  const esc = (s: any) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string))
+
+  const itemsHtml = (items || []).map((item: any) => {
+    const lineTotal = (item.precio * item.cantidad).toFixed(2)
+    const descuentoHtml = item.descuento_aplicado > 0
+      ? `<div class="sub">${esc(item.promocion_nombre || 'Promoción')} -$${Number(item.descuento_aplicado).toFixed(2)}</div>`
+      : ''
+    return `
+      <div class="row bold">
+        <span>${esc(item.cantidad)}x ${esc(item.nombre)}</span>
+        <span>$${lineTotal}</span>
+      </div>
+      ${descuentoHtml}
+    `
+  }).join('')
+
+  const descuentoHtml = (descuento && descuento > 0) ? `
+    <div class="row"><span>SUBTOTAL:</span><span>$${Number(subtotal || 0).toFixed(2)}</span></div>
+    <div class="row sub"><span>DESC (${esc((promos || []).join(', '))}):</span><span>-$${Number(descuento).toFixed(2)}</span></div>
+  ` : ''
+
+  const pagosHtml = (pagos && pagos.length > 0) ? `
+    <div class="dashed"></div>
+    ${pagos.map((pago: any) => {
+      const monto = Number(pago.monto ?? pago.monto_recibido ?? 0)
+      const cambioHtml = pago.cambio > 0 ? `<div class="row muted"><span>Cambio</span><span>$${Number(pago.cambio).toFixed(2)}</span></div>` : ''
+      return `<div class="row"><span>PAGO (${esc(String(pago.metodo || '').toUpperCase())})</span><span>$${monto.toFixed(2)}</span></div>${cambioHtml}`
+    }).join('')}
+  ` : ''
+
+  const fecha = date ? new Date(date).toLocaleString('es-MX') : new Date().toLocaleString('es-MX')
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  @page { size: 58mm 210mm; margin: 6mm; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Courier New', Courier, monospace;
+    font-weight: bold;
+    font-size: 10px;
+    color: #000;
+    margin: 0;
+    padding: 0;
+  }
+  .center { text-align: center; }
+  .title { font-size: 13px; margin-bottom: 4px; }
+  .meta { font-size: 9px; margin-bottom: 2px; }
+  .dashed { border-top: 1px dashed #000; margin: 6px 0; }
+  .row { display: flex; justify-content: space-between; gap: 6px; margin: 2px 0; }
+  .row.bold { font-weight: bold; }
+  .sub { font-size: 9px; color: #444; margin: 0 0 3px 0; }
+  .muted { color: #444; }
+  .total { font-size: 13px; font-weight: bold; text-align: right; margin: 6px 0; }
+</style>
+</head>
+<body>
+  <div class="center title">${esc(businessName || 'MI NEGOCIO POS')}</div>
+  <div class="center meta">Ticket #${esc(orderId)}</div>
+  <div class="center meta">Cajero: ${esc(cajero || 'Admin')}</div>
+  <div class="center meta">${esc(fecha)}</div>
+  <div class="dashed"></div>
+  ${itemsHtml}
+  <div class="dashed"></div>
+  ${descuentoHtml}
+  <div class="total">TOTAL: $${Number(total || 0).toFixed(2)}</div>
+  ${pagosHtml}
+</body>
+</html>`
+}
+
+// Imprime el ticket directo a la impresora predeterminada del sistema, sin
+// abrir ningún visor externo ni mostrar diálogo alguno. Escribe un HTML
+// temporal, lo carga en una ventana de Electron invisible, y llama a
+// webContents.print() en modo silencioso.
+function printTicketSilently(data: any): Promise<{ success: boolean; error?: string }> {
+  return new Promise((resolve) => {
+    const tmpDir = app.getPath('temp')
+    const tmpFile = path.join(tmpDir, `hipos_print_${Date.now()}.html`)
+    fs.writeFileSync(tmpFile, buildTicketHtml(data), 'utf-8')
+
+    const cleanup = () => { try { fs.unlinkSync(tmpFile) } catch { /* noop */ } }
+
+    const printWindow = new BrowserWindow({
+      show: false,
+      webPreferences: { sandbox: false }
+    })
+
+    printWindow.webContents.on('did-finish-load', () => {
+      printWindow.webContents.print(
+        {
+          silent: DEBUG_SHOW_PRINT_DIALOG ? false : true,
+          printBackground: true,
+          margins: { marginType: 'none' },
+          // Tamaño de página en micrones (1mm = 1000 micrones). Sin diálogo de
+          // por medio, Electron puede ignorar el @page del CSS y usar Carta/A4
+          // por defecto — hay que forzarlo aquí explícitamente al tamaño real
+          // del rollo térmico (58mm de ancho).
+          pageSize: { width: 58000, height: 210000 },
+          // Replica el control de "Escala" que el usuario tuvo que bajar manualmente
+          // en el diálogo de Chrome para que el PDF cupiera sin recortes: el área
+          // imprimible real de esta térmica es más angosta que los 58mm nominales.
+          scaleFactor: 90
+        },
+        (success, failureReason) => {
+          printWindow.close()
+          cleanup()
+          if (success) resolve({ success: true })
+          else resolve({ success: false, error: failureReason })
+        }
+      )
+    })
+
+    printWindow.webContents.on('did-fail-load', (_e, _code, desc) => {
+      printWindow.close()
+      cleanup()
+      resolve({ success: false, error: desc })
+    })
+
+    printWindow.loadFile(tmpFile)
+  })
+}
+
   // Ruta donde se guardan los PDFs de tickets (ya la usaba Settings.tsx)
   ipcMain.handle('get-tickets-path', () => getTicketsDir())
 
@@ -151,9 +293,13 @@ export function registerPrinterHandlers() {
       const filePath = path.join(dir, `ticket_${payload.orderId}_${Date.now()}.pdf`)
       await buildTicketPdf(filePath, payload)
 
-      // Abrimos el PDF con el visor predeterminado del sistema — desde ahí
-      // el usuario manda a imprimir con Ctrl+P como con cualquier PDF.
-      await shell.openPath(filePath)
+      // Imprimimos directo a la impresora predeterminada, sin abrir ningún
+      // visor externo ni mostrar diálogo de impresión.
+      const printResult = await printTicketSilently(payload)
+      if (!printResult.success) {
+        console.error('Error al imprimir el ticket:', printResult.error)
+        return { success: false, error: printResult.error || 'No se pudo imprimir el ticket', path: filePath }
+      }
 
       return { success: true, path: filePath }
     } catch (error: any) {

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 interface PinPadModalProps {
   title?: string;
@@ -9,8 +9,6 @@ interface PinPadModalProps {
 
 export function PinPadModal({ title = "Ingrese su PIN", isOpen, onClose, onVerify }: PinPadModalProps) {
   const [pin, setPin] = useState('')
-
-  if (!isOpen) return null;
 
   const handleNumClick = (num: string) => {
     if (pin.length < 4) { // Limitamos a 4 dígitos por seguridad visual
@@ -27,6 +25,33 @@ export function PinPadModal({ title = "Ingrese su PIN", isOpen, onClose, onVerif
       setPin('') // Limpiar para el siguiente intento
     }
   }
+
+  // Soporte de teclado físico: números 0-9, Backspace para borrar, Enter para confirmar.
+  // Se activa solo mientras el modal está abierto, para no interceptar teclas en el resto de la app.
+  useEffect(() => {
+    if (!isOpen) return
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key >= '0' && e.key <= '9') {
+        e.preventDefault()
+        handleNumClick(e.key)
+      } else if (e.key === 'Backspace') {
+        e.preventDefault()
+        handleBackspace()
+      } else if (e.key === 'Enter') {
+        e.preventDefault()
+        handleSubmit()
+      } else if (e.key === 'Escape') {
+        e.preventDefault()
+        onClose()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isOpen, pin])
+
+  if (!isOpen) return null;
 
   return (
     <div style={{
