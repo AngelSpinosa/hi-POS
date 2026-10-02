@@ -47,13 +47,10 @@ function buildTicketPdf(filePath: string, data: any): Promise<void> {
     const left = doc.page.margins.left
     const contentWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right
 
-    // Escribe una línea a todo el ancho, siempre anclada al margen izquierdo.
     const line = (text: string, opts: any = {}) => {
       doc.text(text, left, doc.y, { width: contentWidth, ...opts })
     }
 
-    // Escribe una fila de dos columnas (ej. "3x KEKE" ... "$300.00") en el mismo
-    // renglón, calculando manualmente el siguiente Y para que no queden desalineadas.
     const row = (leftText: string, rightText: string, opts: { leftWidth?: number; fontSize?: number; bold?: boolean } = {}) => {
       const fontSize = opts.fontSize ?? 8
       const leftWidth = opts.leftWidth ?? contentWidth * 0.58
@@ -137,9 +134,7 @@ function buildTicketPdf(filePath: string, data: any): Promise<void> {
   })
 }
 
-export function registerPrinterHandlers() {
-
-// Genera una versión HTML del mismo ticket, pensada solo para imprimir
+// Genera una versión HTML del ticket de venta, pensada solo para imprimir
 // (no se guarda en disco). Usamos HTML en vez del PDF generado por pdfkit
 // porque Electron no renderiza PDFs de forma confiable dentro de una
 // BrowserWindow oculta (el visor embebido de Chromium requiere el plugin
@@ -221,15 +216,62 @@ function buildTicketHtml(data: any): string {
 </html>`
 }
 
-// Imprime el ticket directo a la impresora predeterminada del sistema, sin
-// abrir ningún visor externo ni mostrar diálogo alguno. Escribe un HTML
-// temporal, lo carga en una ventana de Electron invisible, y llama a
-// webContents.print() en modo silencioso.
-function printTicketSilently(data: any): Promise<{ success: boolean; error?: string }> {
+// Genera una versión HTML de la comanda de cocina: solo lista de productos
+// con checkbox, sin precios ni pagos. Se usa cuando se manda la orden a
+// cocina (generateCommand en los hooks), independiente del ticket de venta.
+function buildComandaHtml(data: any): string {
+  const { label, items, orderId, date } = data
+
+  const esc = (s: any) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string))
+
+  const itemsHtml = (items || []).map((item: any) => `
+    <div class="item">[&nbsp;&nbsp;] ${esc(item.cantidad)} x ${esc(item.nombre)}</div>
+  `).join('')
+
+  const fecha = date ? new Date(date).toLocaleString('es-MX') : new Date().toLocaleString('es-MX')
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  @page { size: 58mm 210mm; margin: 6mm; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Courier New', Courier, monospace;
+    font-weight: bold;
+    font-size: 9px;
+    color: #000;
+    margin: 0;
+    padding: 0;
+  }
+  .center { text-align: center; }
+  .title { font-size: 11px; margin-bottom: 4px; }
+  .meta { font-size: 8px; margin-bottom: 2px; }
+  .dashed { border-top: 1px dashed #000; margin: 8px 0; }
+  .item { font-size: 10px; margin: 8px 0; line-height: 1.4; }
+</style>
+</head>
+<body>
+  <div class="center title">COCINA - ${esc(label || '')}</div>
+  ${orderId ? `<div class="center meta">Orden #${esc(orderId)}</div>` : ''}
+  <div class="center meta">${esc(fecha)}</div>
+  <div class="dashed"></div>
+  ${itemsHtml}
+</body>
+</html>`
+}
+
+// Imprime un HTML directo a la impresora predeterminada del sistema, sin
+// abrir ningún visor externo ni mostrar diálogo alguno (salvo que
+// DEBUG_SHOW_PRINT_DIALOG esté activo). Escribe un HTML temporal, lo carga
+// en una ventana de Electron invisible, y llama a webContents.print().
+// Genérica: la usan tanto el ticket de venta como la comanda de cocina.
+function printHtmlSilently(html: string): Promise<{ success: boolean; error?: string }> {
   return new Promise((resolve) => {
     const tmpDir = app.getPath('temp')
-    const tmpFile = path.join(tmpDir, `hipos_print_${Date.now()}.html`)
-    fs.writeFileSync(tmpFile, buildTicketHtml(data), 'utf-8')
+    const tmpFile = path.join(tmpDir, `hipos_print_${Date.now()}_${Math.random().toString(36).slice(2)}.html`)
+    fs.writeFileSync(tmpFile, html, 'utf-8')
 
     const cleanup = () => { try { fs.unlinkSync(tmpFile) } catch { /* noop */ } }
 
@@ -249,10 +291,7 @@ function printTicketSilently(data: any): Promise<{ success: boolean; error?: str
           // por defecto — hay que forzarlo aquí explícitamente al tamaño real
           // del rollo térmico (58mm de ancho).
           pageSize: { width: 58000, height: 210000 },
-          // Replica el control de "Escala" que el usuario tuvo que bajar manualmente
-          // en el diálogo de Chrome para que el PDF cupiera sin recortes: el área
-          // imprimible real de esta térmica es más angosta que los 58mm nominales.
-          scaleFactor: 90
+          scaleFactor: 100
         },
         (success, failureReason) => {
           printWindow.close()
@@ -273,11 +312,13 @@ function printTicketSilently(data: any): Promise<{ success: boolean; error?: str
   })
 }
 
+export function registerPrinterHandlers() {
+
   // Ruta donde se guardan los PDFs de tickets (ya la usaba Settings.tsx)
   ipcMain.handle('get-tickets-path', () => getTicketsDir())
 
   // ==========================================
-  // GENERAR / REGENERAR PDF DE UN TICKET
+  // GENERAR / REGENERAR PDF DE UN TICKET DE VENTA
   // Se llama desde TicketReceipt (venta recién cobrada) y desde
   // Settings > Historial de tickets (reimpresión).
   // ==========================================
@@ -295,7 +336,7 @@ function printTicketSilently(data: any): Promise<{ success: boolean; error?: str
 
       // Imprimimos directo a la impresora predeterminada, sin abrir ningún
       // visor externo ni mostrar diálogo de impresión.
-      const printResult = await printTicketSilently(payload)
+      const printResult = await printHtmlSilently(buildTicketHtml(payload))
       if (!printResult.success) {
         console.error('Error al imprimir el ticket:', printResult.error)
         return { success: false, error: printResult.error || 'No se pudo imprimir el ticket', path: filePath }
@@ -304,6 +345,31 @@ function printTicketSilently(data: any): Promise<{ success: boolean; error?: str
       return { success: true, path: filePath }
     } catch (error: any) {
       console.error('Error generando ticket PDF:', error)
+      return { success: false, error: error.message }
+    }
+  })
+
+  // ==========================================
+  // IMPRIMIR COMANDA DE COCINA
+  // Se llama desde ComandaReceipt cuando el cajero/mesero manda la orden a
+  // cocina. A diferencia del ticket de venta, no se guarda en disco — es
+  // solo para imprimir en el momento.
+  // ==========================================
+  ipcMain.handle('generate-comanda-pdf', async (_, payload) => {
+    try {
+      if (!payload || !payload.items || payload.items.length === 0) {
+        return { success: false, error: 'Faltan datos de la comanda' }
+      }
+
+      const printResult = await printHtmlSilently(buildComandaHtml(payload))
+      if (!printResult.success) {
+        console.error('Error al imprimir la comanda:', printResult.error)
+        return { success: false, error: printResult.error || 'No se pudo imprimir la comanda' }
+      }
+
+      return { success: true }
+    } catch (error: any) {
+      console.error('Error generando comanda:', error)
       return { success: false, error: error.message }
     }
   })

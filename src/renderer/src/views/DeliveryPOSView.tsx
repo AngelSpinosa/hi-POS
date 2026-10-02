@@ -3,27 +3,11 @@ import type { Producto } from '../types/db'
 import { OrderCart } from '../components/OrderCart'
 import { PaymentModal, type PaymentData } from '../components/PaymentModal'
 import { TicketReceipt } from '../components/TicketReceipt'
+import { ComandaReceipt } from '../components/ComandaReceipt'
 import { PinPadModal } from '../components/PinPadModal'
 import { ShippingInfoModal } from '../components/ShippingInfoModal'
 import { ScreenHeader } from '../components/ScreenHeader'
 import { useDeliveryOrder } from '../hooks/useDeliveryOrder'
-
-// Igual que en POSView.tsx: modal simple para mostrar lo que se manda a cocina
-// eslint-disable-next-line react/prop-types
-function KitchenCommand({ items, onClose }: any) {
-  return (
-    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.8)', zIndex: 3000, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-      <div style={{ backgroundColor: '#fff', color: '#000', padding: '20px', width: '250px', fontFamily: 'monospace' }}>
-        <h3 style={{ textAlign: 'center', borderBottom: '2px dashed #000' }}>COCINA - DOMICILIO</h3>
-        {/* eslint-disable-next-line react/prop-types */}
-        {items.map((item: any, idx: number) => (
-          <div key={idx} style={{ fontSize: '1.2rem', margin: '10px 0' }}>[ ] {item.cantidad} x {item.nombre}</div>
-        ))}
-        <button onClick={onClose} style={{ width: '100%', marginTop: '20px', padding: '10px', background: '#000', color: '#fff', border: 'none', cursor: 'pointer' }}>OK</button>
-      </div>
-    </div>
-  )
-}
 
 interface DeliveryPOSViewProps {
   userId?: number;
@@ -36,16 +20,7 @@ export function DeliveryPOSView({ userId, onBack }: DeliveryPOSViewProps) {
   const [businessName, setBusinessName] = useState('')
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false)
 
-  useEffect(() => {
-    // Cargamos el nombre del negocio configurado, para que el ticket impreso
-    // lo use en vez del valor por defecto "MI NEGOCIO POS"
-    // @ts-ignore
-    window.electron.ipcRenderer.invoke('get-app-config').then((res) => {
-      if (res && res.success && res.data) {
-        setBusinessName(res.data.business_name || '')
-      }
-    })
-  }, [])
+  const etiqueta = `Domicilio #${order.activeOrderId ? order.activeOrderId.toString().padStart(4, '0') : '...'}`
 
   useEffect(() => {
     // Mismo endpoint que POSView.tsx: cruza productos con recetas e insumos
@@ -54,6 +29,17 @@ export function DeliveryPOSView({ userId, onBack }: DeliveryPOSViewProps) {
       if (Array.isArray(res)) {
         // @ts-ignore
         setProducts(res.filter(p => p.active == 1 || p.active === true))
+      }
+    })
+  }, [])
+
+  useEffect(() => {
+    // Cargamos el nombre del negocio configurado, para que el ticket impreso
+    // lo use en vez del valor por defecto "MI NEGOCIO POS"
+    // @ts-ignore
+    window.electron.ipcRenderer.invoke('get-app-config').then((res) => {
+      if (res && res.success && res.data) {
+        setBusinessName(res.data.business_name || '')
       }
     })
   }, [])
@@ -87,20 +73,39 @@ export function DeliveryPOSView({ userId, onBack }: DeliveryPOSViewProps) {
           businessName: businessName
         })
         if (!res || !res.success) {
-          alert('Error al generar el ticket: ' + (res?.error || 'Desconocido'))
+          alert('❌ Error al generar el ticket: ' + (res?.error || 'Desconocido'))
         }
       } catch (e) {
         console.error('Error al imprimir ticket:', e)
-        alert('currió un error al intentar imprimir el ticket.')
+        alert('❌ Ocurrió un error al intentar imprimir el ticket.')
       }
     }
     handleTicketClose()
   }
 
+  // Imprime la comanda de cocina para el pedido de domicilio
+  const handlePrintComanda = async () => {
+    if (!order.kitchenData) return
+    try {
+      // @ts-ignore
+      const res = await window.electron.ipcRenderer.invoke('generate-comanda-pdf', {
+        label: etiqueta,
+        orderId: order.activeOrderId,
+        items: order.kitchenData.items
+      })
+      if (!res || !res.success) {
+        alert('❌ Error al imprimir la comanda: ' + (res?.error || 'Desconocido'))
+      }
+    } catch (e) {
+      console.error('Error al imprimir comanda:', e)
+      alert('❌ Ocurrió un error al intentar imprimir la comanda.')
+    }
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', backgroundColor: '#111', color: 'white' }}>
 
-      <ScreenHeader title={`Envío #${order.activeOrderId ? order.activeOrderId.toString().padStart(4, '0') : '...'}`} onBack={onBack} />
+      <ScreenHeader title={etiqueta} onBack={onBack} />
 
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
 
@@ -171,7 +176,13 @@ export function DeliveryPOSView({ userId, onBack }: DeliveryPOSViewProps) {
 
       {/* MODALES */}
       {order.kitchenData && (
-        <KitchenCommand items={order.kitchenData.items} onClose={() => order.setKitchenData(null)} />
+        <ComandaReceipt
+          label={etiqueta}
+          orderId={order.activeOrderId ?? undefined}
+          items={order.kitchenData.items}
+          onClose={() => order.setKitchenData(null)}
+          onPrint={handlePrintComanda}
+        />
       )}
 
       <ShippingInfoModal

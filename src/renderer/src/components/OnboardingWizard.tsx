@@ -145,7 +145,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: '20px' }}>
         
         <div style={{ 
-          width: '650px', 
+          width: '760px', 
           backgroundColor: '#161616', 
           borderRadius: '16px', 
           padding: '40px 50px', 
@@ -231,7 +231,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
               
               <div style={{ display: 'flex', gap: '20px', marginBottom: '30px' }}>
                 <div style={{ flex: 1, textAlign: 'left' }}>
-                  <label style={{ display: 'block', marginBottom: '10px', fontSize: '1rem' }}>Mesas</label>
+                  <label style={{ display: 'flex', alignItems: 'flex-end', minHeight: '2.6em', lineHeight: '1.3', marginBottom: '10px', fontSize: '1rem' }}>Mesas</label>
                   <input 
                     type="number" min="1" value={numMesas} onChange={e => setNumMesas(parseInt(e.target.value) || 0)}
                     placeholder="Selecciona la cantidad de mesas"
@@ -239,7 +239,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                   />
                 </div>
                 <div style={{ flex: 1, textAlign: 'left' }}>
-                  <label style={{ display: 'block', marginBottom: '10px', fontSize: '1rem' }}>PIN Admin (de 1 a 6 dígitos)</label>
+                  <label style={{ display: 'flex', alignItems: 'flex-end', minHeight: '2.6em', lineHeight: '1.3', marginBottom: '10px', fontSize: '1rem' }}>PIN Admin (de 1 a 6 dígitos)</label>
                   <input 
                     type="password" maxLength={6} value={adminPin} onChange={e => setAdminPin(e.target.value)}
                     placeholder="----"
@@ -251,21 +251,21 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
               <div style={{ border: '1px solid #444', borderRadius: '12px', padding: '25px', marginBottom: '40px' }}>
                 <h3 style={{ textAlign: 'center', margin: '0 0 20px 0', fontSize: '1.3rem', fontWeight: 'normal' }}>Personal adicional (opcional)</h3>
                 
-                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '20px' }}>
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '20px' }}>
                   <input 
                     type="text" placeholder="Nombre" value={empNombre} onChange={e => setEmpNombre(e.target.value)}
-                    style={{ flex: 1.5, height: '42px', padding: '0 12px', borderRadius: '6px', border: '1px solid #555', background: 'transparent', color: 'white', fontFamily: 'inherit', boxSizing: 'border-box', outline: 'none' }}
+                    style={{ flex: '2 1 0', minWidth: 0, height: '42px', padding: '0 12px', borderRadius: '6px', border: '1px solid #555', background: 'transparent', color: 'white', fontFamily: 'inherit', boxSizing: 'border-box', outline: 'none' }}
                   />
                   <select 
                     value={empRol} onChange={e => setEmpRol(e.target.value)}
-                    style={{ flex: 1.5, height: '42px', padding: '0 12px', borderRadius: '6px', border: '1px solid #555', background: 'transparent', color: 'white', fontFamily: 'inherit', appearance: 'none', boxSizing: 'border-box', outline: 'none' }}
+                    style={{ flex: '1.4 1 0', minWidth: 0, height: '42px', padding: '0 12px', borderRadius: '6px', border: '1px solid #555', background: 'transparent', color: 'white', fontFamily: 'inherit', appearance: 'none', boxSizing: 'border-box', outline: 'none' }}
                   >
                     <option value="cajero" style={{ background: '#1a1a1a' }}>Mesero/Cajero</option>
                     <option value="admin" style={{ background: '#1a1a1a' }}>Administrador</option>
                   </select>
                   <input 
                     type="password" placeholder="PIN" maxLength={6} value={empPin} onChange={e => setEmpPin(e.target.value)}
-                    style={{ flex: 1, height: '42px', padding: '0 12px', borderRadius: '6px', border: '1px solid #555', background: 'transparent', color: 'white', fontFamily: 'inherit', textAlign: 'center', boxSizing: 'border-box', outline: 'none' }}
+                    style={{ flex: '0 1 90px', minWidth: '70px', height: '42px', padding: '0 12px', borderRadius: '6px', border: '1px solid #555', background: 'transparent', color: 'white', fontFamily: 'inherit', textAlign: 'center', boxSizing: 'border-box', outline: 'none' }}
                   />
                   <button 
                     onClick={handleAddEmpleado} 

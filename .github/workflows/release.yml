@@ -1,0 +1,70 @@
+name: Build y publicar release
+
+# Se ejecuta al subir un tag que empiece con "v" (ej. v1.1.0)
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            script: build:win
+            files: |
+              dist/*.exe
+          - os: ubuntu-latest
+            script: build:linux
+            files: |
+              dist/*.AppImage
+              dist/*.deb
+          - os: macos-latest
+            script: build:mac
+            files: |
+              dist/*.dmg
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      # --publish never: electron-builder solo compila, la publicación la hace el job "release"
+      - run: npm run ${{ matrix.script }} -- --publish never
+        env:
+          # Sin certificado de firma por ahora
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: instalador-${{ matrix.os }}
+          path: ${{ matrix.files }}
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: instaladores
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          # ⚠️ Cambia por tu repo público de releases
+          repository: AngelSpinosa/hipos-releases
+          token: ${{ secrets.RELEASES_TOKEN }}
+          tag_name: ${{ github.ref_name }}
+          name: hi-POS ${{ github.ref_name }}
+          generate_release_notes: true
+          files: instaladores/*
